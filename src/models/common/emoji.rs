@@ -1,9 +1,21 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use crate::{
+use crate::models::{
     common::Snowflake,
     deserialize::{Role, User},
 };
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PartialEmoji {
+    /// [emoji id](https://discord.com/developers/docs/reference#image-formatting)
+    pub id: Option<Snowflake>,
+
+    /// emoji name
+    pub name: Option<String>,
+
+    /// whether this emoji is animated
+    pub animated: Option<bool>,
+}
 
 /// [Emoji Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/emoji#emoji-object)
 #[derive(Debug, Deserialize)]

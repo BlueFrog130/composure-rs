@@ -1,8 +1,9 @@
-use serde::Deserialize;
-use serde_repr::Deserialize_repr;
+use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use crate::{
-    common::Snowflake,
+use crate::models::{
+    common::{Permissions, Snowflake},
     deserialize::{Member, User},
 };
 
@@ -19,7 +20,7 @@ pub struct PartialChannel {
     pub name: Option<String>,
 
     /// computed permissions for the invoking user in the channel, including overwrites, only included when part of the resolved data received on a slash command interaction
-    pub permissions: Option<String>,
+    pub permissions: Option<Permissions>,
 
     /// thread-specific fields not needed by other channels
     pub thread_metadata: Option<ThreadMetadata>,
@@ -111,10 +112,10 @@ pub struct Channel {
     pub default_auto_archive_duration: Option<u32>,
 
     /// computed permissions for the invoking user in the channel, including overwrites, only included when part of the resolved data received on a slash command interaction
-    pub permissions: Option<String>,
+    pub permissions: Option<Permissions>,
 
     /// [channel flags](https://discord.com/developers/docs/resources/channel#channel-object-channel-flags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
-    pub flags: Option<u32>,
+    pub flags: Option<ChannelFlags>,
 
     /// number of messages ever sent in a thread, it's similar to message_count on message creation, but will not decrement the number when a message is deleted
     pub total_message_sent: Option<u32>,
@@ -145,7 +146,7 @@ impl PartialEq for Channel {
 }
 
 /// [Channel Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-channel-types)
-#[derive(Debug, Deserialize_repr, PartialEq, Eq)]
+#[derive(Debug, Deserialize_repr, Serialize_repr, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ChannelType {
     /// a text channel within a server
@@ -195,14 +196,35 @@ pub enum VideoQualityMode {
     Full = 2,
 }
 
-/// [Channel Flags](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-channel-flags)
-#[derive(Debug, Deserialize)]
-pub enum ChannelFlag {
-    /// this thread is pinned to the top of its parent GUILD_FORUM channel
-    Pinned = 1 << 1,
+bitflags! {
+    /// [Channel Flags](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-channel-flags)
+    #[derive(Debug)]
+    pub struct ChannelFlags: u32 {
+        /// this thread is pinned to the top of its parent GUILD_FORUM channel
+        const Pinned = 1 << 1;
 
-    /// whether a tag is required to be specified when creating a thread in a GUILD_FORUM channel. Tags are specified in the applied_tags field.
-    RequireTag = 1 << 4,
+        /// whether a tag is required to be specified when creating a thread in a GUILD_FORUM channel. Tags are specified in the applied_tags field.
+        const RequireTag = 1 << 4;
+    }
+}
+
+impl Serialize for ChannelFlags {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u32(self.bits())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChannelFlags {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bits = u32::deserialize(deserializer)?;
+        Ok(ChannelFlags::from_bits_retain(bits))
+    }
 }
 
 /// [Sort Order Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-sort-order-types)
@@ -239,10 +261,10 @@ pub struct Overwrite {
     pub t: OverwriteType,
 
     /// permission bit set
-    pub allow: String,
+    pub allow: Permissions,
 
     /// permission bit set
-    pub deny: String,
+    pub deny: Permissions,
 }
 
 #[derive(Debug, Deserialize_repr)]
@@ -371,8 +393,6 @@ mod tests {
         }"#;
 
         let channel = serde_json::from_str::<Channel>(channel_json);
-
-        assert!(channel.is_ok());
 
         let channel = channel.unwrap();
 

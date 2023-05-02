@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 
-use crate::{common::Snowflake, deserialize::User};
+use crate::models::{Snowflake, User};
 
 /// [Sticker Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/sticker#sticker-object-sticker-structure)
 #[derive(Debug, Deserialize)]

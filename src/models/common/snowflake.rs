@@ -12,7 +12,7 @@ const TIMESTAMP_SHIFT: u8 = 22;
 const WORKER_SHIFT: u8 = 17;
 const PROCESS_ID_SHIFT: u8 = 12;
 
-#[derive(Debug, Eq)]
+#[derive(Debug, Eq, Clone)]
 pub struct Snowflake {
     pub timestamp: u64,
     worker_id: u8,

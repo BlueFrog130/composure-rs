@@ -1,6 +1,6 @@
 use serde::{de::Visitor, Deserialize};
 
-use crate::common::Snowflake;
+use crate::models::{Permissions, Snowflake};
 
 /// [Role Object](https://discord.comundefinedhttps://discord.com/developers/docs/topics/permissions#role-object)
 #[derive(Debug, Deserialize)]
@@ -27,7 +27,7 @@ pub struct Role {
     pub position: i32,
 
     /// permission bit set
-    pub permissions: String,
+    pub permissions: Permissions,
 
     /// whether this role is managed by an integration
     pub managed: bool,

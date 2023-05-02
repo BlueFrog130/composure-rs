@@ -1,6 +1,9 @@
 use serde::Deserialize;
 
-use crate::{common::Snowflake, Avatar, ImageFormat};
+use crate::models::{
+    common::{Permissions, Snowflake},
+    Avatar, ImageFormat,
+};
 
 /// User object
 #[derive(Debug, Deserialize)]
@@ -76,7 +79,7 @@ pub struct PartialMember {
     pub pending: Option<bool>,
 
     /// total permissions of the member in the channel, including overwrites, returned when in the interaction object
-    pub permissions: String,
+    pub permissions: Permissions,
 }
 
 /// [Guild Member](https://discord.com/developers/docs/resources/guild#guild-member-object)
@@ -113,7 +116,7 @@ pub struct Member {
     pub pending: Option<bool>,
 
     /// total permissions of the member in the channel, including overwrites, returned when in the interaction object
-    pub permissions: Option<String>,
+    pub permissions: Option<Permissions>,
 
     /// when the user's [timeout](https://support.discord.com/hc/en-us/articles/4413305239191-Time-Out-FAQ) will expire and the user will be able to communicate in the guild again, null or a time in the past if the user is not timed out
     pub communication_disabled_until: Option<String>,

@@ -1,4 +1,4 @@
-use models::common::{Snowflake, TypeField};
+use interaction_bot::models::{Permissions, Snowflake, TypeField};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -10,7 +10,7 @@ impl ApplicationCommand {
         guild_id: Option<Snowflake>,
         name: String,
         description: String,
-        default_member_permissions: Option<String>,
+        default_member_permissions: Option<Permissions>,
         dm_permission: Option<bool>,
         nsfw: Option<bool>,
         options: Option<Vec<ApplicationCommandOption>>,
@@ -23,14 +23,14 @@ impl ApplicationCommand {
                 guild_id,
                 name,
                 name_localizations: None,
-                description,
-                description_localizations: None,
                 default_member_permissions,
                 dm_permission,
                 nsfw,
                 version: None,
             },
             options,
+            description,
+            description_localizations: None,
         })
     }
 
@@ -38,8 +38,7 @@ impl ApplicationCommand {
         application_id: Snowflake,
         guild_id: Option<Snowflake>,
         name: String,
-        description: String,
-        default_member_permissions: Option<String>,
+        default_member_permissions: Option<Permissions>,
         dm_permission: Option<bool>,
         nsfw: Option<bool>,
     ) -> ApplicationCommand {
@@ -50,8 +49,6 @@ impl ApplicationCommand {
             guild_id,
             name,
             name_localizations: None,
-            description,
-            description_localizations: None,
             default_member_permissions,
             dm_permission,
             nsfw,
@@ -63,8 +60,7 @@ impl ApplicationCommand {
         application_id: Snowflake,
         guild_id: Option<Snowflake>,
         name: String,
-        description: String,
-        default_member_permissions: Option<String>,
+        default_member_permissions: Option<Permissions>,
         dm_permission: Option<bool>,
         nsfw: Option<bool>,
     ) -> ApplicationCommand {
@@ -75,13 +71,19 @@ impl ApplicationCommand {
             guild_id,
             name,
             name_localizations: None,
-            description,
-            description_localizations: None,
             default_member_permissions,
             dm_permission,
             nsfw,
             version: None,
         })
+    }
+
+    pub fn get_guild_id(&self) -> &Option<Snowflake> {
+        match self {
+            ApplicationCommand::ChatInputCommand(value) => &value.details.guild_id,
+            ApplicationCommand::UserCommand(value) => &value.guild_id,
+            ApplicationCommand::MessageCommand(value) => &value.guild_id,
+        }
     }
 }
 

@@ -4,17 +4,14 @@ use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use crate::{
-    common::Snowflake,
-    deserialize::{
-        Attachment, Channel, Component, Member, Message, PartialChannel, PartialMember, Role,
-        SelectOption, User,
-    },
+use crate::models::{
+    Attachment, Channel, Component, Member, Message, PartialChannel, PartialMember, Permissions,
+    Role, SelectOption, Snowflake, User,
 };
 
-type ApplicationCommandInteraction = DataInteraction<ApplicationCommandInteractionData>;
-type MessageComponentInteraction = DataInteraction<MessageComponentData>;
-type ModalSubmitInteraction = DataInteraction<ModalSubmitData>;
+pub type ApplicationCommandInteraction = DataInteraction<ApplicationCommandInteractionData>;
+pub type MessageComponentInteraction = DataInteraction<MessageComponentData>;
+pub type ModalSubmitInteraction = DataInteraction<ModalSubmitData>;
 
 /// [Interaction Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-structure)
 #[derive(Debug)]
@@ -96,7 +93,7 @@ pub struct InteractionCommon {
     // pub message: Option<>,
 
     /// Bitwise set of permissions the app or bot has within the channel the interaction was sent from
-    pub app_permissions: Option<String>,
+    pub app_permissions: Option<Permissions>,
 
     /// [Guild's preferred locale](https://discord.com/developers/docs/resources/guild#guild-object), if invoked in a guild
     pub guild_locale: Option<String>,

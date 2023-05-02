@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use models::common::{Snowflake, TypeField};
+use interaction_bot::models::{Permissions, Snowflake, TypeField};
 use serde::{Deserialize, Serialize};
 
 /// [Application Command Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
@@ -35,16 +35,9 @@ pub struct CommandDetails<const T: u8> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name_localizations: Option<HashMap<String, String>>,
 
-    /// Description for CHAT_INPUT commands, 1-100 characters. Empty string for USER and MESSAGE commands
-    pub description: String,
-
-    /// Localization dictionary for description field. Values follow the same restrictions as description
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description_localizations: Option<HashMap<String, String>>,
-
     /// Set of [permissions](https://discord.com/developers/docs/topics/permissions) represented as a bit set
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_member_permissions: Option<String>,
+    pub default_member_permissions: Option<Permissions>,
 
     /// Indicates whether the command is available in DMs with the app, only for globally-scoped commands. By default, commands are visible.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -67,6 +60,13 @@ pub struct CommandDetails<const T: u8> {
 pub struct ChatInputCommand<const T: u8> {
     #[serde(flatten)]
     pub details: CommandDetails<T>,
+
+    /// Description for CHAT_INPUT commands, 1-100 characters. Empty string for USER and MESSAGE commands
+    pub description: String,
+
+    /// Localization dictionary for description field. Values follow the same restrictions as description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description_localizations: Option<HashMap<String, String>>,
 
     /// Parameters for the command, max of 25
     #[serde(skip_serializing_if = "Option::is_none")]

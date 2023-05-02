@@ -6,7 +6,7 @@ pub use model::*;
 
 #[cfg(test)]
 mod tests {
-    use models::common::{Snowflake, TypeField};
+    use interaction_bot::models::{Snowflake, TypeField};
 
     use super::*;
 
@@ -32,7 +32,6 @@ mod tests {
             Snowflake::default(),
             None,
             String::from("name"),
-            String::from("descr"),
             None,
             None,
             None,
@@ -47,7 +46,6 @@ mod tests {
             Snowflake::default(),
             None,
             String::from("name"),
-            String::from("descr"),
             None,
             None,
             None,
@@ -66,13 +64,13 @@ mod tests {
                 guild_id: None,
                 name: String::from("name"),
                 name_localizations: None,
-                description: String::from("description"),
-                description_localizations: None,
                 default_member_permissions: None,
                 dm_permission: None,
                 nsfw: None,
                 version: None,
             },
+            description: String::from("description"),
+            description_localizations: None,
             options: Some(vec![ApplicationCommandOption::new_boolean_option(
                 String::from("bool name"),
                 String::from("bool desc"),

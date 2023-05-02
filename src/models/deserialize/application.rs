@@ -1,7 +1,10 @@
+use bitflags::bitflags;
 use serde::Deserialize;
-use serde_repr::Deserialize_repr;
 
-use crate::{common::Snowflake, deserialize::User};
+use crate::models::{
+    common::{Permissions, Snowflake},
+    deserialize::User,
+};
 
 /// [Application Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/application#application-object)
 #[derive(Debug, Deserialize)]
@@ -68,6 +71,7 @@ pub struct Application {
     /// the application's role connection verification entry point, which when configured will render the app as a verification method in the guild role verification configuration
     pub role_connections_verification_url: Option<String>,
 }
+
 /// [Install Params Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/application#install-params-object)
 #[derive(Debug, Deserialize)]
 pub struct InstallParams {
@@ -75,40 +79,51 @@ pub struct InstallParams {
     pub scopes: Vec<String>,
 
     /// the [permissions](https://discord.com/developers/docs/topics/permissions) to request for the bot role
-    pub permissions: String,
+    pub permissions: Permissions,
 }
 
-/// [Application Flags](https://discord.comundefinedhttps://discord.com/developers/docs/resources/application#application-object-application-flags)
-#[derive(Debug, Deserialize_repr)]
-#[repr(u32)]
-pub enum ApplicationFlags {
-    /// Indicates if an app uses the [Auto Moderation API](https://discord.com/developers/docs/resources/auto-moderation)
-    ApplicationAutoModerationRuleCreateBadge = 1 << 6,
+bitflags! {
+    /// [Application Flags](https://discord.comundefinedhttps://discord.com/developers/docs/resources/application#application-object-application-flags)
+    #[derive(Debug)]
+    pub struct ApplicationFlags: u32 {
+        /// Indicates if an app uses the [Auto Moderation API](https://discord.com/developers/docs/resources/auto-moderation)
+        const ApplicationAutoModerationRuleCreateBadge = 1 << 6;
 
-    /// Intent required for bots in 100 or more servers to receive [presence_update events](https://discord.com/developers/docs/topics/gateway-events#presence-update)
-    GatewayPresence = 1 << 12,
+        /// Intent required for bots in 100 or more servers to receive [presence_update events](https://discord.com/developers/docs/topics/gateway-events#presence-update)
+        const GatewayPresence = 1 << 12;
 
-    /// Intent required for bots in under 100 servers to receive [presence_update events](https://discord.com/developers/docs/topics/gateway-events#presence-update), found on the Bot page in your app's settings
-    GatewayPresenceLimited = 1 << 13,
+        /// Intent required for bots in under 100 servers to receive [presence_update events](https://discord.com/developers/docs/topics/gateway-events#presence-update), found on the Bot page in your app's settings
+        const GatewayPresenceLimited = 1 << 13;
 
-    /// Intent required for bots in 100 or more servers to receive member-related events like guild_member_add. See the list of member-related events [under GUILD_MEMBERS](https://discord.com/developers/docs/topics/gateway#list-of-intents)
-    GatewayGuildMembers = 1 << 14,
+        /// Intent required for bots in 100 or more servers to receive member-related events like guild_member_add. See the list of member-related events [under GUILD_MEMBERS](https://discord.com/developers/docs/topics/gateway#list-of-intents)
+        const GatewayGuildMembers = 1 << 14;
 
-    /// Intent required for bots in under 100 servers to receive member-related events like guild_member_add, found on the Bot page in your app's settings. See the list of member-related events [under GUILD_MEMBERS](https://discord.com/developers/docs/topics/gateway#list-of-intents)
-    GatewayGuildMembersLimited = 1 << 15,
+        /// Intent required for bots in under 100 servers to receive member-related events like guild_member_add, found on the Bot page in your app's settings. See the list of member-related events [under GUILD_MEMBERS](https://discord.com/developers/docs/topics/gateway#list-of-intents)
+        const GatewayGuildMembersLimited = 1 << 15;
 
-    /// Indicates unusual growth of an app that prevents verification
-    VerificationPendingGuildLimit = 1 << 16,
+        /// Indicates unusual growth of an app that prevents verification
+        const VerificationPendingGuildLimit = 1 << 16;
 
-    /// Indicates if an app is embedded within the Discord client (currently unavailable publicly)
-    Embedded = 1 << 17,
+        /// Indicates if an app is embedded within the Discord client (currently unavailable publicly)
+        const Embedded = 1 << 17;
 
-    /// Intent required for bots in 100 or more servers to receive [message content](https://support-dev.discord.com/hc/en-us/articles/4404772028055)
-    GatewayMessageContent = 1 << 18,
+        /// Intent required for bots in 100 or more servers to receive [message content](https://support-dev.discord.com/hc/en-us/articles/4404772028055)
+        const GatewayMessageContent = 1 << 18;
 
-    /// Intent required for bots in under 100 servers to receive [message content](https://support-dev.discord.com/hc/en-us/articles/4404772028055), found on the Bot page in your app's settings
-    GatewayMessageContentLimited = 1 << 19,
+        /// Intent required for bots in under 100 servers to receive [message content](https://support-dev.discord.com/hc/en-us/articles/4404772028055), found on the Bot page in your app's settings
+        const GatewayMessageContentLimited = 1 << 19;
 
-    /// Indicates if an app has registered global [application commands](https://discord.com/developers/docs/interactions/application-commands)
-    ApplicationCommandBadge = 1 << 23,
+        /// Indicates if an app has registered global [application commands](https://discord.com/developers/docs/interactions/application-commands)
+        const ApplicationCommandBadge = 1 << 23;
+    }
+}
+
+impl<'de> Deserialize<'de> for ApplicationFlags {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bits = u32::deserialize(deserializer)?;
+        Ok(ApplicationFlags::from_bits_retain(bits))
+    }
 }
