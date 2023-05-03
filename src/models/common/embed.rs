@@ -42,34 +42,81 @@ pub struct Embed {
 }
 
 impl Embed {
-    pub fn new(
-        title: Option<String>,
-        description: Option<String>,
-        url: Option<String>,
-        timestamp: Option<String>,
-        color: Option<u32>,
-        footer: Option<EmbedFooter>,
-        image: Option<EmbedImage>,
-        thumbnail: Option<EmbedThumbnail>,
-        video: Option<EmbedVideo>,
-        provider: Option<EmbedProvider>,
-        author: Option<EmbedAuthor>,
-        fields: Option<Vec<EmbedField>>,
-    ) -> Self {
+    pub fn new() -> Self {
         Self {
-            title,
-            description,
-            url,
-            timestamp,
-            color,
-            footer,
-            image,
-            thumbnail,
-            video,
-            provider,
-            author,
-            fields,
+            title: None,
+            description: None,
+            url: None,
+            timestamp: None,
+            color: None,
+            footer: None,
+            image: None,
+            thumbnail: None,
+            video: None,
+            provider: None,
+            author: None,
+            fields: None,
         }
+    }
+
+    pub fn with_title(mut self, title: String) -> Self {
+        self.title = Some(title);
+        self
+    }
+
+    pub fn with_description(mut self, description: String) -> Self {
+        self.description = Some(description);
+        self
+    }
+
+    pub fn with_url(mut self, url: String) -> Self {
+        self.url = Some(url);
+        self
+    }
+
+    pub fn with_timestamp(mut self, timestamp: String) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+
+    pub fn with_color(mut self, color: u32) -> Self {
+        self.color = Some(color);
+        self
+    }
+
+    pub fn with_footer(mut self, footer: EmbedFooter) -> Self {
+        self.footer = Some(footer);
+        self
+    }
+
+    pub fn with_image(mut self, image: EmbedImage) -> Self {
+        self.image = Some(image);
+        self
+    }
+
+    pub fn with_thumbnail(mut self, thumbnail: EmbedThumbnail) -> Self {
+        self.thumbnail = Some(thumbnail);
+        self
+    }
+
+    pub fn with_video(mut self, video: EmbedVideo) -> Self {
+        self.video = Some(video);
+        self
+    }
+
+    pub fn with_provider(mut self, provider: EmbedProvider) -> Self {
+        self.provider = Some(provider);
+        self
+    }
+
+    pub fn with_author(mut self, author: EmbedAuthor) -> Self {
+        self.author = Some(author);
+        self
+    }
+
+    pub fn with_fields(mut self, fields: Vec<EmbedField>) -> Self {
+        self.fields = Some(fields);
+        self
     }
 }
 
@@ -263,95 +310,15 @@ impl EmbedField {
     }
 }
 
-/// Builder for Embeds
-pub struct EmbedBuilder {
-    embed: Embed,
-}
-
-impl EmbedBuilder {
-    pub fn new() -> Self {
-        EmbedBuilder {
-            embed: Embed::new(
-                None, None, None, None, None, None, None, None, None, None, None, None,
-            ),
-        }
-    }
-
-    pub fn with_title(mut self, title: String) -> Self {
-        self.embed.title = Some(title);
-        self
-    }
-
-    pub fn with_description(mut self, description: String) -> Self {
-        self.embed.description = Some(description);
-        self
-    }
-
-    pub fn with_url(mut self, url: String) -> Self {
-        self.embed.url = Some(url);
-        self
-    }
-
-    pub fn with_timestamp(mut self, timestamp: String) -> Self {
-        self.embed.timestamp = Some(timestamp);
-        self
-    }
-
-    pub fn with_color(mut self, color: u32) -> Self {
-        self.embed.color = Some(color);
-        self
-    }
-
-    pub fn with_footer(mut self, footer: EmbedFooter) -> Self {
-        self.embed.footer = Some(footer);
-        self
-    }
-
-    pub fn with_image(mut self, image: EmbedImage) -> Self {
-        self.embed.image = Some(image);
-        self
-    }
-
-    pub fn with_thumbnail(mut self, thumbnail: EmbedThumbnail) -> Self {
-        self.embed.thumbnail = Some(thumbnail);
-        self
-    }
-
-    pub fn with_video(mut self, video: EmbedVideo) -> Self {
-        self.embed.video = Some(video);
-        self
-    }
-
-    pub fn with_provider(mut self, provider: EmbedProvider) -> Self {
-        self.embed.provider = Some(provider);
-        self
-    }
-
-    pub fn with_author(mut self, author: EmbedAuthor) -> Self {
-        self.embed.author = Some(author);
-        self
-    }
-
-    pub fn with_fields(mut self, fields: Vec<EmbedField>) -> Self {
-        self.embed.fields = Some(fields);
-        self
-    }
-
-    pub fn build(self) -> Embed {
-        self.embed
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
 
     #[test]
     pub fn embed_serialize_test() {
-        let embed = EmbedBuilder::new()
+        let embed = Embed::new()
             .with_title("title".to_string())
-            .with_color(0xFFFFFF)
-            .build();
+            .with_color(0xFFFFFF);
 
         let json = serde_json::to_string_pretty(&embed).unwrap();
 
