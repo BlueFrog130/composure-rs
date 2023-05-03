@@ -2,7 +2,7 @@ use serde::{de::Visitor, Deserialize};
 
 use crate::models::{Permissions, Snowflake};
 
-/// [Role Object](https://discord.comundefinedhttps://discord.com/developers/docs/topics/permissions#role-object)
+/// [Role Object](https://discord.com/developers/docs/topics/permissions#role-object)
 #[derive(Debug, Deserialize)]
 pub struct Role {
     /// role id
@@ -39,7 +39,7 @@ pub struct Role {
     pub tags: Option<RoleTags>,
 }
 
-/// [Role Subscription Data Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#role-subscription-data-object)
+/// [Role Subscription Data Object](https://discord.com/developers/docs/resources/channel#role-subscription-data-object)
 #[derive(Debug, Deserialize)]
 pub struct RoleSubscriptionData {
     /// the id of the sku and listing that the user is subscribed to
@@ -55,7 +55,7 @@ pub struct RoleSubscriptionData {
     pub is_renewal: bool,
 }
 
-/// [Role Tags Structure](https://discord.comundefinedhttps://discord.com/developers/docs/topics/permissions#role-object-role-tags-structure)
+/// [Role Tags Structure](https://discord.com/developers/docs/topics/permissions#role-object-role-tags-structure)
 #[derive(Debug)]
 pub struct RoleTags {
     /// the id of the bot this role belongs to

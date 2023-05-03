@@ -3,7 +3,7 @@ use serde_repr::Deserialize_repr;
 
 use crate::models::{Snowflake, User};
 
-/// [Sticker Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/sticker#sticker-object-sticker-structure)
+/// [Sticker Structure](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-structure)
 #[derive(Debug, Deserialize)]
 pub struct Sticker {
     /// [id of the sticker](https://discord.com/developers/docs/reference#image-formatting)
@@ -44,7 +44,7 @@ pub struct Sticker {
     pub sort_value: Option<i32>,
 }
 
-/// [Sticker Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/sticker#sticker-object-sticker-types)
+/// [Sticker Types](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-types)
 #[derive(Debug, Deserialize_repr)]
 #[repr(u8)]
 
@@ -56,7 +56,7 @@ pub enum StickerType {
     Guild = 2,
 }
 
-/// [Sticker Format Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/sticker#sticker-object-sticker-format-types)
+/// [Sticker Format Types](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-format-types)
 #[derive(Debug, Deserialize_repr)]
 #[repr(u8)]
 
@@ -70,7 +70,7 @@ pub enum StickerFormatTypes {
     Gif = 4,
 }
 
-/// [Sticker Item Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/sticker#sticker-item-object-sticker-item-structure)
+/// [Sticker Item Structure](https://discord.com/developers/docs/resources/sticker#sticker-item-object-sticker-item-structure)
 #[derive(Debug, Deserialize)]
 pub struct StickerItem {
     /// id of the sticker
@@ -83,7 +83,7 @@ pub struct StickerItem {
     pub format_type: i32,
 }
 
-/// [Sticker Pack Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/sticker#sticker-pack-object-sticker-pack-structure)
+/// [Sticker Pack Structure](https://discord.com/developers/docs/resources/sticker#sticker-pack-object-sticker-pack-structure)
 #[derive(Debug, Deserialize)]
 pub struct StickerPack {
     /// id of the sticker pack

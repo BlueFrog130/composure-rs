@@ -2,7 +2,7 @@ use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
 bitflags! {
-    /// [Bitwise Permission Flags](https://discord.comundefinedhttps://discord.com/developers/docs/topics/permissions#permissions-bitwise-permission-flags)
+    /// [Bitwise Permission Flags](https://discord.com/developers/docs/topics/permissions#permissions-bitwise-permission-flags)
     #[derive(Debug)]
     pub struct Permissions: u64 {
         /// Allows creation of instant invites

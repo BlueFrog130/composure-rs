@@ -5,7 +5,7 @@ use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::models::{
-    Attachment, Channel, Component, Member, Message, PartialChannel, PartialMember, Permissions,
+    ActionRow, Attachment, Channel, Member, Message, PartialChannel, PartialMember, Permissions,
     Role, SelectOption, Snowflake, User,
 };
 
@@ -13,7 +13,7 @@ pub type ApplicationCommandInteraction = DataInteraction<ApplicationCommandInter
 pub type MessageComponentInteraction = DataInteraction<MessageComponentData>;
 pub type ModalSubmitInteraction = DataInteraction<ModalSubmitData>;
 
-/// [Interaction Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-structure)
+/// [Interaction Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-structure)
 #[derive(Debug)]
 pub enum Interaction {
     Ping(PingInteraction),
@@ -113,7 +113,7 @@ pub struct DataInteraction<D> {
     pub data: D,
 }
 
-/// [Interaction Data](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-data)
+/// [Interaction Data](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-data)
 #[derive(Debug, Deserialize)]
 pub struct ApplicationCommandInteractionData {
     /// the [ID](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure) of the invoked command
@@ -139,7 +139,7 @@ pub struct ApplicationCommandInteractionData {
     pub target_id: Option<Snowflake>,
 }
 
-/// [Message Component Data Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-message-component-data-structure)
+/// [Message Component Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-message-component-data-structure)
 #[derive(Debug, Deserialize)]
 pub struct MessageComponentData {
     /// the [custom_id](https://discord.com/developers/docs/interactions/message-components#custom-id) of the component
@@ -152,17 +152,17 @@ pub struct MessageComponentData {
     pub values: Option<Vec<SelectOption>>,
 }
 
-/// [Modal Submit Data Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-modal-submit-data-structure)
+/// [Modal Submit Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-modal-submit-data-structure)
 #[derive(Debug, Deserialize)]
 pub struct ModalSubmitData {
     /// the [custom_id](https://discord.com/developers/docs/interactions/message-components#custom-id) of the modal
     pub custom_id: String,
 
     /// the values submitted by the user
-    pub components: Vec<Component>,
+    pub components: Vec<ActionRow>, // TODO: this is a guess - might need to be a Vec<Component>
 }
 
-/// [Resolved Data Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure)
+/// [Resolved Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure)
 #[derive(Debug, Deserialize)]
 pub struct ResolvedData {
     /// the ids and User objects
@@ -184,7 +184,7 @@ pub struct ResolvedData {
     pub attachments: Option<HashMap<Snowflake, Attachment>>,
 }
 
-/// [Application Command Interaction Data Option Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-application-command-interaction-data-option-structure)
+/// [Application Command Interaction Data Option Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-application-command-interaction-data-option-structure)
 #[derive(Debug)]
 pub enum ApplicationCommandInteractionDataOption {
     Subcommand(Subcommand),
@@ -262,7 +262,7 @@ pub struct ValueOption<T> {
     pub focused: Option<bool>,
 }
 
-/// [Application Command Types](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-types)
+/// [Application Command Types](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-types)
 #[derive(Debug, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum ApplicationCommandType {

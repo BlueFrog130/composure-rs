@@ -29,7 +29,7 @@ pub struct PartialChannel {
     pub parent_id: Option<Snowflake>,
 }
 
-/// [Channel Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-channel-structure)
+/// [Channel Structure](https://discord.com/developers/docs/resources/channel#channel-object-channel-structure)
 #[derive(Debug, Deserialize)]
 pub struct Channel {
     /// the id of this channel
@@ -145,7 +145,7 @@ impl PartialEq for Channel {
     }
 }
 
-/// [Channel Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-channel-types)
+/// [Channel Types](https://discord.com/developers/docs/resources/channel#channel-object-channel-types)
 #[derive(Debug, Deserialize_repr, Serialize_repr, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ChannelType {
@@ -186,7 +186,7 @@ pub enum ChannelType {
     GuildForum = 15,
 }
 
-/// [Video Quality Modes](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-video-quality-modes)
+/// [Video Quality Modes](https://discord.com/developers/docs/resources/channel#channel-object-video-quality-modes)
 #[derive(Debug, Deserialize)]
 pub enum VideoQualityMode {
     /// Discord chooses the quality for optimal performance
@@ -197,7 +197,7 @@ pub enum VideoQualityMode {
 }
 
 bitflags! {
-    /// [Channel Flags](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-channel-flags)
+    /// [Channel Flags](https://discord.com/developers/docs/resources/channel#channel-object-channel-flags)
     #[derive(Debug)]
     pub struct ChannelFlags: u32 {
         /// this thread is pinned to the top of its parent GUILD_FORUM channel
@@ -227,7 +227,7 @@ impl<'de> Deserialize<'de> for ChannelFlags {
     }
 }
 
-/// [Sort Order Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-sort-order-types)
+/// [Sort Order Types](https://discord.com/developers/docs/resources/channel#channel-object-sort-order-types)
 #[derive(Debug, Deserialize)]
 pub enum SortOrderType {
     /// Sort forum posts by activity
@@ -237,7 +237,7 @@ pub enum SortOrderType {
     CreationDate = 1,
 }
 
-/// [Forum Layout Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-object-forum-layout-types)
+/// [Forum Layout Types](https://discord.com/developers/docs/resources/channel#channel-object-forum-layout-types)
 #[derive(Debug, Deserialize)]
 pub enum ForumLayoutType {
     /// No default has been set for forum channel
@@ -250,7 +250,7 @@ pub enum ForumLayoutType {
     GalleryView = 2,
 }
 
-/// [Overwrite Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#overwrite-object)
+/// [Overwrite Object](https://discord.com/developers/docs/resources/channel#overwrite-object)
 #[derive(Debug, Deserialize)]
 pub struct Overwrite {
     /// role or user id
@@ -274,7 +274,7 @@ pub enum OverwriteType {
     Member = 1,
 }
 
-/// [Thread Metadata Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#thread-metadata-object)
+/// [Thread Metadata Object](https://discord.com/developers/docs/resources/channel#thread-metadata-object)
 #[derive(Debug, Deserialize)]
 pub struct ThreadMetadata {
     /// whether the thread is archived
@@ -296,7 +296,7 @@ pub struct ThreadMetadata {
     pub create_timestamp: Option<String>,
 }
 
-/// [Thread Member Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#thread-member-object)
+/// [Thread Member Object](https://discord.com/developers/docs/resources/channel#thread-member-object)
 #[derive(Debug, Deserialize)]
 pub struct ThreadMember {
     /// ID of the thread
@@ -321,7 +321,7 @@ impl PartialEq for ThreadMember {
     }
 }
 
-/// [Forum Tag Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#forum-tag-object)
+/// [Forum Tag Object](https://discord.com/developers/docs/resources/channel#forum-tag-object)
 #[derive(Debug, Deserialize)]
 pub struct ForumTag {
     /// the id of the tag
@@ -346,7 +346,7 @@ impl PartialEq for ForumTag {
     }
 }
 
-/// [Default Reaction Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#default-reaction-object)
+/// [Default Reaction Object](https://discord.com/developers/docs/resources/channel#default-reaction-object)
 #[derive(Debug, Deserialize)]
 pub struct DefaultReaction {
     /// the id of a guild's custom emoji

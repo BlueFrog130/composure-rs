@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 
 use crate::models::{
-    Application, Attachment, Channel, Component, Embed, Emoji, Interaction, Role,
+    ActionRow, Application, Attachment, Channel, Embed, Emoji, Interaction, Role,
     RoleSubscriptionData, Snowflake, StickerItem, User,
 };
 
-/// [Message Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#message-object-message-structure)
+/// [Message Structure](https://discord.com/developers/docs/resources/channel#message-object-message-structure)
 #[derive(Debug, Deserialize)]
 pub struct Message {
     /// id of the message
@@ -89,7 +89,7 @@ pub struct Message {
     pub thread: Option<Channel>,
 
     /// sent if the message contains components like buttons, action rows, or other interactive components
-    pub components: Option<Vec<Component>>,
+    pub components: Option<Vec<ActionRow>>,
 
     /// sent if the message contains stickers
     pub sticker_items: Option<Vec<StickerItem>>,
@@ -100,7 +100,7 @@ pub struct Message {
     /// data of the role subscription purchase or renewal that prompted this ROLE_SUBSCRIPTION_PURCHASE message
     pub role_subscription_data: Option<RoleSubscriptionData>,
 }
-/// [Channel Mention Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#channel-mention-object)
+/// [Channel Mention Object](https://discord.com/developers/docs/resources/channel#channel-mention-object)
 #[derive(Debug, Deserialize)]
 pub struct ChannelMention {
     /// id of the channel
@@ -117,7 +117,7 @@ pub struct ChannelMention {
     pub name: String,
 }
 
-/// [Reaction Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#reaction-object)
+/// [Reaction Object](https://discord.com/developers/docs/resources/channel#reaction-object)
 #[derive(Debug, Deserialize)]
 pub struct Reaction {
     /// times this emoji has been used to react
@@ -130,7 +130,7 @@ pub struct Reaction {
     pub emoji: Emoji,
 }
 
-/// [Message Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#message-object-message-types)
+/// [Message Types](https://discord.com/developers/docs/resources/channel#message-object-message-types)
 #[derive(Debug, Deserialize_repr)]
 #[repr(u8)]
 pub enum MessageType {
@@ -228,7 +228,7 @@ pub enum MessageType {
     GuildApplicationPremiumSubscription = 32,
 }
 
-/// [Message Activity Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#message-object-message-activity-structure)
+/// [Message Activity Structure](https://discord.com/developers/docs/resources/channel#message-object-message-activity-structure)
 #[derive(Debug, Deserialize)]
 pub struct MessageActivity {
     /// [type of message activity](https://discord.com/developers/docs/resources/channel#message-object-message-activity-types)
@@ -239,7 +239,7 @@ pub struct MessageActivity {
     pub party_id: Option<String>,
 }
 
-/// [Message Activity Types](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#message-object-message-activity-types)
+/// [Message Activity Types](https://discord.com/developers/docs/resources/channel#message-object-message-activity-types)
 #[derive(Debug, Deserialize_repr)]
 #[repr(u8)]
 pub enum MessageActivityType {
@@ -253,7 +253,7 @@ pub enum MessageActivityType {
 }
 
 bitflags::bitflags! {
-    /// [Message Flags](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#message-object-message-flags)
+    /// [Message Flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags)
     #[derive(Debug)]
     pub struct MessageFlags: u16 {
         /// this message has been published to subscribed channels (via Channel Following)
@@ -315,7 +315,7 @@ impl<'de> Deserialize<'de> for MessageFlags {
     }
 }
 
-/// [Message Reference Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#message-reference-object-message-reference-structure)
+/// [Message Reference Structure](https://discord.com/developers/docs/resources/channel#message-reference-object-message-reference-structure)
 #[derive(Debug, Deserialize)]
 pub struct MessageReference {
     /// id of the originating message
@@ -333,6 +333,8 @@ pub struct MessageReference {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::models::Component;
+
     use super::*;
 
     #[test]
@@ -349,21 +351,14 @@ pub mod tests {
             ]
         }"#;
 
-        let res = serde_json::from_str::<Component>(json);
+        let res = serde_json::from_str::<ActionRow>(json);
 
         assert!(res.is_ok());
 
-        let component = res.unwrap();
+        let action_row = res.unwrap();
 
-        assert!(matches!(component, Component::ActionRow { .. }));
-
-        match component {
-            Component::ActionRow(action_row) => {
-                assert_eq!(action_row.components.len(), 1);
-                assert!(matches!(action_row.components[0], Component::Button { .. }));
-            }
-            _ => assert!(false),
-        }
+        assert_eq!(action_row.components.len(), 1);
+        assert!(matches!(action_row.components[0], Component::Button { .. }));
     }
 
     #[test]
@@ -410,7 +405,7 @@ pub mod tests {
             ]
         }"#;
 
-        let res = serde_json::from_str::<Component>(json);
+        let res = serde_json::from_str::<ActionRow>(json);
 
         assert!(res.is_ok());
 

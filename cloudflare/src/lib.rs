@@ -1,6 +1,6 @@
 use interaction_bot::models::{Interaction, InteractionResponse};
 use interaction_bot::{CommandMap, InteractionBot};
-use worker::{Env, Error, Headers, Request, Response, Result};
+use worker::{Env, Error, Headers, Method, Request, Response, Result};
 
 /// Validates a request from Discord
 ///
@@ -41,6 +41,10 @@ impl InteractionBot for CloudflareInteractionBot {
 impl CloudflareInteractionBot {
     /// Handles a request from Discord
     pub async fn handle_request(&mut self, mut req: Request, env: Env) -> Result<Response> {
+        if req.method() != Method::Post {
+            return Response::error("Method not allowed", 405);
+        }
+
         let bytes = req.bytes().await?;
         validate_request(&env, req.headers(), &bytes)?;
         let interaction: Interaction = serde_json::from_slice(&bytes)?;

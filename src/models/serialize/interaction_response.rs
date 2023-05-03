@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use serde::{ser::SerializeMap, Serialize};
 
-use crate::models::{AllowedMentions, Component, Embed, MessageFlags, PartialAttachment};
+use crate::models::{ActionRow, AllowedMentions, Embed, MessageFlags, PartialAttachment};
 
 const TYPE_KEY: &str = "type";
 const DATA_KEY: &str = "data";
 
-/// [Interaction Response Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-interaction-response-structure)
+/// [Interaction Response Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-interaction-response-structure)
 #[derive(Debug)]
 pub enum InteractionResponse {
     /// ACK to a `ping`
@@ -101,7 +101,7 @@ pub struct MessageCallbackData {
     pub flags: Option<MessageFlags>,
 
     /// message components
-    pub components: Option<Vec<Component>>,
+    pub components: Option<Vec<ActionRow>>,
 
     /// attachment objects with filename and description
     pub attachments: Option<Vec<PartialAttachment>>,
@@ -112,7 +112,7 @@ pub struct AutocompleteCallbackData {
     choices: Vec<ApplicationCommandOptionChoice>,
 }
 
-/// [Application Command Option Choice Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)
+/// [Application Command Option Choice Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)
 #[derive(Debug, Serialize)]
 pub struct ApplicationCommandOptionChoice {
     /// 1-100 character choice name
@@ -134,7 +134,7 @@ pub enum ApplicationCommandOptionChoiceValue {
     Double(f64),
 }
 
-/// [Modal](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-modal)
+/// [Modal](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-modal)
 #[derive(Debug, Serialize)]
 pub struct ModalCallbackData {
     /// a developer-defined identifier for the modal, max 100 characters
@@ -144,7 +144,7 @@ pub struct ModalCallbackData {
     pub title: String,
 
     /// between 1 and 5 (inclusive) components that make up the modal
-    pub components: Vec<Component>,
+    pub components: Vec<ActionRow>,
 }
 
 #[cfg(test)]

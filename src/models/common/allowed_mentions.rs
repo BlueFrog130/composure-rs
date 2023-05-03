@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::Snowflake;
 
-/// [Allowed Mentions Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#allowed-mentions-object-allowed-mentions-structure)
+/// [Allowed Mentions Structure](https://discord.com/developers/docs/resources/channel#allowed-mentions-object-allowed-mentions-structure)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AllowedMentions {
     /// An array of [allowed mention types](https://discord.com/developers/docs/resources/channel#allowed-mentions-object-allowed-mention-types) to parse from the content.

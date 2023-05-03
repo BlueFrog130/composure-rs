@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// [Embed Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#embed-object)
+/// [Embed Object](https://discord.com/developers/docs/resources/channel#embed-object)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Embed {
     /// title of embed
@@ -44,7 +44,7 @@ pub struct Embed {
     pub fields: Option<Vec<EmbedField>>,
 }
 
-/// [Embed Footer Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#embed-object-embed-footer-structure)
+/// [Embed Footer Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-footer-structure)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmbedFooter {
     /// footer text
@@ -57,7 +57,7 @@ pub struct EmbedFooter {
     pub proxy_icon_url: Option<String>,
 }
 
-/// [Embed Image Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#embed-object-embed-image-structure)
+/// [Embed Image Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-image-structure)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmbedImage {
     /// source url of image (only supports http(s) and attachments)
@@ -73,7 +73,7 @@ pub struct EmbedImage {
     pub width: Option<i32>,
 }
 
-/// [Embed Thumbnail Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#embed-object-embed-thumbnail-structure)
+/// [Embed Thumbnail Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-thumbnail-structure)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmbedThumbnail {
     /// source url of thumbnail (only supports http(s) and attachments)
@@ -89,7 +89,7 @@ pub struct EmbedThumbnail {
     pub width: Option<i32>,
 }
 
-/// [Embed Video Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#embed-object-embed-video-structure)
+/// [Embed Video Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-video-structure)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmbedVideo {
     /// source url of video
@@ -105,7 +105,7 @@ pub struct EmbedVideo {
     pub width: Option<i32>,
 }
 
-/// [Embed Provider Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#embed-object-embed-provider-structure)
+/// [Embed Provider Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-provider-structure)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmbedProvider {
     /// name of provider
@@ -115,7 +115,7 @@ pub struct EmbedProvider {
     pub url: Option<String>,
 }
 
-/// [Embed Author Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#embed-object-embed-author-structure)
+/// [Embed Author Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-author-structure)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmbedAuthor {
     /// name of author
@@ -131,7 +131,7 @@ pub struct EmbedAuthor {
     pub proxy_icon_url: Option<String>,
 }
 
-/// [Embed Field Structure](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#embed-object-embed-field-structure)
+/// [Embed Field Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-field-structure)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmbedField {
     /// name of the field

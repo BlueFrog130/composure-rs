@@ -17,7 +17,7 @@ pub struct PartialEmoji {
     pub animated: Option<bool>,
 }
 
-/// [Emoji Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/emoji#emoji-object)
+/// [Emoji Object](https://discord.com/developers/docs/resources/emoji#emoji-object)
 #[derive(Debug, Deserialize)]
 pub struct Emoji {
     /// [emoji id](https://discord.com/developers/docs/reference#image-formatting)

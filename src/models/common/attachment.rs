@@ -11,7 +11,7 @@ pub struct PartialAttachment {
     pub description: Option<String>,
 }
 
-/// [Attachment Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/channel#attachment-object)
+/// [Attachment Object](https://discord.com/developers/docs/resources/channel#attachment-object)
 #[derive(Debug, Deserialize)]
 pub struct Attachment {
     /// attachment id

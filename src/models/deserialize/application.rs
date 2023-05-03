@@ -6,7 +6,7 @@ use crate::models::{
     deserialize::User,
 };
 
-/// [Application Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/application#application-object)
+/// [Application Object](https://discord.com/developers/docs/resources/application#application-object)
 #[derive(Debug, Deserialize)]
 pub struct Application {
     /// the id of the app
@@ -72,7 +72,7 @@ pub struct Application {
     pub role_connections_verification_url: Option<String>,
 }
 
-/// [Install Params Object](https://discord.comundefinedhttps://discord.com/developers/docs/resources/application#install-params-object)
+/// [Install Params Object](https://discord.com/developers/docs/resources/application#install-params-object)
 #[derive(Debug, Deserialize)]
 pub struct InstallParams {
     /// the [scopes](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes) to add the application to the server with
@@ -83,7 +83,7 @@ pub struct InstallParams {
 }
 
 bitflags! {
-    /// [Application Flags](https://discord.comundefinedhttps://discord.com/developers/docs/resources/application#application-object-application-flags)
+    /// [Application Flags](https://discord.com/developers/docs/resources/application#application-object-application-flags)
     #[derive(Debug)]
     pub struct ApplicationFlags: u32 {
         /// Indicates if an app uses the [Auto Moderation API](https://discord.com/developers/docs/resources/auto-moderation)

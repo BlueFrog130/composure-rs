@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use interaction_bot::models::{Permissions, Snowflake, TypeField};
 use serde::{Deserialize, Serialize};
 
-/// [Application Command Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
+/// [Application Command Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommand {
@@ -73,7 +73,7 @@ pub struct ChatInputCommand<const T: u8> {
     pub options: Option<Vec<ApplicationCommandOption>>,
 }
 
-/// [Application Command Option Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-structure)
+/// [Application Command Option Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-structure)
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommandOption {
@@ -256,7 +256,7 @@ pub struct BaseOption<const T: u8> {
     pub required: bool,
 }
 
-/// [Application Command Option Choice Structure](https://discord.comundefinedhttps://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)
+/// [Application Command Option Choice Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApplicationCommandOptionChoice<T> {
     /// 1-100 character choice name
