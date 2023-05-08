@@ -1,4 +1,4 @@
-use std::{hash::Hash, str::FromStr};
+use std::{fmt::Debug, hash::Hash, str::FromStr};
 
 use serde::{de::Visitor, Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ const TIMESTAMP_SHIFT: u8 = 22;
 const WORKER_SHIFT: u8 = 17;
 const PROCESS_ID_SHIFT: u8 = 12;
 
-#[derive(Debug, Eq, Clone)]
+#[derive(Eq, Clone)]
 pub struct Snowflake {
     pub timestamp: u64,
     worker_id: u8,
@@ -91,6 +91,12 @@ impl Into<u64> for Snowflake {
 impl ToString for Snowflake {
     fn to_string(&self) -> String {
         self.to_u64().to_string()
+    }
+}
+
+impl Debug for Snowflake {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Snowflake").field(&self.to_u64()).finish()
     }
 }
 

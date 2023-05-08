@@ -36,21 +36,26 @@ impl<'de> Deserialize<'de> for Interaction {
             .ok_or(serde::de::Error::missing_field("type"))?;
 
         match t {
+            // Ping
             1 => Ok(Interaction::Ping(
                 PingInteraction::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
             )),
+            // Application Command
             2 => Ok(Interaction::ApplicationCommand(
                 DataInteraction::<ApplicationCommandInteractionData>::deserialize(value)
                     .map_err(|e| serde::de::Error::custom(e))?,
             )),
+            // Message Component
             3 => Ok(Interaction::MessageComponent(
                 DataInteraction::<MessageComponentData>::deserialize(value)
                     .map_err(|e| serde::de::Error::custom(e))?,
             )),
+            // Autocomplete
             4 => Ok(Interaction::ApplicationCommandAutocomplete(
                 DataInteraction::<ApplicationCommandInteractionData>::deserialize(value)
                     .map_err(|e| serde::de::Error::custom(e))?,
             )),
+            // Modal Submit
             5 => Ok(Interaction::ModalSubmit(
                 DataInteraction::<ModalSubmitData>::deserialize(value)
                     .map_err(|e| serde::de::Error::custom(e))?,
@@ -130,13 +135,40 @@ pub struct ApplicationCommandInteractionData {
     pub resolved: Option<ResolvedData>,
 
     /// the params + values from the user
-    pub options: Option<Vec<ApplicationCommandInteractionDataOption>>,
+    pub options: Option<OptionList>,
 
     /// the id of the guild the command is registered to
     pub guild_id: Option<Snowflake>,
 
     /// id of the [user](https://discord.com/developers/docs/interactions/application-commands#user-commands) or [message](https://discord.com/developers/docs/interactions/application-commands#message-commands) targeted by a user or message command
     pub target_id: Option<Snowflake>,
+}
+
+impl ApplicationCommandInteractionData {
+    pub fn resolved_user(&self, snowflake: &Snowflake) -> Option<&User> {
+        self.resolved
+            .as_ref()
+            .and_then(|r| r.users.as_ref())
+            .and_then(|u| u.get(snowflake))
+    }
+
+    pub fn resolved_member(&self, snowflake: &Snowflake) -> Option<&PartialMember> {
+        self.resolved
+            .as_ref()
+            .and_then(|r| r.members.as_ref())
+            .and_then(|u| u.get(snowflake))
+    }
+
+    pub fn resolved_role(&self, snowflake: &Snowflake) -> Option<&Role> {
+        self.resolved
+            .as_ref()
+            .and_then(|r| r.roles.as_ref())
+            .and_then(|u| u.get(snowflake))
+    }
+
+    pub fn first_option(&self) -> Option<&ApplicationCommandInteractionDataOption> {
+        self.options.as_ref().and_then(|o| o.single())
+    }
 }
 
 /// [Message Component Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-message-component-data-structure)
@@ -184,19 +216,26 @@ pub struct ResolvedData {
     pub attachments: Option<HashMap<Snowflake, Attachment>>,
 }
 
+pub type StringOption = ValueOption<String>;
+pub type IntegerOption = ValueOption<i64>;
+pub type BooleanOption = ValueOption<bool>;
+pub type SnowflakeOption = ValueOption<Snowflake>;
+pub type NumberOption = ValueOption<f64>;
+
 /// [Application Command Interaction Data Option Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-application-command-interaction-data-option-structure)
 #[derive(Debug)]
 pub enum ApplicationCommandInteractionDataOption {
     Subcommand(Subcommand),
-    String(ValueOption<String>),
-    Integer(ValueOption<i64>),
-    Boolean(ValueOption<bool>),
-    User,
-    Channel,
-    Role,
-    Mentionable,
-    Number(ValueOption<f64>),
-    Attachment,
+    SubcommandGroup(SubcommandGroup),
+    String(StringOption),
+    Integer(IntegerOption),
+    Boolean(BooleanOption),
+    User(SnowflakeOption),
+    Channel(SnowflakeOption),
+    Role(SnowflakeOption),
+    Mentionable(SnowflakeOption),
+    Number(NumberOption),
+    Attachment, // TODO: Figure out value type
 }
 
 impl<'de> Deserialize<'de> for ApplicationCommandInteractionDataOption {
@@ -212,8 +251,11 @@ impl<'de> Deserialize<'de> for ApplicationCommandInteractionDataOption {
             .ok_or(serde::de::Error::missing_field("type"))?;
 
         match t {
-            1..=2 => Ok(ApplicationCommandInteractionDataOption::Subcommand(
+            1 => Ok(ApplicationCommandInteractionDataOption::Subcommand(
                 Subcommand::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            2 => Ok(ApplicationCommandInteractionDataOption::SubcommandGroup(
+                SubcommandGroup::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
             )),
             3 => Ok(ApplicationCommandInteractionDataOption::String(
                 ValueOption::<String>::deserialize(value)
@@ -225,10 +267,22 @@ impl<'de> Deserialize<'de> for ApplicationCommandInteractionDataOption {
             5 => Ok(ApplicationCommandInteractionDataOption::Boolean(
                 ValueOption::<bool>::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
             )),
-            6 => Ok(ApplicationCommandInteractionDataOption::User),
-            7 => Ok(ApplicationCommandInteractionDataOption::Channel),
-            8 => Ok(ApplicationCommandInteractionDataOption::Role),
-            9 => Ok(ApplicationCommandInteractionDataOption::Mentionable),
+            6 => Ok(ApplicationCommandInteractionDataOption::User(
+                ValueOption::<Snowflake>::deserialize(value)
+                    .map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            7 => Ok(ApplicationCommandInteractionDataOption::Channel(
+                ValueOption::<Snowflake>::deserialize(value)
+                    .map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            8 => Ok(ApplicationCommandInteractionDataOption::Role(
+                ValueOption::<Snowflake>::deserialize(value)
+                    .map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            9 => Ok(ApplicationCommandInteractionDataOption::Mentionable(
+                ValueOption::<Snowflake>::deserialize(value)
+                    .map_err(|e| serde::de::Error::custom(e))?,
+            )),
             10 => Ok(ApplicationCommandInteractionDataOption::Number(
                 ValueOption::<f64>::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
             )),
@@ -238,16 +292,160 @@ impl<'de> Deserialize<'de> for ApplicationCommandInteractionDataOption {
     }
 }
 
+#[derive(Debug)]
+pub struct OptionList(Vec<ApplicationCommandInteractionDataOption>);
+
+impl OptionList {
+    pub fn single(&self) -> Option<&ApplicationCommandInteractionDataOption> {
+        self.0.get(0)
+    }
+
+    pub fn subcommand(&self) -> Option<&Subcommand> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Subcommand(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn subcommand_group(&self) -> Option<&SubcommandGroup> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::SubcommandGroup(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn get_option(&self, name: &str) -> Option<&ApplicationCommandInteractionDataOption> {
+        self.0.iter().find(|o| match o {
+            ApplicationCommandInteractionDataOption::Subcommand(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::SubcommandGroup(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::String(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::Integer(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::Boolean(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::User(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::Channel(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::Role(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::Mentionable(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::Number(s) => s.name == name,
+            ApplicationCommandInteractionDataOption::Attachment => false,
+        })
+    }
+
+    pub fn get_string_option(&self, name: &str) -> Option<&StringOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::String(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn get_integer_option(&self, name: &str) -> Option<&IntegerOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Integer(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn get_boolean_option(&self, name: &str) -> Option<&BooleanOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Boolean(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn get_user_option(&self, name: &str) -> Option<&SnowflakeOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::User(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn get_channel_option(&self, name: &str) -> Option<&SnowflakeOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Channel(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn get_role_option(&self, name: &str) -> Option<&SnowflakeOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Role(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn get_mentionable_option(&self, name: &str) -> Option<&SnowflakeOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Mentionable(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for OptionList {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(OptionList(
+            Vec::<ApplicationCommandInteractionDataOption>::deserialize(deserializer)?,
+        ))
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Subcommand {
     /// Name of the parameter
     pub name: String,
 
     /// Present if this option is a group or subcommand
-    pub options: Vec<ApplicationCommandInteractionDataOption>,
+    pub options: OptionList,
 
     /// true if this option is the currently focused option for autocomplete
     pub focused: Option<bool>,
+}
+
+#[derive(Debug)]
+pub struct SubcommandGroup {
+    /// Name of the parameter
+    pub name: String,
+
+    /// The command being called
+    pub subcommand: Subcommand,
+
+    /// true if this option is the currently focused option for autocomplete
+    pub focused: Option<bool>,
+}
+
+impl<'de> Deserialize<'de> for SubcommandGroup {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct InnerData {
+            name: String,
+            options: Vec<ApplicationCommandInteractionDataOption>,
+            focused: Option<bool>,
+        }
+
+        let InnerData {
+            name,
+            focused,
+            mut options,
+        } = InnerData::deserialize(deserializer)?;
+
+        let option = options.remove(0);
+
+        match option {
+            ApplicationCommandInteractionDataOption::Subcommand(subcommand) => {
+                Ok(SubcommandGroup {
+                    name,
+                    subcommand,
+                    focused,
+                })
+            }
+            _ => return Err(serde::de::Error::custom("Not a subcommand")),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

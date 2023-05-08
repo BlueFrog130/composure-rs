@@ -74,7 +74,7 @@ mod tests {
             options: Some(vec![ApplicationCommandOption::new_boolean_option(
                 String::from("bool name"),
                 String::from("bool desc"),
-                false,
+                None,
             )]),
         });
 

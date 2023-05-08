@@ -1,6 +1,6 @@
 use commands::command::ApplicationCommand;
 
-use crate::{DiscordClient, Result, DISCORD_API};
+use crate::{DiscordClient, Error, Result, DISCORD_API};
 
 impl DiscordClient {
     pub fn get_global_commands(&self) -> Result<Vec<ApplicationCommand>> {
@@ -62,9 +62,15 @@ impl DiscordClient {
             self.application_id
         );
 
-        let commands = self.put(url, commands)?;
+        let response = self.put(url, commands);
 
-        Ok(commands)
+        if let Err(ref e) = response {
+            if let Error::UnknownResponse(response) = e {
+                println!("Invalid response: {}", response);
+            }
+        }
+
+        response
     }
 
     /// Sets the list of guild commands.

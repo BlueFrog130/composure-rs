@@ -78,7 +78,7 @@ pub struct Message {
     pub message_reference: Option<MessageReference>,
 
     /// [message flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
-    pub flags: Option<u32>,
+    pub flags: Option<MessageFlags>,
 
     // /// the message associated with the message_reference
     // pub referenced_message: Option<Message>,
@@ -134,97 +134,97 @@ pub struct Reaction {
 #[derive(Debug, Deserialize_repr)]
 #[repr(u8)]
 pub enum MessageType {
-    /// true
+    /// Deletable: true
     Default = 0,
 
-    /// false
+    /// Deletable: false
     RecipientAdd = 1,
 
-    /// false
+    /// Deletable: false
     RecipientRemove = 2,
 
-    /// false
+    /// Deletable: false
     Call = 3,
 
-    /// false
+    /// Deletable: false
     ChannelNameChange = 4,
 
-    /// false
+    /// Deletable: false
     ChannelIconChange = 5,
 
-    /// true
+    /// Deletable: true
     ChannelPinnedMessage = 6,
 
-    /// true
+    /// Deletable: true
     UserJoin = 7,
 
-    /// true
+    /// Deletable: true
     GuildBoost = 8,
 
-    /// true
+    /// Deletable: true
     GuildBoostTier1 = 9,
 
-    /// true
+    /// Deletable: true
     GuildBoostTier2 = 10,
 
-    /// true
+    /// Deletable: true
     GuildBoostTier3 = 11,
 
-    /// true
+    /// Deletable: true
     ChannelFollowAdd = 12,
 
-    /// false
+    /// Deletable: false
     GuildDiscoveryDisqualified = 14,
 
-    /// false
+    /// Deletable: false
     GuildDiscoveryRequalified = 15,
 
-    /// false
+    /// Deletable: false
     GuildDiscoveryGracePeriodInitialWarning = 16,
 
-    /// false
+    /// Deletable: false
     GuildDiscoveryGracePeriodFinalWarning = 17,
 
-    /// true
+    /// Deletable: true
     ThreadCreated = 18,
 
-    /// true
+    /// Deletable: true
     Reply = 19,
 
-    /// true
+    /// Deletable: true
     ChatInputCommand = 20,
 
-    /// false
+    /// Deletable: false
     ThreadStarterMessage = 21,
 
-    /// true
+    /// Deletable: true
     GuildInviteReminder = 22,
 
-    /// true
+    /// Deletable: true
     ContextMenuCommand = 23,
 
-    /// true*
+    /// Deletable: true, can only be deleted by members with MANAGE_MESSAGES permission
     AutoModerationAction = 24,
 
-    /// true
+    /// Deletable: true
     RoleSubscriptionPurchase = 25,
 
-    /// true
+    /// Deletable: true
     InteractionPremiumUpsell = 26,
 
-    /// true
+    /// Deletable: true
     StageStart = 27,
 
-    /// true
+    /// Deletable: true
     StageEnd = 28,
 
-    /// true
+    /// Deletable: true
     StageSpeaker = 29,
 
-    /// true
+    /// Deletable: true
     StageTopic = 31,
 
-    /// false
+    /// Deletable: false
     GuildApplicationPremiumSubscription = 32,
 }
 

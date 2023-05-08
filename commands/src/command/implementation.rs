@@ -118,13 +118,11 @@ impl ApplicationCommandOption {
     pub fn new_subcommand_option(
         name: String,
         description: String,
-        required: bool,
-        options: Vec<ApplicationCommandOption>,
+        options: Option<Vec<SubcommandCommandOption>>,
     ) -> ApplicationCommandOption {
         ApplicationCommandOption::Subcommand(SubcommandOption {
             name,
             description,
-            required,
             options,
             t: TypeField::<1>,
             name_localizations: None,
@@ -135,13 +133,11 @@ impl ApplicationCommandOption {
     pub fn new_subcommand_group_option(
         name: String,
         description: String,
-        required: bool,
-        options: Vec<ApplicationCommandOption>,
+        options: Option<Vec<SubcommandGroupCommandOption>>,
     ) -> ApplicationCommandOption {
-        ApplicationCommandOption::SubcommandGroup(SubcommandOption {
+        ApplicationCommandOption::SubcommandGroup(SubcommandGroupOption {
             name,
             description,
-            required,
             options,
             t: TypeField::<2>,
             name_localizations: None,
@@ -152,7 +148,7 @@ impl ApplicationCommandOption {
     pub fn new_string_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
         choices: Option<Vec<ApplicationCommandOptionChoice<String>>>,
         min_length: Option<i32>,
         max_length: Option<i32>,
@@ -175,7 +171,7 @@ impl ApplicationCommandOption {
     pub fn new_integer_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
         choices: Option<Vec<ApplicationCommandOptionChoice<i64>>>,
         min_value: Option<i64>,
         max_value: Option<i64>,
@@ -198,7 +194,7 @@ impl ApplicationCommandOption {
     pub fn new_boolean_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
     ) -> ApplicationCommandOption {
         ApplicationCommandOption::Boolean(Self::new_base_option::<5>(name, description, required))
     }
@@ -206,7 +202,7 @@ impl ApplicationCommandOption {
     pub fn new_user_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
     ) -> ApplicationCommandOption {
         ApplicationCommandOption::User(Self::new_base_option::<6>(name, description, required))
     }
@@ -214,7 +210,7 @@ impl ApplicationCommandOption {
     pub fn new_channel_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
     ) -> ApplicationCommandOption {
         ApplicationCommandOption::Channel(Self::new_base_option::<7>(name, description, required))
     }
@@ -222,7 +218,7 @@ impl ApplicationCommandOption {
     pub fn new_role_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
     ) -> ApplicationCommandOption {
         ApplicationCommandOption::Role(Self::new_base_option::<8>(name, description, required))
     }
@@ -230,7 +226,7 @@ impl ApplicationCommandOption {
     pub fn new_mentionable_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
     ) -> ApplicationCommandOption {
         ApplicationCommandOption::Mentionable(Self::new_base_option::<9>(
             name,
@@ -242,7 +238,7 @@ impl ApplicationCommandOption {
     pub fn new_attachment_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
     ) -> ApplicationCommandOption {
         ApplicationCommandOption::Attachment(Self::new_base_option::<11>(
             name,
@@ -254,7 +250,7 @@ impl ApplicationCommandOption {
     pub fn new_number_option(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
         choices: Option<Vec<ApplicationCommandOptionChoice<f64>>>,
         min_value: Option<f64>,
         max_value: Option<f64>,
@@ -277,7 +273,7 @@ impl ApplicationCommandOption {
     fn new_base_option<const T: u8>(
         name: String,
         description: String,
-        required: bool,
+        required: Option<bool>,
     ) -> BaseOption<T> {
         BaseOption {
             t: TypeField::<T>,
@@ -306,8 +302,9 @@ impl<'de> Deserialize<'de> for ApplicationCommandOption {
             1 => Ok(ApplicationCommandOption::Subcommand(
                 SubcommandOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
             )),
-            2 => Ok(ApplicationCommandOption::Subcommand(
-                SubcommandOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            2 => Ok(ApplicationCommandOption::SubcommandGroup(
+                SubcommandGroupOption::deserialize(value)
+                    .map_err(|e| serde::de::Error::custom(e))?,
             )),
             3 => Ok(ApplicationCommandOption::String(
                 StringOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
@@ -334,6 +331,406 @@ impl<'de> Deserialize<'de> for ApplicationCommandOption {
                 NumberOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
             )),
             11 => Ok(ApplicationCommandOption::Attachment(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            _ => Err(serde::de::Error::custom("Unknown option")),
+        }
+    }
+}
+
+impl SubcommandGroupCommandOption {
+    pub fn new_subcommand_option(
+        name: String,
+        description: String,
+        options: Option<Vec<SubcommandCommandOption>>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::Subcommand(SubcommandOption {
+            name,
+            description,
+            options,
+            t: TypeField::<1>,
+            name_localizations: None,
+            description_localizations: None,
+        })
+    }
+
+    pub fn new_string_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+        choices: Option<Vec<ApplicationCommandOptionChoice<String>>>,
+        min_length: Option<i32>,
+        max_length: Option<i32>,
+        autocomplete: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::String(StringOption {
+            name,
+            description,
+            required,
+            choices,
+            min_length,
+            max_length,
+            autocomplete,
+            t: TypeField::<3>,
+            name_localizations: None,
+            description_localizations: None,
+        })
+    }
+
+    pub fn new_integer_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+        choices: Option<Vec<ApplicationCommandOptionChoice<i64>>>,
+        min_value: Option<i64>,
+        max_value: Option<i64>,
+        autocomplete: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::Integer(IntegerOption {
+            name,
+            description,
+            required,
+            choices,
+            min_value,
+            max_value,
+            autocomplete,
+            t: TypeField::<4>,
+            name_localizations: None,
+            description_localizations: None,
+        })
+    }
+
+    pub fn new_boolean_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::Boolean(Self::new_base_option::<5>(
+            name,
+            description,
+            required,
+        ))
+    }
+
+    pub fn new_user_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::User(Self::new_base_option::<6>(name, description, required))
+    }
+
+    pub fn new_channel_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::Channel(Self::new_base_option::<7>(
+            name,
+            description,
+            required,
+        ))
+    }
+
+    pub fn new_role_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::Role(Self::new_base_option::<8>(name, description, required))
+    }
+
+    pub fn new_mentionable_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::Mentionable(Self::new_base_option::<9>(
+            name,
+            description,
+            required,
+        ))
+    }
+
+    pub fn new_attachment_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::Attachment(Self::new_base_option::<11>(
+            name,
+            description,
+            required,
+        ))
+    }
+
+    pub fn new_number_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+        choices: Option<Vec<ApplicationCommandOptionChoice<f64>>>,
+        min_value: Option<f64>,
+        max_value: Option<f64>,
+        autocomplete: Option<bool>,
+    ) -> SubcommandGroupCommandOption {
+        SubcommandGroupCommandOption::Number(NumberOption {
+            name,
+            description,
+            required,
+            choices,
+            min_value,
+            max_value,
+            autocomplete,
+            t: TypeField::<10>,
+            name_localizations: None,
+            description_localizations: None,
+        })
+    }
+
+    fn new_base_option<const T: u8>(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> BaseOption<T> {
+        BaseOption {
+            t: TypeField::<T>,
+            name,
+            name_localizations: None,
+            description,
+            description_localizations: None,
+            required,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SubcommandGroupCommandOption {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+
+        let t = value
+            .get("type")
+            .and_then(Value::as_u64)
+            .ok_or(serde::de::Error::missing_field("type"))?;
+
+        match t {
+            1 => Ok(SubcommandGroupCommandOption::Subcommand(
+                SubcommandOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            3 => Ok(SubcommandGroupCommandOption::String(
+                StringOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            4 => Ok(SubcommandGroupCommandOption::Integer(
+                IntegerOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            5 => Ok(SubcommandGroupCommandOption::Boolean(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            6 => Ok(SubcommandGroupCommandOption::User(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            7 => Ok(SubcommandGroupCommandOption::Channel(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            8 => Ok(SubcommandGroupCommandOption::Role(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            9 => Ok(SubcommandGroupCommandOption::Mentionable(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            10 => Ok(SubcommandGroupCommandOption::Number(
+                NumberOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            11 => Ok(SubcommandGroupCommandOption::Attachment(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            _ => Err(serde::de::Error::custom("Unknown option")),
+        }
+    }
+}
+
+impl SubcommandCommandOption {
+    pub fn new_string_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+        choices: Option<Vec<ApplicationCommandOptionChoice<String>>>,
+        min_length: Option<i32>,
+        max_length: Option<i32>,
+        autocomplete: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::String(StringOption {
+            name,
+            description,
+            required,
+            choices,
+            min_length,
+            max_length,
+            autocomplete,
+            t: TypeField::<3>,
+            name_localizations: None,
+            description_localizations: None,
+        })
+    }
+
+    pub fn new_integer_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+        choices: Option<Vec<ApplicationCommandOptionChoice<i64>>>,
+        min_value: Option<i64>,
+        max_value: Option<i64>,
+        autocomplete: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::Integer(IntegerOption {
+            name,
+            description,
+            required,
+            choices,
+            min_value,
+            max_value,
+            autocomplete,
+            t: TypeField::<4>,
+            name_localizations: None,
+            description_localizations: None,
+        })
+    }
+
+    pub fn new_boolean_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::Boolean(Self::new_base_option::<5>(name, description, required))
+    }
+
+    pub fn new_user_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::User(Self::new_base_option::<6>(name, description, required))
+    }
+
+    pub fn new_channel_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::Channel(Self::new_base_option::<7>(name, description, required))
+    }
+
+    pub fn new_role_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::Role(Self::new_base_option::<8>(name, description, required))
+    }
+
+    pub fn new_mentionable_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::Mentionable(Self::new_base_option::<9>(
+            name,
+            description,
+            required,
+        ))
+    }
+
+    pub fn new_attachment_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::Attachment(Self::new_base_option::<11>(
+            name,
+            description,
+            required,
+        ))
+    }
+
+    pub fn new_number_option(
+        name: String,
+        description: String,
+        required: Option<bool>,
+        choices: Option<Vec<ApplicationCommandOptionChoice<f64>>>,
+        min_value: Option<f64>,
+        max_value: Option<f64>,
+        autocomplete: Option<bool>,
+    ) -> SubcommandCommandOption {
+        SubcommandCommandOption::Number(NumberOption {
+            name,
+            description,
+            required,
+            choices,
+            min_value,
+            max_value,
+            autocomplete,
+            t: TypeField::<10>,
+            name_localizations: None,
+            description_localizations: None,
+        })
+    }
+
+    fn new_base_option<const T: u8>(
+        name: String,
+        description: String,
+        required: Option<bool>,
+    ) -> BaseOption<T> {
+        BaseOption {
+            t: TypeField::<T>,
+            name,
+            name_localizations: None,
+            description,
+            description_localizations: None,
+            required,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SubcommandCommandOption {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+
+        let t = value
+            .get("type")
+            .and_then(Value::as_u64)
+            .ok_or(serde::de::Error::missing_field("type"))?;
+
+        match t {
+            3 => Ok(SubcommandCommandOption::String(
+                StringOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            4 => Ok(SubcommandCommandOption::Integer(
+                IntegerOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            5 => Ok(SubcommandCommandOption::Boolean(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            6 => Ok(SubcommandCommandOption::User(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            7 => Ok(SubcommandCommandOption::Channel(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            8 => Ok(SubcommandCommandOption::Role(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            9 => Ok(SubcommandCommandOption::Mentionable(
+                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            10 => Ok(SubcommandCommandOption::Number(
+                NumberOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+            )),
+            11 => Ok(SubcommandCommandOption::Attachment(
                 BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
             )),
             _ => Err(serde::de::Error::custom("Unknown option")),

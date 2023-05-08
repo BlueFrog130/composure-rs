@@ -73,27 +73,65 @@ pub struct ChatInputCommand<const T: u8> {
     pub options: Option<Vec<ApplicationCommandOption>>,
 }
 
+pub type BooleanOption = BaseOption<5>;
+pub type UserOption = BaseOption<6>;
+pub type ChannelOption = BaseOption<7>;
+pub type RoleOption = BaseOption<8>;
+pub type MentionableOption = BaseOption<9>;
+pub type AttachmentOption = BaseOption<11>;
+
 /// [Application Command Option Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-structure)
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommandOption {
-    Subcommand(SubcommandOption<1>),
-    SubcommandGroup(SubcommandOption<2>),
-    String(StringOption<3>),
-    Integer(IntegerOption<4>),
-    Boolean(BaseOption<5>),
-    User(BaseOption<6>),
-    Channel(BaseOption<7>),
-    Role(BaseOption<8>),
-    Mentionable(BaseOption<9>),
-    Number(NumberOption<10>),
-    Attachment(BaseOption<11>),
+    Subcommand(SubcommandOption),
+    SubcommandGroup(SubcommandGroupOption),
+    String(StringOption),
+    Integer(IntegerOption),
+    Boolean(BooleanOption),
+    User(UserOption),
+    Channel(ChannelOption),
+    Role(RoleOption),
+    Mentionable(MentionableOption),
+    Number(NumberOption),
+    Attachment(AttachmentOption),
+}
+
+/// Subcommand group options
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum SubcommandGroupCommandOption {
+    Subcommand(SubcommandOption),
+    String(StringOption),
+    Integer(IntegerOption),
+    Boolean(BooleanOption),
+    User(UserOption),
+    Channel(ChannelOption),
+    Role(RoleOption),
+    Mentionable(MentionableOption),
+    Number(NumberOption),
+    Attachment(AttachmentOption),
+}
+
+/// Subcommand options
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum SubcommandCommandOption {
+    String(StringOption),
+    Integer(IntegerOption),
+    Boolean(BooleanOption),
+    User(UserOption),
+    Channel(ChannelOption),
+    Role(RoleOption),
+    Mentionable(MentionableOption),
+    Number(NumberOption),
+    Attachment(AttachmentOption),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SubcommandOption<const T: u8> {
+pub struct SubcommandOption {
     #[serde(rename = "type")]
-    pub t: TypeField<T>,
+    pub t: TypeField<1>,
 
     /// [1-32 character name](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming)
     pub name: String,
@@ -108,18 +146,38 @@ pub struct SubcommandOption<const T: u8> {
     /// Localization dictionary for the description field. Values follow the same restrictions as description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description_localizations: Option<HashMap<String, String>>,
-
-    /// If the parameter is required or optional--default false
-    pub required: bool,
 
     /// If the option is a subcommand or subcommand group type, these nested options will be the parameters
-    pub options: Vec<ApplicationCommandOption>,
+    pub options: Option<Vec<SubcommandCommandOption>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StringOption<const T: u8> {
+pub struct SubcommandGroupOption {
     #[serde(rename = "type")]
-    pub t: TypeField<T>,
+    pub t: TypeField<2>,
+
+    /// [1-32 character name](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming)
+    pub name: String,
+
+    /// Localization dictionary for the name field. Values follow the same restrictions as name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_localizations: Option<HashMap<String, String>>,
+
+    /// 1-100 character description
+    pub description: String,
+
+    /// Localization dictionary for the description field. Values follow the same restrictions as description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description_localizations: Option<HashMap<String, String>>,
+
+    /// If the option is a subcommand or subcommand group type, these nested options will be the parameters
+    pub options: Option<Vec<SubcommandGroupCommandOption>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StringOption {
+    #[serde(rename = "type")]
+    pub t: TypeField<3>,
 
     /// [1-32 character name](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming)
     pub name: String,
@@ -136,7 +194,8 @@ pub struct StringOption<const T: u8> {
     pub description_localizations: Option<HashMap<String, String>>,
 
     /// If the parameter is required or optional--default false
-    pub required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 
     /// Choices for STRING, INTEGER, and NUMBER types for the user to pick from, max 25
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -156,9 +215,9 @@ pub struct StringOption<const T: u8> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct IntegerOption<const T: u8> {
+pub struct IntegerOption {
     #[serde(rename = "type")]
-    pub t: TypeField<T>,
+    pub t: TypeField<4>,
 
     /// [1-32 character name](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming)
     pub name: String,
@@ -175,7 +234,8 @@ pub struct IntegerOption<const T: u8> {
     pub description_localizations: Option<HashMap<String, String>>,
 
     /// If the parameter is required or optional--default false
-    pub required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 
     /// Choices for STRING, INTEGER, and NUMBER types for the user to pick from, max 25
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -195,9 +255,9 @@ pub struct IntegerOption<const T: u8> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NumberOption<const T: u8> {
+pub struct NumberOption {
     #[serde(rename = "type")]
-    pub t: TypeField<T>,
+    pub t: TypeField<10>,
 
     /// [1-32 character name](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming)
     pub name: String,
@@ -214,7 +274,8 @@ pub struct NumberOption<const T: u8> {
     pub description_localizations: Option<HashMap<String, String>>,
 
     /// If the parameter is required or optional--default false
-    pub required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 
     /// Choices for STRING, INTEGER, and NUMBER types for the user to pick from, max 25
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -253,7 +314,8 @@ pub struct BaseOption<const T: u8> {
     pub description_localizations: Option<HashMap<String, String>>,
 
     /// If the parameter is required or optional--default false
-    pub required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 }
 
 /// [Application Command Option Choice Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)

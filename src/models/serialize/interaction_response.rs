@@ -32,6 +32,32 @@ pub enum InteractionResponse {
     Modal(ModalCallbackData),
 }
 
+impl InteractionResponse {
+    pub fn respond_with_message(content: String) -> Self {
+        InteractionResponse::ChannelMessageWithSource(MessageCallbackData {
+            tts: None,
+            content: Some(content),
+            embeds: None,
+            allowed_mentions: None,
+            flags: None,
+            components: None,
+            attachments: None,
+        })
+    }
+
+    pub fn respond_with_embed(embed: Embed) -> Self {
+        InteractionResponse::ChannelMessageWithSource(MessageCallbackData {
+            tts: None,
+            content: None,
+            embeds: Some(vec![embed]),
+            allowed_mentions: None,
+            flags: None,
+            components: None,
+            attachments: None,
+        })
+    }
+}
+
 impl Serialize for InteractionResponse {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -68,15 +94,6 @@ impl Serialize for InteractionResponse {
     }
 }
 
-// Wrapper around an interaction response
-#[derive(Debug, Serialize)]
-struct InteractionResponseStructure {
-    #[serde(rename = "type")]
-    t: u8,
-
-    data: InteractionResponse,
-}
-
 /// [Message Callback Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-messages)
 #[derive(Debug, Serialize)]
 pub struct MessageCallbackData {
@@ -101,9 +118,11 @@ pub struct MessageCallbackData {
     pub flags: Option<MessageFlags>,
 
     /// message components
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<Vec<ActionRow>>,
 
     /// attachment objects with filename and description
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<PartialAttachment>>,
 }
 
