@@ -1,5 +1,5 @@
 [package]
-name = "interaction_bot"
+name = "conform"
 version = "0.1.0"
 edition = "2021"
 
@@ -15,7 +15,6 @@ serde_repr = "0.1.12"
 strum = { version = "0.24.1", features = ["derive"] }
 
 [dev-dependencies]
-commands = { path = "./commands" }
 
 [workspace]
 members = ["commands", "api", "cloudflare"]

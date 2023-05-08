@@ -3,19 +3,6 @@
 version = 3
 
 [[package]]
-name = "api"
-version = "0.1.0"
-dependencies = [
- "commands",
- "dotenv",
- "interaction_bot",
- "itertools",
- "reqwest",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -124,20 +111,46 @@ dependencies = [
 ]
 
 [[package]]
-name = "cloudflare"
+name = "conform"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.2.1",
+ "ed25519-dalek",
+ "hex",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "strum",
+]
+
+[[package]]
+name = "conform_adapter_cloudflare"
+version = "0.1.0"
+dependencies = [
+ "conform",
  "futures",
- "interaction_bot",
  "serde_json",
  "worker",
 ]
 
 [[package]]
-name = "commands"
+name = "conform_api"
 version = "0.1.0"
 dependencies = [
- "interaction_bot",
+ "conform",
+ "conform_commands",
+ "dotenv",
+ "itertools",
+ "reqwest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "conform_commands"
+version = "0.1.0"
+dependencies = [
+ "conform",
  "serde",
  "serde_json",
  "serde_repr",
@@ -541,20 +554,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "interaction_bot"
-version = "0.1.0"
-dependencies = [
- "bitflags 2.2.1",
- "commands",
- "ed25519-dalek",
- "hex",
- "serde",
- "serde_json",
- "serde_repr",
- "strum",
 ]
 
 [[package]]

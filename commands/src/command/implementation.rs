@@ -1,4 +1,4 @@
-use interaction_bot::models::{Permissions, Snowflake, TypeField};
+use conform::models::{Permissions, Snowflake, TypeField};
 use serde::Deserialize;
 use serde_json::Value;
 

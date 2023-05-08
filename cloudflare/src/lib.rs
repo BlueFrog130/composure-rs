@@ -1,7 +1,5 @@
+use conform::models::{ApplicationCommandInteraction, Embed, Interaction, InteractionResponse};
 use futures::future::BoxFuture;
-use interaction_bot::models::{
-    ApplicationCommandInteraction, Embed, Interaction, InteractionResponse,
-};
 use worker::{console_debug, console_error, console_warn, Env, Headers, Request, Response};
 
 #[derive(Debug)]
@@ -38,7 +36,7 @@ pub fn validate_request(env: &Env, headers: &Headers, body: &[u8]) -> Result<()>
         .map_err(|e| Error::WorkerError(e))?
         .to_string();
 
-    interaction_bot::auth::validate_request(&public_key, &signature, &timestamp, body)
+    conform::auth::validate_request(&public_key, &signature, &timestamp, body)
         .map_err(|_| Error::ValidationError)
 }
 

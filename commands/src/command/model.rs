@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use interaction_bot::models::{Permissions, Snowflake, TypeField};
+use conform::models::{Permissions, Snowflake, TypeField};
 use serde::{Deserialize, Serialize};
 
 /// [Application Command Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)

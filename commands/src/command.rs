@@ -6,7 +6,7 @@ pub use model::*;
 
 #[cfg(test)]
 mod tests {
-    use interaction_bot::models::{Snowflake, TypeField};
+    use conform::models::{Snowflake, TypeField};
 
     use super::*;
 
