@@ -1,7 +1,12 @@
 [package]
 name = "composure_adapter_cloudflare"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+readme = "README.md"
+description = "Discord bot framework for running on the edge"
+repository = "https://github.com/BlueFrog130/composure-rs/adapters/cloudflare"
+keywords = ["discord", "bot", "framework", "edge", "serverless", "wasm", "cloudflare"]
+license = "Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "composure_adapter_cloudflare"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "composure",
  "futures",
@@ -135,7 +135,7 @@ dependencies = [
 
 [[package]]
 name = "composure_api"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "composure",
  "composure_commands",
@@ -148,7 +148,7 @@ dependencies = [
 
 [[package]]
 name = "composure_commands"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "composure",
  "serde",
