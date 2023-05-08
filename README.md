@@ -23,3 +23,6 @@ Adapters are responsible for verifying the request, parsing the request body, th
 
 - [ ] Explore more adapters
 - [ ] Create macro to simplify command tree
+- [ ] Handle message component interaction
+- [ ] Handle autocomplete interaction
+- [ ] Handle modal submit interaction
