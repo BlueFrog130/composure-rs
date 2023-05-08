@@ -6,7 +6,7 @@ pub use model::*;
 
 #[cfg(test)]
 mod tests {
-    use conform::models::{Snowflake, TypeField};
+    use composure::models::{Snowflake, TypeField};
 
     use super::*;
 

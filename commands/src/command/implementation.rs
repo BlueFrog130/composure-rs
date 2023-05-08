@@ -1,4 +1,4 @@
-use conform::models::{Permissions, Snowflake, TypeField};
+use composure::models::{Permissions, Snowflake, TypeField};
 use serde::Deserialize;
 use serde_json::Value;
 

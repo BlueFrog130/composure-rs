@@ -111,8 +111,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "conform"
-version = "0.1.0"
+name = "composure"
+version = "0.0.1"
 dependencies = [
  "bitflags 2.2.1",
  "ed25519-dalek",
@@ -124,21 +124,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "conform_adapter_cloudflare"
+name = "composure_adapter_cloudflare"
 version = "0.1.0"
 dependencies = [
- "conform",
+ "composure",
  "futures",
  "serde_json",
  "worker",
 ]
 
 [[package]]
-name = "conform_api"
+name = "composure_api"
 version = "0.1.0"
 dependencies = [
- "conform",
- "conform_commands",
+ "composure",
+ "composure_commands",
  "dotenv",
  "itertools",
  "reqwest",
@@ -147,10 +147,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "conform_commands"
+name = "composure_commands"
 version = "0.1.0"
 dependencies = [
- "conform",
+ "composure",
  "serde",
  "serde_json",
  "serde_repr",

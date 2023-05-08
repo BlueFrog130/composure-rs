@@ -1,9 +1,0 @@
-# Conform
-
-### Todo
-
-- [ ] Make Readme
-- [ ] Reduce package size
-- [ ] Publish to crates.io
-- [ ] Add Discord REST integration (configurable to minimize pakacge size)
-- [ ] Explore more adapters

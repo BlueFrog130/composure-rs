@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use commands::command::ApplicationCommand;
-use interaction_bot::models::Snowflake;
+use composure::models::Snowflake;
+use composure_commands::command::ApplicationCommand;
 use reqwest::{
     header::{self, AUTHORIZATION},
     IntoUrl, StatusCode,
@@ -148,7 +148,7 @@ pub fn update_commands(
 pub mod tests {
     use std::{env, str::FromStr};
 
-    use interaction_bot::models::Snowflake;
+    use composure::models::Snowflake;
 
     use super::*;
 

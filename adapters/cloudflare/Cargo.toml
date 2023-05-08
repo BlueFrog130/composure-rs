@@ -1,5 +1,5 @@
 [package]
-name = "conform_adapter_cloudflare"
+name = "composure_adapter_cloudflare"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 worker = "0.0.16"
-conform = { path = "../" }
+composure = { path = "../../" }
 serde_json = "1.0.96"
 futures = { version = "0.3.28", default-features = false }

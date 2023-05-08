@@ -1,4 +1,4 @@
-use commands::command::ApplicationCommand;
+use composure_commands::command::ApplicationCommand;
 
 use crate::{DiscordClient, Error, Result, DISCORD_API};
 
@@ -94,7 +94,7 @@ impl DiscordClient {
 
 #[cfg(test)]
 pub mod tests {
-    use interaction_bot::models::Snowflake;
+    use composure::models::Snowflake;
     use std::{env, str::FromStr};
 
     use super::*;
