@@ -26,7 +26,7 @@ pub enum InteractionResponse {
     UpdateMessage(MessageCallbackData),
 
     /// respond to an autocomplete interaction with suggested choices
-    ApplicationCommandAutocompleteResult,
+    ApplicationCommandAutocompleteResult(AutocompleteCallbackData),
 
     /// respond to an interaction with a popup modal
     Modal(ModalCallbackData),
@@ -56,6 +56,12 @@ impl InteractionResponse {
             attachments: None,
         })
     }
+
+    pub fn respond_with_autocomplete_choices(choices: Vec<ApplicationCommandOptionChoice>) -> Self {
+        InteractionResponse::ApplicationCommandAutocompleteResult(AutocompleteCallbackData {
+            choices,
+        })
+    }
 }
 
 impl Serialize for InteractionResponse {
@@ -82,8 +88,9 @@ impl Serialize for InteractionResponse {
                 map.serialize_entry(TYPE_KEY, &7)?;
                 map.serialize_entry(DATA_KEY, &data)?;
             }
-            InteractionResponse::ApplicationCommandAutocompleteResult => {
+            InteractionResponse::ApplicationCommandAutocompleteResult(data) => {
                 map.serialize_entry(TYPE_KEY, &8)?;
+                map.serialize_entry(DATA_KEY, &data)?;
             }
             InteractionResponse::Modal(data) => {
                 map.serialize_entry(TYPE_KEY, &9)?;
@@ -128,7 +135,8 @@ pub struct MessageCallbackData {
 
 #[derive(Debug, Serialize)]
 pub struct AutocompleteCallbackData {
-    choices: Vec<ApplicationCommandOptionChoice>,
+    /// autocomplete choices (max of 25 choices)
+    pub choices: Vec<ApplicationCommandOptionChoice>,
 }
 
 /// [Application Command Option Choice Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)
@@ -163,7 +171,28 @@ pub struct ModalCallbackData {
     pub title: String,
 
     /// between 1 and 5 (inclusive) components that make up the modal
-    pub components: Vec<ActionRow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub components: Option<Vec<ActionRow>>,
+
+    /// is the response TTS
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tts: Option<bool>,
+
+    /// message content
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+
+    /// supports up to 10 embeds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embeds: Option<Vec<Embed>>,
+
+    /// [allowed mentions](https://discord.com/developers/docs/resources/channel#allowed-mentions-object) object
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_mentions: Option<AllowedMentions>,
+
+    /// [message flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field) (only SUPPRESS_EMBEDS and EPHEMERAL can be set)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flags: Option<MessageFlags>,
 }
 
 #[cfg(test)]

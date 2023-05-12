@@ -127,6 +127,7 @@ dependencies = [
 name = "composure_adapter_cloudflare"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "composure",
  "futures",
  "serde_json",

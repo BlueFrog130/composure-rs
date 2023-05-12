@@ -178,10 +178,23 @@ pub struct MessageComponentData {
     pub custom_id: String,
 
     /// the [type](https://discord.com/developers/docs/interactions/message-components#component-object-component-types) of the component
-    pub component_type: i32,
+    pub component_type: MessageComponentType,
 
     /// values the user selected in a [select menu](https://discord.com/developers/docs/interactions/message-components#select-menu-object) component
     pub values: Option<Vec<SelectOption>>,
+}
+
+#[derive(Debug, Deserialize_repr)]
+#[repr(u8)]
+pub enum MessageComponentType {
+    ActionRow = 1,
+    Button = 2,
+    StringSelect = 3,
+    TextInput = 4,
+    UserSelect = 5,
+    RoleSelect = 6,
+    MentionableSelect = 7,
+    ChannelSelect = 8,
 }
 
 /// [Modal Submit Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-modal-submit-data-structure)

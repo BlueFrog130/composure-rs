@@ -59,23 +59,23 @@ impl Embed {
         }
     }
 
-    pub fn with_title(mut self, title: String) -> Self {
-        self.title = Some(title);
+    pub fn with_title(mut self, title: &str) -> Self {
+        self.title = Some(title.into());
         self
     }
 
-    pub fn with_description(mut self, description: String) -> Self {
-        self.description = Some(description);
+    pub fn with_description(mut self, description: &str) -> Self {
+        self.description = Some(description.into());
         self
     }
 
-    pub fn with_url(mut self, url: String) -> Self {
-        self.url = Some(url);
+    pub fn with_url(mut self, url: &str) -> Self {
+        self.url = Some(url.into());
         self
     }
 
-    pub fn with_timestamp(mut self, timestamp: String) -> Self {
-        self.timestamp = Some(timestamp);
+    pub fn with_timestamp(mut self, timestamp: &str) -> Self {
+        self.timestamp = Some(timestamp.into());
         self
     }
 
@@ -114,8 +114,21 @@ impl Embed {
         self
     }
 
+    pub fn with_field(mut self, field: EmbedField) -> Self {
+        if let Some(fields) = &mut self.fields {
+            fields.push(field);
+        } else {
+            self.fields = Some(vec![field]);
+        }
+        self
+    }
+
     pub fn with_fields(mut self, fields: Vec<EmbedField>) -> Self {
-        self.fields = Some(fields);
+        if let Some(existing_fields) = &mut self.fields {
+            existing_fields.extend(fields);
+        } else {
+            self.fields = Some(fields);
+        }
         self
     }
 }
@@ -316,9 +329,7 @@ pub mod tests {
 
     #[test]
     pub fn embed_serialize_test() {
-        let embed = Embed::new()
-            .with_title("title".to_string())
-            .with_color(0xFFFFFF);
+        let embed = Embed::new().with_title("title").with_color(0xFFFFFF);
 
         let json = serde_json::to_string_pretty(&embed).unwrap();
 
