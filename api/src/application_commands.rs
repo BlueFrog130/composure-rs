@@ -94,8 +94,7 @@ impl DiscordClient {
 
 #[cfg(test)]
 pub mod tests {
-    use composure::models::Snowflake;
-    use std::{env, str::FromStr};
+    use std::env;
 
     use super::*;
 
@@ -140,8 +139,6 @@ pub mod tests {
         let client = DiscordClient::new(&token(), &application_id).unwrap();
 
         let command = ApplicationCommand::new_chat_input_command(
-            Snowflake::from_str(&application_id).unwrap(),
-            None,
             String::from("test"),
             String::from("test"),
             None,
@@ -163,14 +160,7 @@ pub mod tests {
 
         let client = DiscordClient::new(&token(), &application_id).unwrap();
 
-        let command = ApplicationCommand::new_user_command(
-            Snowflake::from_str(&application_id).unwrap(),
-            None,
-            String::from("test"),
-            None,
-            None,
-            None,
-        );
+        let command = ApplicationCommand::new_user_command(String::from("test"), None, None, None);
 
         println!("{}", serde_json::to_string_pretty(&command).unwrap());
 
@@ -188,8 +178,6 @@ pub mod tests {
         let client = DiscordClient::new(&token(), &application_id).unwrap();
 
         let binding = ApplicationCommand::new_chat_input_command(
-            Snowflake::from_str(&application_id).unwrap(),
-            None,
             String::from("test"),
             String::from("test"),
             None,
@@ -213,8 +201,6 @@ pub mod tests {
         let client = DiscordClient::new(&token(), &application_id).unwrap();
 
         let binding = ApplicationCommand::new_chat_input_command(
-            Snowflake::from_str(&application_id).unwrap(),
-            None,
             String::from("test"),
             String::from("test"),
             None,

@@ -1,20 +1,20 @@
+mod builder;
 mod implementation;
 mod model;
 
+pub use builder::*;
 pub use implementation::*;
 pub use model::*;
 
 #[cfg(test)]
 mod tests {
-    use composure::models::{Snowflake, TypeField};
+    use composure::models::TypeField;
 
     use super::*;
 
     #[test]
     pub fn serialize_command() {
         let command = ApplicationCommand::new_chat_input_command(
-            Snowflake::default(),
-            None,
             String::from("name"),
             String::from("descr"),
             None,
@@ -28,28 +28,15 @@ mod tests {
 
     #[test]
     pub fn serialize_message_command() {
-        let command = ApplicationCommand::new_message_command(
-            Snowflake::default(),
-            None,
-            String::from("name"),
-            None,
-            None,
-            None,
-        );
+        let command =
+            ApplicationCommand::new_message_command(String::from("name"), None, None, None);
 
         println!("{}", serde_json::to_string_pretty(&command).unwrap());
     }
 
     #[test]
     pub fn serialize_user_command() {
-        let command = ApplicationCommand::new_user_command(
-            Snowflake::default(),
-            None,
-            String::from("name"),
-            None,
-            None,
-            None,
-        );
+        let command = ApplicationCommand::new_user_command(String::from("name"), None, None, None);
 
         println!("{}", serde_json::to_string_pretty(&command).unwrap());
     }
@@ -60,7 +47,7 @@ mod tests {
             details: CommandDetails {
                 t: TypeField::<1>,
                 id: None,
-                application_id: Snowflake::default(),
+                application_id: None,
                 guild_id: None,
                 name: String::from("name"),
                 name_localizations: None,

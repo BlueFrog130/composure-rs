@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use composure::models::Snowflake;
-use composure_commands::command::ApplicationCommand;
+use composure_commands::command::{ApplicationCommand, CommandsBuilder};
 use reqwest::{
     header::{self, AUTHORIZATION},
     IntoUrl, StatusCode,
@@ -108,117 +108,40 @@ impl DiscordClient {
     }
 }
 
-pub fn update_commands(
-    token: &str,
-    application_id: &str,
-    commands: &[ApplicationCommand],
-) -> Result<Vec<ApplicationCommand>> {
-    let client = DiscordClient::new(token, application_id)?;
-
-    let mut groups: HashMap<&Option<Snowflake>, Vec<&ApplicationCommand>> = HashMap::new();
-
-    for command in commands.iter() {
-        let group = groups.get_mut(command.get_guild_id());
-
-        match group {
-            None => {
-                groups.insert(command.get_guild_id(), vec![command]);
-            }
-            Some(group) => {
-                group.push(command);
-            }
-        }
-    }
-
-    let mut updated_commands: Vec<ApplicationCommand> = vec![];
-
-    for (guild_id, group) in groups.iter() {
-        let updated_group = match guild_id {
-            Some(snowflake) => client.overwrite_guild_commands(&snowflake.to_string(), group),
-            None => client.overwrite_global_commands(group),
-        }?;
-
-        updated_commands.extend(updated_group);
-    }
-
-    Ok(updated_commands)
+pub trait UpdateCommands {
+    fn update_commands(&self, token: &str) -> Result<Vec<ApplicationCommand>>;
 }
 
-#[cfg(test)]
-pub mod tests {
-    use std::{env, str::FromStr};
+impl UpdateCommands for CommandsBuilder {
+    fn update_commands(&self, token: &str) -> Result<Vec<ApplicationCommand>> {
+        let client = DiscordClient::new(token, &self.application_id.to_string())?;
 
-    use composure::models::Snowflake;
+        let mut groups: HashMap<&Option<Snowflake>, Vec<&ApplicationCommand>> = HashMap::new();
 
-    use super::*;
+        for command in self.commands.iter() {
+            let group = groups.get_mut(command.get_guild_id());
 
-    fn setup() {
-        dotenv::from_filename(".env.test").unwrap();
-    }
+            match group {
+                None => {
+                    groups.insert(command.get_guild_id(), vec![command]);
+                }
+                Some(group) => {
+                    group.push(command);
+                }
+            }
+        }
 
-    fn application_id() -> String {
-        env::var("DISCORD_APPLICATION_ID").unwrap()
-    }
+        let mut updated_commands: Vec<ApplicationCommand> = vec![];
 
-    fn guild_id() -> String {
-        env::var("DISCORD_GUILD_ID").unwrap()
-    }
+        for (guild_id, group) in groups.iter() {
+            let updated_group = match guild_id {
+                Some(snowflake) => client.overwrite_guild_commands(&snowflake.to_string(), group),
+                None => client.overwrite_global_commands(group),
+            }?;
 
-    fn token() -> String {
-        env::var("DISCORD_TOKEN").unwrap()
-    }
+            updated_commands.extend(updated_group);
+        }
 
-    #[test]
-    pub fn update_commands_test() {
-        setup();
-
-        let guild_id = Snowflake::from_str(&guild_id()).unwrap();
-        let application_id = Snowflake::from_str(&application_id()).unwrap();
-
-        let commands = [
-            ApplicationCommand::new_chat_input_command(
-                application_id.clone(),
-                None,
-                String::from("test"),
-                String::from("descr"),
-                None,
-                None,
-                None,
-                None,
-            ),
-            ApplicationCommand::new_message_command(
-                application_id.clone(),
-                Some(guild_id.clone()),
-                String::from("msg command"),
-                None,
-                None,
-                None,
-            ),
-            ApplicationCommand::new_chat_input_command(
-                application_id.clone(),
-                Some(guild_id),
-                String::from("guild_command"),
-                String::from("guild command desc"),
-                None,
-                None,
-                None,
-                None,
-            ),
-            ApplicationCommand::new_chat_input_command(
-                application_id.clone(),
-                None,
-                String::from("test_2"),
-                String::from("descr"),
-                None,
-                None,
-                None,
-                None,
-            ),
-        ];
-
-        let updated_commands =
-            update_commands(&token(), &application_id.to_string(), &commands).unwrap();
-
-        println!("{:#?}", updated_commands);
+        Ok(updated_commands)
     }
 }

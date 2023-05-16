@@ -12,6 +12,32 @@ pub enum ApplicationCommand {
     MessageCommand(CommandDetails<3>),
 }
 
+impl ApplicationCommand {
+    pub fn as_chat_input_command(&self) -> Option<&ChatInputCommand<1>> {
+        if let Self::ChatInputCommand(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_user_command(&self) -> Option<&CommandDetails<2>> {
+        if let Self::UserCommand(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_message_command(&self) -> Option<&CommandDetails<3>> {
+        if let Self::MessageCommand(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommandDetails<const T: u8> {
     #[serde(rename = "type")]
@@ -22,7 +48,8 @@ pub struct CommandDetails<const T: u8> {
     pub id: Option<Snowflake>,
 
     /// ID of the parent application
-    pub application_id: Snowflake,
+    #[serde(skip_serializing)]
+    pub application_id: Option<Snowflake>,
 
     /// Guild ID of the command, if not global
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,22 +124,6 @@ pub enum ApplicationCommandOption {
     Attachment(AttachmentOption),
 }
 
-/// Subcommand group options
-#[derive(Debug, Serialize)]
-#[serde(untagged)]
-pub enum SubcommandGroupCommandOption {
-    Subcommand(SubcommandOption),
-    String(StringOption),
-    Integer(IntegerOption),
-    Boolean(BooleanOption),
-    User(UserOption),
-    Channel(ChannelOption),
-    Role(RoleOption),
-    Mentionable(MentionableOption),
-    Number(NumberOption),
-    Attachment(AttachmentOption),
-}
-
 /// Subcommand options
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
@@ -171,7 +182,7 @@ pub struct SubcommandGroupOption {
     pub description_localizations: Option<HashMap<String, String>>,
 
     /// If the option is a subcommand or subcommand group type, these nested options will be the parameters
-    pub options: Option<Vec<SubcommandGroupCommandOption>>,
+    pub options: Option<Vec<SubcommandOption>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
