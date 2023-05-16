@@ -1,6 +1,6 @@
 [package]
 name = "composure_api"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 readme = "README.md"
 description = "Discord bot framework for running on the edge"
@@ -12,8 +12,8 @@ license = "Apache-2.0"
 
 [dependencies]
 reqwest = { version = "0.11.16", features = ["serde_json", "blocking", "json"] }
-composure = { path = "../", version = "0.0.1" }
-composure_commands = { path = "../commands", version = "0.0.1" }
+composure = { path = "../", version = "0.0.2" }
+composure_commands = { path = "../commands", version = "0.0.2" }
 serde = "1.0.160"
 dotenv = "0.15.0"
 itertools = "0.10.5"

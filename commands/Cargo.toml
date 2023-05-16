@@ -1,6 +1,6 @@
 [package]
 name = "composure_commands"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 readme = "README.md"
 description = "Discord bot framework for running on the edge"
@@ -11,7 +11,7 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-composure = { path = "../", version = "0.0.1" }
+composure = { path = "../", version = "0.0.2" }
 serde = { version = "1.0.160", features = ["derive"] }
 serde_json = "1.0.96"
 serde_repr = "0.1.12"

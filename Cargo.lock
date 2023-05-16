@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "composure"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "bitflags 2.2.1",
  "ed25519-dalek",
@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "composure_adapter_cloudflare"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "async-trait",
  "composure",
@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "composure_api"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "composure",
  "composure_commands",
@@ -149,7 +149,7 @@ dependencies = [
 
 [[package]]
 name = "composure_commands"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "composure",
  "serde",
