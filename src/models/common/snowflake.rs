@@ -88,15 +88,15 @@ impl Into<u64> for Snowflake {
     }
 }
 
-impl ToString for Snowflake {
-    fn to_string(&self) -> String {
-        self.to_u64().to_string()
-    }
-}
-
 impl Debug for Snowflake {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Snowflake").field(&self.to_u64()).finish()
+    }
+}
+
+impl std::fmt::Display for Snowflake {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_u64())
     }
 }
 

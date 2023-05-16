@@ -1,8 +1,11 @@
 use serde::Deserialize;
 
-use crate::models::{
-    common::{Permissions, Snowflake},
-    Avatar, ImageFormat,
+use crate::{
+    models::{
+        common::{Permissions, Snowflake},
+        Avatar, ImageFormat,
+    },
+    Mentionable,
 };
 
 /// User object
@@ -55,6 +58,12 @@ impl Avatar for User {
             Self::get_cdn_url(),
             discriminator % 5
         ))
+    }
+}
+
+impl Mentionable for User {
+    fn to_mention(&self) -> String {
+        format!("<@{}>", self.id)
     }
 }
 
@@ -120,6 +129,12 @@ pub struct Member {
 
     /// when the user's [timeout](https://support.discord.com/hc/en-us/articles/4413305239191-Time-Out-FAQ) will expire and the user will be able to communicate in the guild again, null or a time in the past if the user is not timed out
     pub communication_disabled_until: Option<String>,
+}
+
+impl Mentionable for Member {
+    fn to_mention(&self) -> String {
+        format!("<@{}>", self.user.id)
+    }
 }
 
 #[cfg(test)]

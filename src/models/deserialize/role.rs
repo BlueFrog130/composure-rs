@@ -1,6 +1,9 @@
 use serde::{de::Visitor, Deserialize};
 
-use crate::models::{Permissions, Snowflake};
+use crate::{
+    models::{Permissions, Snowflake},
+    Mentionable,
+};
 
 /// [Role Object](https://discord.com/developers/docs/topics/permissions#role-object)
 #[derive(Debug, Deserialize)]
@@ -37,6 +40,12 @@ pub struct Role {
 
     /// the tags this role has
     pub tags: Option<RoleTags>,
+}
+
+impl Mentionable for Role {
+    fn to_mention(&self) -> String {
+        format!("<@&{}>", self.id)
+    }
 }
 
 /// [Role Subscription Data Object](https://discord.com/developers/docs/resources/channel#role-subscription-data-object)

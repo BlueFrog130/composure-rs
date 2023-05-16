@@ -2,9 +2,12 @@ use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use crate::models::{
-    common::{Permissions, Snowflake},
-    deserialize::{Member, User},
+use crate::{
+    models::{
+        common::{Permissions, Snowflake},
+        deserialize::{Member, User},
+    },
+    Mentionable,
 };
 
 #[derive(Debug, Deserialize)]
@@ -27,6 +30,12 @@ pub struct PartialChannel {
 
     /// for guild channels: id of the parent category for a channel (each parent category can contain up to 50 channels), for threads: id of the text channel this thread was created
     pub parent_id: Option<Snowflake>,
+}
+
+impl Mentionable for PartialChannel {
+    fn to_mention(&self) -> String {
+        format!("<#{}>", self.id)
+    }
 }
 
 /// [Channel Structure](https://discord.com/developers/docs/resources/channel#channel-object-channel-structure)
@@ -137,6 +146,12 @@ pub struct Channel {
 
     /// the [default forum layout view](https://discord.com/developers/docs/resources/channel#channel-object-forum-layout-types) used to display posts in GUILD_FORUM channels. Defaults to 0, which indicates a layout view has not been set by a channel admin
     pub default_forum_layout: Option<ForumLayoutType>,
+}
+
+impl Mentionable for Channel {
+    fn to_mention(&self) -> String {
+        format!("<#{}>", self.id)
+    }
 }
 
 impl PartialEq for Channel {
