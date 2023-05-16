@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-
-use composure::models::Snowflake;
 use composure_commands::command::{ApplicationCommand, CommandsBuilder};
 use reqwest::{
     header::{self, AUTHORIZATION},
@@ -116,31 +113,12 @@ impl UpdateCommands for CommandsBuilder {
     fn update_commands(&self, token: &str) -> Result<Vec<ApplicationCommand>> {
         let client = DiscordClient::new(token, &self.application_id.to_string())?;
 
-        let mut groups: HashMap<&Option<Snowflake>, Vec<&ApplicationCommand>> = HashMap::new();
+        let ref_vec = self.commands.iter().map(|c| c).collect();
 
-        for command in self.commands.iter() {
-            let group = groups.get_mut(command.get_guild_id());
-
-            match group {
-                None => {
-                    groups.insert(command.get_guild_id(), vec![command]);
-                }
-                Some(group) => {
-                    group.push(command);
-                }
-            }
-        }
-
-        let mut updated_commands: Vec<ApplicationCommand> = vec![];
-
-        for (guild_id, group) in groups.iter() {
-            let updated_group = match guild_id {
-                Some(snowflake) => client.overwrite_guild_commands(&snowflake.to_string(), group),
-                None => client.overwrite_global_commands(group),
-            }?;
-
-            updated_commands.extend(updated_group);
-        }
+        let updated_commands = match &self.guild_id {
+            Some(snowflake) => client.overwrite_guild_commands(&snowflake.to_string(), &ref_vec),
+            None => client.overwrite_global_commands(&ref_vec),
+        }?;
 
         Ok(updated_commands)
     }
