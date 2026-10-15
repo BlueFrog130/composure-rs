@@ -24,9 +24,11 @@ impl CloudflareCommandHandler for Bot {
     ) -> Result<InteractionResponse> {
         match command.data.name.as_str() {
             "hello" => {
-                let name = match &command.common.member {
-                    Some(member) => member.display_name(),
-                    None => "unknown user",
+                // Server nickname in guilds; display name or username in DMs
+                let name = match (&command.common.member, command.common.invoking_user()) {
+                    (Some(member), _) => member.display_name(),
+                    (None, Some(user)) => user.display_name(),
+                    (None, None) => "unknown user",
                 };
                 Ok(InteractionResponse::respond_with_message(format!(
                     "Hello, {name}!"

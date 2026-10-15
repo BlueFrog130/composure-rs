@@ -5,8 +5,8 @@ use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::models::{
-    ActionRow, Attachment, Channel, Member, Message, PartialChannel, PartialMember, Permissions,
-    Role, SelectOption, Snowflake, User,
+    ActionRow, ApplicationIntegrationType, Attachment, Channel, InteractionContextType, Member,
+    Message, PartialChannel, PartialMember, Permissions, Role, SelectOption, Snowflake, User,
 };
 
 pub type ApplicationCommandInteraction = DataInteraction<ApplicationCommandInteractionData>;
@@ -85,7 +85,7 @@ pub struct InteractionCommon {
     /// Guild member data for the invoking user, including permissions
     pub member: Option<Member>,
 
-    /// User object for the invoking user, if invoked in a DM
+    /// User object for the invoking user, if invoked in a DM. Use [`InteractionCommon::invoking_user`] to get the user in any context.
     pub user: Option<User>,
 
     /// Continuation token for responding to the interaction
@@ -102,6 +102,45 @@ pub struct InteractionCommon {
 
     /// [Guild's preferred locale](https://discord.com/developers/docs/resources/guild#guild-object), if invoked in a guild
     pub guild_locale: Option<String>,
+
+    /// Installation contexts the interaction is authorized for, mapped to the guild id (guild install;
+    /// `"0"` in a DM with the bot) or the authorizing user's id (user install)
+    #[serde(default, deserialize_with = "deserialize_integration_owners")]
+    pub authorizing_integration_owners: HashMap<ApplicationIntegrationType, Snowflake>,
+
+    /// Context the interaction was triggered from
+    pub context: Option<InteractionContextType>,
+}
+
+/// Keys are integration types as strings (`"0"`, `"1"`); unknown types are skipped.
+fn deserialize_integration_owners<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<ApplicationIntegrationType, Snowflake>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let owners = HashMap::<String, Snowflake>::deserialize(deserializer)?;
+
+    Ok(owners
+        .into_iter()
+        .filter_map(|(key, owner)| {
+            let key = key.parse::<u8>().ok()?;
+            let integration_type =
+                ApplicationIntegrationType::deserialize(Value::from(key)).ok()?;
+            Some((integration_type, owner))
+        })
+        .collect())
+}
+
+impl InteractionCommon {
+    /// The user who invoked the interaction: `member.user` in a guild, `user` in DMs and private channels.
+    /// `None` only for pings.
+    pub fn invoking_user(&self) -> Option<&User> {
+        self.member
+            .as_ref()
+            .map(|member| &member.user)
+            .or(self.user.as_ref())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -763,5 +802,139 @@ mod tests {
         assert_eq!(member.user.discriminator, "0");
         assert_eq!(member.user.global_name.as_deref(), Some("Blue Frog"));
         assert_eq!(member.display_name(), "Blue Frog");
+    }
+
+    fn user_install_interaction(context: u8, location: &str) -> ApplicationCommandInteraction {
+        let json = format!(
+            r#"{{
+                "app_permissions": "562949953601536",
+                "application_id": "1052322265397739523",
+                "attachment_size_limit": 10485760,
+                "authorizing_integration_owners": {{ "1": "282265607313817601" }},
+                "context": {context},
+                "data": {{ "id": "1052358444704862218", "name": "ping", "type": 1 }},
+                "entitlements": [],
+                "id": "1100173248714518568",
+                "locale": "en-US",
+                {location},
+                "token": "A_UNIQUE_TOKEN",
+                "type": 2,
+                "version": 1
+            }}"#
+        );
+
+        match serde_json::from_str::<Interaction>(&json).unwrap() {
+            Interaction::ApplicationCommand(interaction) => interaction,
+            other => panic!("expected application command, got {other:?}"),
+        }
+    }
+
+    const USER: &str = r#"{
+        "avatar": null,
+        "discriminator": "0",
+        "global_name": "Blue Frog",
+        "id": "282265607313817601",
+        "public_flags": 0,
+        "username": "bluefrog"
+    }"#;
+
+    #[test]
+    pub fn user_install_guild_context() {
+        let location = format!(
+            r#""guild_id": "798662131062931547",
+            "guild_locale": "en-US",
+            "channel_id": "941169456686723122",
+            "member": {{
+                "avatar": null,
+                "deaf": false,
+                "flags": 0,
+                "joined_at": "2021-01-12T21:18:10.481000+00:00",
+                "mute": false,
+                "nick": "Froggy",
+                "pending": false,
+                "permissions": "2251799813685247",
+                "premium_since": null,
+                "roles": [],
+                "user": {USER}
+            }}"#
+        );
+        let interaction = user_install_interaction(0, &location);
+        let common = &interaction.common;
+
+        assert_eq!(common.context, Some(InteractionContextType::Guild));
+        assert_eq!(
+            common.authorizing_integration_owners[&ApplicationIntegrationType::UserInstall],
+            Snowflake::from_u64(282265607313817601)
+        );
+        assert!(common.user.is_none());
+        assert_eq!(
+            common.invoking_user().unwrap().id,
+            Snowflake::from_u64(282265607313817601)
+        );
+    }
+
+    #[test]
+    pub fn bot_dm_context() {
+        let location = format!(
+            r#""channel": {{
+                "flags": 0,
+                "id": "1100155827400229026",
+                "last_message_id": null,
+                "recipients": [{USER}],
+                "type": 1
+            }},
+            "channel_id": "1100155827400229026",
+            "user": {USER}"#
+        );
+        let interaction = user_install_interaction(1, &location);
+        let common = &interaction.common;
+
+        assert_eq!(common.context, Some(InteractionContextType::BotDm));
+        assert!(common.member.is_none());
+        assert_eq!(common.invoking_user().unwrap().username, "bluefrog");
+    }
+
+    #[test]
+    pub fn private_channel_context() {
+        let location = format!(
+            r#""channel": {{ "id": "1100155827400229026", "type": 3 }},
+            "channel_id": "1100155827400229026",
+            "user": {USER}"#
+        );
+        let interaction = user_install_interaction(2, &location);
+        let common = &interaction.common;
+
+        assert_eq!(common.context, Some(InteractionContextType::PrivateChannel));
+        assert!(common.guild_id.is_none());
+        assert!(common.member.is_none());
+        assert_eq!(common.invoking_user().unwrap().display_name(), "Blue Frog");
+    }
+
+    #[test]
+    pub fn guild_install_owners() {
+        let json = r#"{
+            "application_id": "1052322265397739523",
+            "authorizing_integration_owners": { "0": "798662131062931547", "1": "282265607313817601" },
+            "context": 0,
+            "id": "1100173248714518568",
+            "token": "A_UNIQUE_TOKEN",
+            "type": 1,
+            "version": 1
+        }"#;
+
+        let Interaction::Ping(ping) = serde_json::from_str::<Interaction>(json).unwrap() else {
+            panic!("expected ping");
+        };
+
+        let owners = &ping.common.authorizing_integration_owners;
+        assert_eq!(
+            owners[&ApplicationIntegrationType::GuildInstall],
+            Snowflake::from_u64(798662131062931547)
+        );
+        assert_eq!(
+            owners[&ApplicationIntegrationType::UserInstall],
+            Snowflake::from_u64(282265607313817601)
+        );
+        assert!(ping.common.invoking_user().is_none());
     }
 }
