@@ -4,7 +4,12 @@ Basic interactions with Discord API. Should be used to update commands for bot a
 
 ## Live tests
 
-The tests in this crate call the real Discord API (they create and overwrite commands), so they are `#[ignore]`d by default. To run them, create `api/.env.test`:
+`tests/regression.rs` holds a command suite covering every option type and field, subcommands and groups, localizations, permissions, NSFW, user/message commands, and contexts/integration types.
+
+- **Offline** (always run): every suite command round-trips through the models unchanged.
+- **Live** (`#[ignore]`d): one ordered test against the real Discord API. It clears all global and guild commands, publishes both suites, reads them back raw and through the models, exercises POST, `UpdateCommands`, an invalid command, and a bad token, then leaves the guild suite installed.
+
+It **overwrites the app's global commands and the test guild's commands**, so use a dedicated test bot. Credentials come from `api/.env.test` (gitignored) or the environment:
 
 ```sh
 DISCORD_TOKEN=...
@@ -12,8 +17,8 @@ DISCORD_APPLICATION_ID=...
 DISCORD_GUILD_ID=...
 ```
 
-then run:
-
 ```sh
-cargo test -p composure_api -- --ignored
+cargo test -p composure_api --test regression -- --ignored --test-threads=1 --nocapture
 ```
+
+CI runs the same test when the repository secrets `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, and `DISCORD_GUILD_ID` are set (`gh secret set -f api/.env.test`).

@@ -1,17 +1,15 @@
 //! Command publishing regression suite.
 //!
-//! `suite_round_trips_through_models` runs offline: every command in the suite must survive
-//! JSON -> model -> JSON unchanged, so a field the models drop or mis-shape fails here first.
+//! Offline tests check every command in the suite survives JSON -> model -> JSON unchanged, so a
+//! field the models drop or mis-shape fails without touching Discord.
 //!
-//! The rest are `#[ignore]`d because they hit the live Discord API: they publish the suite,
-//! read it back, and check Discord echoes everything that was sent. They need `api/.env.test`
-//! (see the crate README) and overwrite the test guild's and the app's global commands.
-//! Run with `cargo test -p composure_api -- --ignored`.
+//! `live_regression` is `#[ignore]`d because it drives the real Discord API, in order: clear all
+//! global and guild commands, publish the suites, read them back raw and through the models, then
+//! exercise POST, `UpdateCommands`, and error paths, leaving the guild suite installed. It reads
+//! `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID` from `api/.env.test` or the
+//! environment (CI). Run with `cargo test -p composure_api --test regression -- --ignored`.
 
-use std::{
-    env,
-    sync::{Mutex, MutexGuard},
-};
+use std::{collections::BTreeSet, env, thread, time::Duration};
 
 use composure::models::{
     ApplicationIntegrationType, ChannelType, InteractionContextType, Snowflake,
@@ -359,6 +357,7 @@ fn key(command: &Value) -> (u64, String) {
 fn is_default(value: &Value) -> bool {
     match value {
         Value::Null | Value::Bool(false) => true,
+        Value::String(s) => s.is_empty(),
         Value::Array(a) => a.is_empty(),
         Value::Object(o) => o.is_empty(),
         _ => false,
@@ -426,36 +425,145 @@ fn assert_echoed(sent: &[Value], returned: &[ApplicationCommand]) {
 }
 
 struct Live {
-    _guard: MutexGuard<'static, ()>,
     client: DiscordClient,
+    http: reqwest::blocking::Client,
     application_id: String,
     guild_id: String,
     token: String,
 }
 
-/// Live tests share a guild and the global command list, so they run one at a time.
-fn live() -> Live {
-    static LOCK: Mutex<()> = Mutex::new(());
-    let guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+impl Live {
+    /// Credentials from `api/.env.test` if present, otherwise the environment.
+    fn new() -> Self {
+        let _ = dotenvy::from_filename(".env.test");
+        let var = |name: &str| {
+            env::var(name)
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| panic!("{name} missing from api/.env.test and the environment"))
+        };
+        let token = var("DISCORD_TOKEN");
+        let application_id = var("DISCORD_APPLICATION_ID");
+        let guild_id = var("DISCORD_GUILD_ID");
 
-    dotenvy::from_filename(".env.test").expect("api/.env.test with Discord credentials");
-    let var = |name: &str| {
-        env::var(name)
-            .ok()
-            .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| panic!("{name} missing from api/.env.test"))
-    };
-    let token = var("DISCORD_TOKEN");
-    let application_id = var("DISCORD_APPLICATION_ID");
-    let guild_id = var("DISCORD_GUILD_ID");
-
-    Live {
-        _guard: guard,
-        client: DiscordClient::new(&token, &application_id).unwrap(),
-        application_id,
-        guild_id,
-        token,
+        Live {
+            client: DiscordClient::new(&token, &application_id).unwrap(),
+            http: reqwest::blocking::Client::new(),
+            application_id,
+            guild_id,
+            token,
+        }
     }
+
+    fn global_url(&self) -> String {
+        format!(
+            "{}/applications/{}/commands?with_localizations=true",
+            composure_api::DISCORD_API,
+            self.application_id
+        )
+    }
+
+    fn guild_url(&self) -> String {
+        format!(
+            "{}/applications/{}/guilds/{}/commands?with_localizations=true",
+            composure_api::DISCORD_API,
+            self.application_id,
+            self.guild_id
+        )
+    }
+
+    /// Raw JSON from Discord, bypassing the models.
+    fn raw_get(&self, url: &str) -> Vec<Value> {
+        for _ in 0..5 {
+            let response = self
+                .http
+                .get(url)
+                .header("Authorization", format!("Bot {}", self.token))
+                .send()
+                .unwrap();
+            if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                let body: Value = response.json().unwrap();
+                let wait = body["retry_after"].as_f64().unwrap_or(1.0);
+                thread::sleep(Duration::from_secs_f64(wait));
+                continue;
+            }
+            assert!(
+                response.status().is_success(),
+                "GET {url}: {}",
+                response.status()
+            );
+            return response.json().unwrap();
+        }
+        panic!("GET {url}: still rate limited");
+    }
+}
+
+/// Fields Discord returns that the models intentionally don't round-trip.
+const UNMODELED_FIELDS: &[&str] = &[
+    "id",
+    "application_id",
+    "version",
+    "default_permission",
+    "name_localized",
+    "description_localized",
+    "handler",
+];
+
+/// Every raw command deserializes; the model keeps every value it models (`model ⊆ raw`) and
+/// reads ids. Raw fields the model drops beyond [`UNMODELED_FIELDS`] are reported.
+fn assert_deserializes(raw: &[Value]) -> Vec<ApplicationCommand> {
+    raw.iter()
+        .map(|raw| {
+            let name = raw["name"].to_string();
+            let model: ApplicationCommand = serde_json::from_value(raw.clone())
+                .unwrap_or_else(|e| panic!("{name} failed to deserialize: {e}\n{raw:#}"));
+
+            let id = match &model {
+                ApplicationCommand::ChatInputCommand(c) => &c.details.id,
+                ApplicationCommand::UserCommand(c) => &c.id,
+                ApplicationCommand::MessageCommand(c) => &c.id,
+            };
+            assert!(id.is_some(), "{name}: id not deserialized");
+
+            let modeled = to_value(&model);
+            assert_subset(&modeled, raw, &name);
+
+            let mut dropped = BTreeSet::new();
+            unmodeled_paths(raw, &modeled, &name, &mut dropped);
+            if !dropped.is_empty() {
+                eprintln!("note: fields not modeled: {dropped:?}");
+            }
+
+            model
+        })
+        .collect()
+}
+
+fn unmodeled_paths(raw: &Value, modeled: &Value, path: &str, out: &mut BTreeSet<String>) {
+    match (raw, modeled) {
+        (Value::Object(raw), Value::Object(modeled)) => {
+            for (k, v) in raw {
+                let path = format!("{path}.{k}");
+                match modeled.get(k) {
+                    Some(m) => unmodeled_paths(v, m, &path, out),
+                    None if UNMODELED_FIELDS.contains(&k.as_str()) || is_default(v) => {}
+                    None => {
+                        out.insert(path);
+                    }
+                }
+            }
+        }
+        (Value::Array(raw), Value::Array(modeled)) => {
+            for (i, (r, m)) in raw.iter().zip(modeled).enumerate() {
+                unmodeled_paths(r, m, &format!("{path}[{i}]"), out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn step(name: &str) {
+    eprintln!("==> {name}");
 }
 
 // ---------------------------------------------------------------------------
@@ -539,53 +647,86 @@ fn channel_types_model() {
 
 #[test]
 #[ignore = "hits the live Discord API; needs api/.env.test"]
-fn guild_regression() {
-    let live = live();
-    let suite = guild_suite();
-    let commands = to_commands(&suite);
+fn live_regression() {
+    let live = Live::new();
+    let guild = live.guild_id.as_str();
+    let none: Vec<&ApplicationCommand> = Vec::new();
 
-    let published = live
-        .client
-        .overwrite_guild_commands(&live.guild_id, &commands.iter().collect())
-        .unwrap();
-    assert_echoed(&suite, &published);
+    step("clear global commands");
+    assert!(
+        live.client
+            .overwrite_global_commands(&none)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(live.raw_get(&live.global_url()).is_empty());
 
-    let fetched = live.client.get_guild_commands(&live.guild_id).unwrap();
-    assert_echoed(&suite, &fetched);
+    step("clear guild commands");
+    assert!(
+        live.client
+            .overwrite_guild_commands(guild, &none)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(live.raw_get(&live.guild_url()).is_empty());
 
-    // Publishing the same suite again is idempotent
-    let republished = live
-        .client
-        .overwrite_guild_commands(&live.guild_id, &commands.iter().collect())
-        .unwrap();
-    assert_echoed(&suite, &republished);
-}
-
-#[test]
-#[ignore = "hits the live Discord API; needs api/.env.test"]
-fn global_regression() {
-    let live = live();
+    step("publish global suite");
     let suite = global_suite();
     let commands = to_commands(&suite);
-
     let published = live
         .client
         .overwrite_global_commands(&commands.iter().collect())
         .unwrap();
     assert_echoed(&suite, &published);
 
-    let fetched = live.client.get_global_commands().unwrap();
-    assert_echoed(&suite, &fetched);
-}
+    step("read back global suite");
+    assert_echoed(
+        &suite,
+        &assert_deserializes(&live.raw_get(&live.global_url())),
+    );
+    assert_echoed(&suite, &live.client.get_global_commands().unwrap());
 
-#[test]
-#[ignore = "hits the live Discord API; needs api/.env.test"]
-fn update_commands_publishes_to_guild() {
-    let live = live();
+    step("publish guild suite");
+    let suite = guild_suite();
+    let commands = to_commands(&suite);
+    let published = live
+        .client
+        .overwrite_guild_commands(guild, &commands.iter().collect())
+        .unwrap();
+    assert_echoed(&suite, &published);
 
+    step("read back guild suite");
+    assert_echoed(
+        &suite,
+        &assert_deserializes(&live.raw_get(&live.guild_url())),
+    );
+    assert_echoed(&suite, &live.client.get_guild_commands(guild).unwrap());
+
+    step("republish guild suite (idempotent)");
+    let republished = live
+        .client
+        .overwrite_guild_commands(guild, &commands.iter().collect())
+        .unwrap();
+    assert_echoed(&suite, &republished);
+
+    step("create one guild command via POST");
+    let mut created_json = meta_command();
+    created_json["name"] = json!("regress-create");
+    created_json["name_localizations"] = json!({ "fr": "regress-create-fr" });
+    let created: ApplicationCommand = serde_json::from_value(created_json.clone()).unwrap();
+    let created = live.client.create_guild_command(guild, &created).unwrap();
+    assert_subset(&created_json, &to_value(&created), "regress-create");
+    let mut with_created = suite.clone();
+    with_created.push(created_json);
+    assert_echoed(
+        &with_created,
+        &assert_deserializes(&live.raw_get(&live.guild_url())),
+    );
+
+    step("publish via UpdateCommands");
     let builder = CommandsBuilder::new(
         live.application_id.parse::<Snowflake>().unwrap(),
-        Some(live.guild_id.parse::<Snowflake>().unwrap()),
+        Some(guild.parse::<Snowflake>().unwrap()),
     )
     .add_command(|c| {
         c.name("regress-update")
@@ -597,36 +738,13 @@ fn update_commands_publishes_to_guild() {
             .add_subcommand(|s| s.name("go").description("Go"))
     });
     let sent: Vec<Value> = builder.commands.iter().map(to_value).collect();
+    assert_echoed(&sent, &builder.update_commands(&live.token).unwrap());
+    assert_echoed(
+        &sent,
+        &assert_deserializes(&live.raw_get(&live.guild_url())),
+    );
 
-    let published = builder.update_commands(&live.token).unwrap();
-    assert_echoed(&sent, &published);
-
-    let fetched = live.client.get_guild_commands(&live.guild_id).unwrap();
-    assert_echoed(&sent, &fetched);
-}
-
-#[test]
-#[ignore = "hits the live Discord API; needs api/.env.test"]
-fn create_guild_command_echoes() {
-    let live = live();
-    let sent = meta_command();
-    let command: ApplicationCommand = serde_json::from_value(sent.clone()).unwrap();
-
-    let created = live
-        .client
-        .create_guild_command(&live.guild_id, &command)
-        .unwrap();
-    assert_subset(&sent, &to_value(&created), "regress-meta");
-
-    let fetched = live.client.get_guild_commands(&live.guild_id).unwrap();
-    assert!(fetched.iter().any(|c| key(&to_value(c)) == key(&sent)));
-}
-
-#[test]
-#[ignore = "hits the live Discord API; needs api/.env.test"]
-fn invalid_command_is_rejected() {
-    let live = live();
-
+    step("invalid command is rejected");
     // Chat input names must be lowercase with no spaces
     let invalid: ApplicationCommand = serde_json::from_value(json!({
         "type": 1,
@@ -634,34 +752,31 @@ fn invalid_command_is_rejected() {
         "description": "Invalid name"
     }))
     .unwrap();
-
-    let result = live
-        .client
-        .overwrite_guild_commands(&live.guild_id, &vec![&invalid]);
-    match result {
+    match live.client.overwrite_guild_commands(guild, &vec![&invalid]) {
         Err(Error::UnknownResponse(body)) => assert!(body.contains("50035"), "{body}"),
         other => panic!("expected Discord validation error, got {other:?}"),
     }
-
-    let result = live.client.create_guild_command(&live.guild_id, &invalid);
+    let result = live.client.create_guild_command(guild, &invalid);
     assert!(
         matches!(result, Err(Error::UnknownResponse(_))),
         "{result:?}"
     );
-}
 
-#[test]
-#[ignore = "hits the live Discord API; needs api/.env.test"]
-fn invalid_token_is_unauthorized() {
-    let live = live();
-    let client = DiscordClient::new("not-a-token", &live.application_id).unwrap();
-
+    step("invalid token is unauthorized");
+    let unauthorized = DiscordClient::new("not-a-token", &live.application_id).unwrap();
     assert!(matches!(
-        client.get_global_commands(),
+        unauthorized.get_global_commands(),
         Err(Error::Unauthorized)
     ));
     assert!(matches!(
-        client.get_guild_commands(&live.guild_id),
+        unauthorized.get_guild_commands(guild),
         Err(Error::Unauthorized)
     ));
+
+    step("restore guild suite");
+    let restored = live
+        .client
+        .overwrite_guild_commands(guild, &commands.iter().collect())
+        .unwrap();
+    assert_echoed(&suite, &restored);
 }
