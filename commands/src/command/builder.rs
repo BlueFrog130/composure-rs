@@ -1,4 +1,6 @@
-use composure::models::{Permissions, Snowflake, TypeField};
+use composure::models::{
+    ApplicationIntegrationType, InteractionContextType, Permissions, Snowflake, TypeField,
+};
 
 use crate::command::*;
 
@@ -36,6 +38,8 @@ pub struct CommandBuilder {
     description: String,
     default_member_permissions: Option<Permissions>,
     dm_permission: Option<bool>,
+    integration_types: Option<Vec<ApplicationIntegrationType>>,
+    contexts: Option<Vec<InteractionContextType>>,
     options: Option<Vec<ApplicationCommandOption>>,
 }
 
@@ -53,6 +57,8 @@ impl CommandBuilder {
             options: None,
             default_member_permissions: None,
             dm_permission: None,
+            integration_types: None,
+            contexts: None,
         }
     }
 
@@ -97,20 +103,49 @@ impl CommandBuilder {
         self
     }
 
+    #[deprecated(note = "Discord deprecated dm_permission; use with_contexts")]
     pub fn with_dm_permission(mut self, dm_permission: bool) -> Self {
         self.dm_permission = Some(dm_permission);
         self
     }
 
+    /// Installation contexts (guild and/or user install) where the command is available.
+    /// Global commands only.
+    pub fn with_integration_types(
+        mut self,
+        integration_types: &[ApplicationIntegrationType],
+    ) -> Self {
+        self.integration_types = Some(integration_types.to_vec());
+        self
+    }
+
+    /// Interaction contexts (guild, bot DM, private channel) where the command can be used.
+    /// Global commands only; guild commands don't support `BotDm`.
+    pub fn with_contexts(mut self, contexts: &[InteractionContextType]) -> Self {
+        self.contexts = Some(contexts.to_vec());
+        self
+    }
+
     pub fn build_chat_command(self) -> ApplicationCommand {
-        ApplicationCommand::new_chat_input_command(
-            self.name,
-            self.description,
-            self.default_member_permissions,
-            self.dm_permission,
-            None,
-            self.options,
-        )
+        ApplicationCommand::ChatInputCommand(ChatInputCommand {
+            details: CommandDetails {
+                t: TypeField,
+                id: None,
+                application_id: None,
+                guild_id: None,
+                name: self.name,
+                name_localizations: None,
+                default_member_permissions: self.default_member_permissions,
+                dm_permission: self.dm_permission,
+                integration_types: self.integration_types,
+                contexts: self.contexts,
+                nsfw: None,
+                version: None,
+            },
+            description: self.description,
+            description_localizations: None,
+            options: self.options,
+        })
     }
 }
 

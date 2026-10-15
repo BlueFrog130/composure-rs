@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use composure::models::{Permissions, Snowflake, TypeField};
+use composure::models::{
+    ApplicationIntegrationType, InteractionContextType, Permissions, Snowflake, TypeField,
+};
 use serde::{Deserialize, Serialize};
 
 /// [Application Command Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
@@ -67,8 +69,18 @@ pub struct CommandDetails<const T: u8> {
     pub default_member_permissions: Option<Permissions>,
 
     /// Indicates whether the command is available in DMs with the app, only for globally-scoped commands. By default, commands are visible.
+    ///
+    /// Deprecated by Discord: use [`CommandDetails::contexts`] instead.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dm_permission: Option<bool>,
+
+    /// [Installation contexts](https://discord.com/developers/docs/resources/application#installation-context) where the command is available, only for globally-scoped commands. Defaults to the app's configured contexts
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub integration_types: Option<Vec<ApplicationIntegrationType>>,
+
+    /// [Interaction contexts](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-context-types) where the command can be used, only for globally-scoped commands
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contexts: Option<Vec<InteractionContextType>>,
 
     /// Not recommended for use as field will soon be deprecated. Indicates whether the command is enabled by default when the app is added to a guild, defaults to true
     // #[serde(skip_serializing_if = "Option::is_none")]

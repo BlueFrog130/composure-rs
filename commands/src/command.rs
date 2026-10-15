@@ -7,7 +7,8 @@ pub use model::*;
 
 #[cfg(test)]
 mod tests {
-    use composure::models::TypeField;
+    use composure::models::{ApplicationIntegrationType, InteractionContextType, TypeField};
+    use serde_json::json;
 
     use super::*;
 
@@ -52,6 +53,8 @@ mod tests {
                 name_localizations: None,
                 default_member_permissions: None,
                 dm_permission: None,
+                integration_types: None,
+                contexts: None,
                 nsfw: None,
                 version: None,
             },
@@ -95,5 +98,93 @@ mod tests {
             "{:#?}",
             serde_json::from_str::<ApplicationCommand>(json).unwrap()
         );
+    }
+
+    #[test]
+    pub fn serialize_contexts_and_integration_types() {
+        let command = CommandBuilder::new()
+            .name("hello")
+            .description("Say hello")
+            .with_integration_types(&[
+                ApplicationIntegrationType::GuildInstall,
+                ApplicationIntegrationType::UserInstall,
+            ])
+            .with_contexts(&[
+                InteractionContextType::Guild,
+                InteractionContextType::BotDm,
+                InteractionContextType::PrivateChannel,
+            ])
+            .build_chat_command();
+
+        assert_eq!(
+            serde_json::to_value(&command).unwrap(),
+            json!({
+                "type": 1,
+                "name": "hello",
+                "description": "Say hello",
+                "integration_types": [0, 1],
+                "contexts": [0, 1, 2],
+            })
+        );
+    }
+
+    #[test]
+    pub fn serialize_omits_unset_contexts() {
+        let command = CommandBuilder::new()
+            .name("hello")
+            .description("Say hello")
+            .build_chat_command();
+
+        let value = serde_json::to_value(&command).unwrap();
+        assert!(value.get("integration_types").is_none());
+        assert!(value.get("contexts").is_none());
+    }
+
+    #[test]
+    pub fn deserialize_contexts_and_integration_types() {
+        let command: ApplicationCommand = serde_json::from_value(json!({
+            "id": "1052358444704862218",
+            "application_id": "1052322265397739523",
+            "version": "1100155827400229026",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "hello",
+            "description": "Say hello",
+            "dm_permission": true,
+            "contexts": [0, 2],
+            "integration_types": [1],
+            "nsfw": false
+        }))
+        .unwrap();
+
+        let details = &command.as_chat_input_command().unwrap().details;
+        assert_eq!(
+            details.contexts,
+            Some(vec![
+                InteractionContextType::Guild,
+                InteractionContextType::PrivateChannel
+            ])
+        );
+        assert_eq!(
+            details.integration_types,
+            Some(vec![ApplicationIntegrationType::UserInstall])
+        );
+    }
+
+    #[test]
+    pub fn deserialize_null_contexts() {
+        let command: ApplicationCommand = serde_json::from_value(json!({
+            "id": "1052358444704862218",
+            "application_id": "1052322265397739523",
+            "version": "1100155827400229026",
+            "type": 2,
+            "name": "inspect",
+            "contexts": null
+        }))
+        .unwrap();
+
+        let details = command.as_user_command().unwrap();
+        assert_eq!(details.contexts, None);
+        assert_eq!(details.integration_types, None);
     }
 }

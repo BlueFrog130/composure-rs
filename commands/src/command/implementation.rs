@@ -23,6 +23,8 @@ impl ApplicationCommand {
                 name_localizations: None,
                 default_member_permissions,
                 dm_permission,
+                integration_types: None,
+                contexts: None,
                 nsfw,
                 version: None,
             },
@@ -47,6 +49,8 @@ impl ApplicationCommand {
             name_localizations: None,
             default_member_permissions,
             dm_permission,
+            integration_types: None,
+            contexts: None,
             nsfw,
             version: None,
         })
@@ -67,6 +71,8 @@ impl ApplicationCommand {
             name_localizations: None,
             default_member_permissions,
             dm_permission,
+            integration_types: None,
+            contexts: None,
             nsfw,
             version: None,
         })
