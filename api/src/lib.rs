@@ -1,9 +1,9 @@
 use composure_commands::command::{ApplicationCommand, CommandsBuilder};
 use reqwest::{
-    header::{self, AUTHORIZATION},
     IntoUrl, StatusCode,
+    header::{self, AUTHORIZATION},
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 mod application_commands;
 

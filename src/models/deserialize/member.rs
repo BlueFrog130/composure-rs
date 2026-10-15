@@ -1,8 +1,8 @@
 use serde::Deserialize;
 
 use crate::{
-    models::common::{Permissions, Snowflake},
     Mentionable,
+    models::common::{Permissions, Snowflake},
 };
 
 /// User object

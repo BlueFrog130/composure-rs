@@ -5,7 +5,7 @@ use composure::models::{
     ApplicationCommandInteraction, Embed, Interaction, InteractionResponse,
     MessageComponentInteraction, ModalSubmitInteraction,
 };
-use worker::{console_debug, console_error, console_warn, Env, Headers, Request, Response};
+use worker::{Env, Headers, Request, Response, console_debug, console_error, console_warn};
 
 #[derive(Debug)]
 pub enum Error {
@@ -224,7 +224,7 @@ pub trait CloudflareCommandHandler {
 #[cfg(test)]
 mod tests {
     use futures::executor::block_on;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     use super::*;
 

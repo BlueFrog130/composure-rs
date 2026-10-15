@@ -1,8 +1,8 @@
-use serde::{de::Visitor, Deserialize};
+use serde::{Deserialize, de::Visitor};
 
 use crate::{
-    models::{Permissions, Snowflake},
     Mentionable,
+    models::{Permissions, Snowflake},
 };
 
 /// [Role Object](https://discord.com/developers/docs/topics/permissions#role-object)

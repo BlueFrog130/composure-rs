@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{
+    Mentionable,
     models::{
         common::{Permissions, Snowflake},
         deserialize::{Member, User},
     },
-    Mentionable,
 };
 
 #[derive(Debug, Deserialize)]

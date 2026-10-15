@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash, str::FromStr};
 
-use serde::{de::Visitor, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Visitor};
 
 const DISCORD_EPOCH: u64 = 1420070400000;
 

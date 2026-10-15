@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use serde::{ser::SerializeMap, Serialize};
+use serde::{Serialize, ser::SerializeMap};
 
 use crate::models::{ActionRow, AllowedMentions, Embed, MessageFlags, PartialAttachment};
 

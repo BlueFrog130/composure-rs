@@ -1,7 +1,7 @@
 [package]
 name = "composure_api"
 version = "0.0.2"
-edition = "2021"
+edition.workspace = true
 rust-version.workspace = true
 readme = "README.md"
 description = "Discord bot framework for running on the edge"
@@ -15,8 +15,8 @@ license = "Apache-2.0"
 reqwest = { version = "0.13.5", features = ["blocking", "json"] }
 composure = { path = "../", version = "0.0.2" }
 composure_commands = { path = "../commands", version = "0.0.2" }
-serde = "1.0.160"
+serde = "1.0.229"
 
 [dev-dependencies]
 dotenvy = "0.15.7"
-serde_json = "1.0.96"
+serde_json = "1.0.154"

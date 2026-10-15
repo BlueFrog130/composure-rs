@@ -1,6 +1,6 @@
 use composure_commands::command::ApplicationCommand;
 
-use crate::{DiscordClient, Error, Result, DISCORD_API};
+use crate::{DISCORD_API, DiscordClient, Error, Result};
 
 impl DiscordClient {
     pub fn get_global_commands(&self) -> Result<Vec<ApplicationCommand>> {
