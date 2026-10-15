@@ -23,7 +23,7 @@ strum = { version = "0.28.0", features = ["derive"] }
 [dev-dependencies]
 
 [workspace]
-members = ["commands", "api", "adapters/cloudflare"]
+members = ["commands", "api", "adapters/cloudflare", "adapters/cloudflare/example"]
 
 [workspace.package]
 edition = "2024"

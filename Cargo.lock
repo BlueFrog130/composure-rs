@@ -193,6 +193,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "composure_example_cloudflare"
+version = "0.0.2"
+dependencies = [
+ "async-trait",
+ "composure",
+ "composure_adapter_cloudflare",
+ "ed25519-dalek",
+ "futures",
+ "hex",
+ "reqwest",
+ "serde_json",
+ "worker",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

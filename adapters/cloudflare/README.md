@@ -63,6 +63,10 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 # fn main() {}
 ```
 
+## Testing a handler
+
+`handle_interaction(public_key, signature, timestamp, body, Some(&handler))` runs the same verify, parse, and dispatch steps as `process` without the Workers runtime. It returns an `InteractionOutcome` with the HTTP status and response, so a handler can be tested with signed payloads in plain `cargo test`. See `example/` for a regression bot with fixtures, offline tests, and a `wrangler dev` end-to-end test.
+
 ## Todo
 
 - [ ] Make package size smaller (simple build results in ~800 kb worker size)

@@ -1,0 +1,6 @@
+name = "composure-regression-bot"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-09-01"
+
+[build]
+command = "worker-build --release"
