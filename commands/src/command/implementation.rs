@@ -212,7 +212,15 @@ impl ApplicationCommandOption {
         description: String,
         required: Option<bool>,
     ) -> ApplicationCommandOption {
-        ApplicationCommandOption::Channel(Self::new_base_option::<7>(name, description, required))
+        ApplicationCommandOption::Channel(ChannelOption {
+            t: TypeField,
+            name,
+            name_localizations: None,
+            description,
+            description_localizations: None,
+            required,
+            channel_types: None,
+        })
     }
 
     pub fn new_role_option(
@@ -318,7 +326,7 @@ impl<'de> Deserialize<'de> for ApplicationCommandOption {
                 BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             7 => Ok(ApplicationCommandOption::Channel(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
+                ChannelOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             8 => Ok(ApplicationCommandOption::Role(
                 BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
@@ -405,7 +413,15 @@ impl SubcommandCommandOption {
         description: String,
         required: Option<bool>,
     ) -> SubcommandCommandOption {
-        SubcommandCommandOption::Channel(Self::new_base_option::<7>(name, description, required))
+        SubcommandCommandOption::Channel(ChannelOption {
+            t: TypeField,
+            name,
+            name_localizations: None,
+            description,
+            description_localizations: None,
+            required,
+            channel_types: None,
+        })
     }
 
     pub fn new_role_option(
@@ -525,7 +541,7 @@ impl<'de> Deserialize<'de> for SubcommandCommandOption {
                 BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             7 => Ok(SubcommandCommandOption::Channel(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
+                ChannelOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             8 => Ok(SubcommandCommandOption::Role(
                 BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
