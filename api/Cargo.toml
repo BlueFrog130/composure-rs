@@ -12,13 +12,11 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reqwest = { version = "0.11.16", features = ["serde_json", "blocking", "json"] }
+reqwest = { version = "0.13.5", features = ["blocking", "json"] }
 composure = { path = "../", version = "0.0.2" }
 composure_commands = { path = "../commands", version = "0.0.2" }
 serde = "1.0.160"
-dotenv = "0.15.0"
-itertools = "0.15.0"
 
 [dev-dependencies]
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 serde_json = "1.0.96"

@@ -64,10 +64,8 @@ impl DiscordClient {
 
         let response = self.put(url, commands);
 
-        if let Err(ref e) = response {
-            if let Error::UnknownResponse(response) = e {
-                println!("Invalid response: {}", response);
-            }
+        if let Err(Error::UnknownResponse(ref response)) = response {
+            println!("Invalid response: {}", response);
         }
 
         response
@@ -93,13 +91,13 @@ impl DiscordClient {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::env;
 
     use super::*;
 
-    fn setup<'a>() {
-        dotenv::from_filename(".env.test").unwrap();
+    fn setup() {
+        dotenvy::from_filename(".env.test").expect("api/.env.test with Discord credentials");
     }
 
     fn application_id() -> String {
@@ -115,6 +113,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore = "hits the live Discord API; needs api/.env.test"]
     pub fn global_commands() {
         setup();
         let client = DiscordClient::new(&token(), &application_id()).unwrap();
@@ -123,6 +122,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore = "hits the live Discord API; needs api/.env.test"]
     pub fn guild_commands() {
         setup();
         let client = DiscordClient::new(&token(), &application_id()).unwrap();
@@ -131,6 +131,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore = "hits the live Discord API; needs api/.env.test"]
     pub fn create_global_command() {
         setup();
 
@@ -153,6 +154,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore = "hits the live Discord API; needs api/.env.test"]
     pub fn create_guild_command() {
         setup();
 
@@ -170,6 +172,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore = "hits the live Discord API; needs api/.env.test"]
     pub fn overwrite_global_command() {
         setup();
 
@@ -193,6 +196,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore = "hits the live Discord API; needs api/.env.test"]
     pub fn overwrite_guild_command() {
         setup();
 

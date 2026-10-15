@@ -7,8 +7,6 @@ use serde::{de::DeserializeOwned, Serialize};
 
 mod application_commands;
 
-pub use application_commands::*;
-
 pub const DISCORD_API: &str = "https://discord.com/api/v10";
 
 #[derive(Debug)]
@@ -33,13 +31,13 @@ impl DiscordClient {
         headers.insert(
             AUTHORIZATION,
             header::HeaderValue::from_str(format!("Bot {token}").as_str())
-                .map_err(|e| Error::HeaderError(e))?,
+                .map_err(Error::HeaderError)?,
         );
 
         let client = reqwest::blocking::Client::builder()
             .default_headers(headers)
             .build()
-            .map_err(|e| Error::RequestError(e))?;
+            .map_err(Error::RequestError)?;
 
         Ok(DiscordClient {
             client,
@@ -51,15 +49,11 @@ impl DiscordClient {
     where
         T: IntoUrl,
     {
-        let response = self
-            .client
-            .get(url)
-            .send()
-            .map_err(|e| Error::RequestError(e))?;
+        let response = self.client.get(url).send().map_err(Error::RequestError)?;
 
         match response.status() {
             StatusCode::UNAUTHORIZED => Err(Error::Unauthorized),
-            _ => Ok(response.json().map_err(|e| Error::RequestError(e))?),
+            _ => Ok(response.json().map_err(Error::RequestError)?),
         }
     }
 
@@ -73,11 +67,11 @@ impl DiscordClient {
             .post(url)
             .json(body)
             .send()
-            .map_err(|e| Error::RequestError(e))?;
+            .map_err(Error::RequestError)?;
 
         match response.status() {
             StatusCode::UNAUTHORIZED => Err(Error::Unauthorized),
-            _ => Ok(response.json().map_err(|e| Error::RequestError(e))?),
+            _ => Ok(response.json().map_err(Error::RequestError)?),
         }
     }
 
@@ -91,15 +85,15 @@ impl DiscordClient {
             .put(url)
             .json(body)
             .send()
-            .map_err(|e| Error::RequestError(e))?;
+            .map_err(Error::RequestError)?;
 
         match response.status() {
             StatusCode::UNAUTHORIZED => Err(Error::Unauthorized),
             StatusCode::OK | StatusCode::CREATED => {
-                Ok(response.json().map_err(|e| Error::RequestError(e))?)
+                Ok(response.json().map_err(Error::RequestError)?)
             }
             _ => Err(Error::UnknownResponse(
-                response.text().map_err(|e| Error::RequestError(e))?,
+                response.text().map_err(Error::RequestError)?,
             )),
         }
     }
@@ -113,7 +107,7 @@ impl UpdateCommands for CommandsBuilder {
     fn update_commands(&self, token: &str) -> Result<Vec<ApplicationCommand>> {
         let client = DiscordClient::new(token, &self.application_id.to_string())?;
 
-        let ref_vec = self.commands.iter().map(|c| c).collect();
+        let ref_vec = self.commands.iter().collect();
 
         let updated_commands = match &self.guild_id {
             Some(snowflake) => client.overwrite_guild_commands(&snowflake.to_string(), &ref_vec),
