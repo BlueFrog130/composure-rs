@@ -62,12 +62,72 @@ fn verify(
         .map_err(|_| Error::ValidationError)
 }
 
-/// HTTP status for a failed [`validate_request`]: 401 for a bad signature,
-/// 500 for anything else (e.g. the public key secret is missing).
-fn validation_status(err: &Error) -> u16 {
-    match err {
-        Error::ValidationError => 401,
-        _ => 500,
+/// What to answer one interaction request with. Produced by [`handle_interaction`].
+#[derive(Debug)]
+pub enum InteractionOutcome {
+    /// Signature headers missing or invalid
+    Unauthorized,
+
+    /// Signature valid but the body is not an interaction
+    BadRequest(serde_json::Error),
+
+    /// The interaction was handled
+    Respond(InteractionResponse),
+
+    /// The handler returned an error; `response` is the ephemeral error message sent instead
+    HandlerFailed {
+        error: worker::Error,
+        response: InteractionResponse,
+    },
+}
+
+impl InteractionOutcome {
+    /// HTTP status to send
+    pub fn status(&self) -> u16 {
+        match self {
+            Self::Unauthorized => 401,
+            Self::BadRequest(_) => 400,
+            Self::Respond(_) | Self::HandlerFailed { .. } => 200,
+        }
+    }
+
+    /// JSON body to send, for 200 outcomes
+    pub fn response(&self) -> Option<&InteractionResponse> {
+        match self {
+            Self::Respond(response) | Self::HandlerFailed { response, .. } => Some(response),
+            Self::Unauthorized | Self::BadRequest(_) => None,
+        }
+    }
+}
+
+/// Verifies, parses, and dispatches one interaction request without needing the Workers runtime.
+/// [`CloudflareInteractionBot::process`] is a thin wrapper over this; call it directly to test a
+/// handler with signed payloads.
+///
+/// * `public_key` - the application's hex public key
+/// * `signature` / `timestamp` - the `X-Signature-Ed25519` / `X-Signature-Timestamp` headers
+pub async fn handle_interaction<F: CloudflareCommandHandler>(
+    public_key: &str,
+    signature: Option<&str>,
+    timestamp: Option<&str>,
+    body: &[u8],
+    handler: Option<&F>,
+) -> InteractionOutcome {
+    if verify(public_key, signature, timestamp, body).is_err() {
+        return InteractionOutcome::Unauthorized;
+    }
+
+    let interaction: Interaction = match serde_json::from_slice(body) {
+        Ok(interaction) => interaction,
+        Err(e) => return InteractionOutcome::BadRequest(e),
+    };
+
+    match dispatch(interaction, handler).await {
+        Ok(response) => InteractionOutcome::Respond(response),
+        Err(error) => InteractionOutcome::HandlerFailed {
+            error,
+            response: handler_error_response(),
+        },
     }
 }
 
@@ -94,8 +154,8 @@ impl<F: CloudflareCommandHandler + 'static> CloudflareInteractionBot<F> {
     }
 
     /// Validates and handles the request. Every outcome is an HTTP response:
-    /// bad signature is 401, unparseable body is 400, handler errors are logged
-    /// and answered with an ephemeral error message.
+    /// bad signature is 401, unparseable body is 400, a missing public key secret is 500,
+    /// handler errors are logged and answered with an ephemeral error message.
     pub async fn process(mut self) -> worker::Result<Response> {
         console_debug!("Processing request");
 
@@ -107,32 +167,41 @@ impl<F: CloudflareCommandHandler + 'static> CloudflareInteractionBot<F> {
             }
         };
 
-        if let Err(err) = validate_request(&self.env, self.req.headers(), &bytes) {
-            let status = validation_status(&err);
-            if status == 401 {
-                console_warn!("Validation failed");
-                return Response::error("Validation failed", status);
-            }
-            console_error!("Validation error: {:?}", err);
-            return Response::error("Internal error", status);
-        }
-
-        let interaction: Interaction = match serde_json::from_slice(&bytes) {
-            Ok(interaction) => interaction,
+        let public_key = match self.env.secret(PUBLIC_KEY_SECRET) {
+            Ok(secret) => secret.to_string(),
             Err(e) => {
-                console_error!("Failed to parse interaction: {}", e);
-                return Response::error("Bad request", 400);
+                console_error!("Missing {} secret: {}", PUBLIC_KEY_SECRET, e);
+                return Response::error("Internal error", 500);
             }
         };
+        let headers = self.req.headers();
+        let signature = headers.get(SIGNATURE_HEADER).ok().flatten();
+        let timestamp = headers.get(TIMESTAMP_HEADER).ok().flatten();
 
-        let response = dispatch(interaction, self.handler.as_ref())
-            .await
-            .unwrap_or_else(|e| {
-                console_error!("Handler error: {}", e);
-                handler_error_response()
-            });
+        let outcome = handle_interaction(
+            &public_key,
+            signature.as_deref(),
+            timestamp.as_deref(),
+            &bytes,
+            self.handler.as_ref(),
+        )
+        .await;
 
-        Response::from_json(&response)
+        match outcome {
+            InteractionOutcome::Unauthorized => {
+                console_warn!("Validation failed");
+                Response::error("Validation failed", 401)
+            }
+            InteractionOutcome::BadRequest(e) => {
+                console_error!("Failed to parse interaction: {}", e);
+                Response::error("Bad request", 400)
+            }
+            InteractionOutcome::Respond(response) => Response::from_json(&response),
+            InteractionOutcome::HandlerFailed { error, response } => {
+                console_error!("Handler error: {}", error);
+                Response::from_json(&response)
+            }
+        }
     }
 }
 
@@ -331,31 +400,40 @@ mod tests {
         assert_eq!(response["data"]["content"], "component button");
     }
 
+    fn outcome(
+        signature: Option<&str>,
+        timestamp: Option<&str>,
+        body: &[u8],
+    ) -> InteractionOutcome {
+        block_on(handle_interaction(
+            PUBLIC_KEY,
+            signature,
+            timestamp,
+            body,
+            Some(&EchoHandler),
+        ))
+    }
+
     #[test]
     fn missing_signature_header_is_401() {
-        let err = verify(PUBLIC_KEY, None, Some("1682372142"), b"{}").unwrap_err();
-        assert_eq!(validation_status(&err), 401);
+        assert_eq!(outcome(None, Some("1682372142"), b"{}").status(), 401);
     }
 
     #[test]
     fn missing_timestamp_header_is_401() {
-        let err = verify(PUBLIC_KEY, Some(SIGNATURE), None, b"{}").unwrap_err();
-        assert_eq!(validation_status(&err), 401);
+        assert_eq!(outcome(Some(SIGNATURE), None, b"{}").status(), 401);
     }
 
     #[test]
     fn invalid_signature_is_401() {
-        let err = verify(PUBLIC_KEY, Some(SIGNATURE), Some("1682372142"), b"{}").unwrap_err();
-        assert_eq!(validation_status(&err), 401);
-
-        let err = verify(PUBLIC_KEY, Some("not hex"), Some("1682372142"), b"{}").unwrap_err();
-        assert_eq!(validation_status(&err), 401);
-    }
-
-    #[test]
-    fn missing_secret_is_500() {
-        let err = Error::WorkerError(worker::Error::RustError("no secret".into()));
-        assert_eq!(validation_status(&err), 500);
+        assert_eq!(
+            outcome(Some(SIGNATURE), Some("1682372142"), b"{}").status(),
+            401
+        );
+        assert_eq!(
+            outcome(Some("not hex"), Some("1682372142"), b"{}").status(),
+            401
+        );
     }
 
     #[test]
