@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: fmt, clippy, build, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo build --workspace
+      # Live Discord API tests in composure_api are #[ignore]d; no secrets needed.
+      - run: cargo test --workspace
+
+  wasm:
+    name: Cloudflare adapter (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy -p composure_adapter_cloudflare --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo build -p composure_adapter_cloudflare --target wasm32-unknown-unknown --release
+
+  msrv:
+    name: MSRV (1.88)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@1.88
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p composure -p composure_commands -p composure_api
