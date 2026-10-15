@@ -683,4 +683,85 @@ mod tests {
 
         assert!(interaction.is_ok());
     }
+
+    #[test]
+    pub fn current_format_interaction() {
+        let json = r#"{
+            "app_permissions": "2248473465835073",
+            "application_id": "1052322265397739523",
+            "attachment_size_limit": 10485760,
+            "authorizing_integration_owners": { "0": "798662131062931547" },
+            "channel": {
+                "flags": 0,
+                "guild_id": "798662131062931547",
+                "id": "941169456686723122",
+                "last_message_id": "1100155827400229026",
+                "name": "bot-stuff",
+                "nsfw": false,
+                "parent_id": "798662131678969866",
+                "permissions": "2251799813685247",
+                "position": 1,
+                "rate_limit_per_user": 0,
+                "topic": null,
+                "type": 0
+            },
+            "channel_id": "941169456686723122",
+            "context": 0,
+            "data": {
+                "guild_id": "798662131062931547",
+                "id": "1052358444704862218",
+                "name": "ping",
+                "type": 1
+            },
+            "entitlement_sku_ids": [],
+            "entitlements": [],
+            "guild": { "features": [], "id": "798662131062931547", "locale": "en-US" },
+            "guild_id": "798662131062931547",
+            "guild_locale": "en-US",
+            "id": "1100173248714518568",
+            "locale": "en-US",
+            "member": {
+                "avatar": null,
+                "banner": null,
+                "collectibles": null,
+                "communication_disabled_until": null,
+                "deaf": false,
+                "flags": 0,
+                "joined_at": "2021-01-12T21:18:10.481000+00:00",
+                "mute": false,
+                "nick": null,
+                "pending": false,
+                "permissions": "2251799813685247",
+                "premium_since": null,
+                "roles": ["943607715639484456"],
+                "unusual_dm_activity_until": null,
+                "user": {
+                    "avatar": "fa82e15e24ee16c9fcbf8dd34d10b4cc",
+                    "avatar_decoration_data": null,
+                    "clan": null,
+                    "collectibles": null,
+                    "discriminator": "0",
+                    "global_name": "Blue Frog",
+                    "id": "282265607313817601",
+                    "primary_guild": null,
+                    "public_flags": 0,
+                    "username": "bluefrog"
+                }
+            },
+            "token": "A_UNIQUE_TOKEN",
+            "type": 2,
+            "version": 1
+        }"#;
+
+        let Interaction::ApplicationCommand(interaction) =
+            serde_json::from_str::<Interaction>(json).unwrap()
+        else {
+            panic!("expected application command");
+        };
+
+        let member = interaction.common.member.unwrap();
+        assert_eq!(member.user.discriminator, "0");
+        assert_eq!(member.user.global_name.as_deref(), Some("Blue Frog"));
+        assert_eq!(member.display_name(), "Blue Frog");
+    }
 }
