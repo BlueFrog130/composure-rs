@@ -296,7 +296,7 @@ impl Serialize for MessageFlags {
     where
         S: serde::Serializer,
     {
-        self.bits().to_string().serialize(serializer)
+        self.bits().serialize(serializer)
     }
 }
 
@@ -305,10 +305,7 @@ impl<'de> Deserialize<'de> for MessageFlags {
     where
         D: serde::Deserializer<'de>,
     {
-        let bit_str = String::deserialize(deserializer)?;
-        let bits = bit_str.parse::<u16>().map_err(serde::de::Error::custom)?;
-
-        // Permissions::from_bits(bits).ok_or(serde::de::Error::custom("Unexpected permissions flags"))
+        let bits = u16::deserialize(deserializer)?;
         Ok(MessageFlags::from_bits_retain(bits))
     }
 }
