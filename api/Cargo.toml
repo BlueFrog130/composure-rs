@@ -2,6 +2,7 @@
 name = "composure_api"
 version = "0.0.2"
 edition = "2021"
+rust-version.workspace = true
 readme = "README.md"
 description = "Discord bot framework for running on the edge"
 repository = "https://github.com/BlueFrog130/composure-rs/api"
@@ -16,7 +17,7 @@ composure = { path = "../", version = "0.0.2" }
 composure_commands = { path = "../commands", version = "0.0.2" }
 serde = "1.0.160"
 dotenv = "0.15.0"
-itertools = "0.10.5"
+itertools = "0.15.0"
 
 [dev-dependencies]
 dotenv = "0.15.0"

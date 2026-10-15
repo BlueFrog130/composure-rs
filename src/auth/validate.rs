@@ -13,15 +13,15 @@ pub fn validate_request(
     timestamp: &str,
     body: &[u8],
 ) -> Result<(), ValidateError> {
-    let public_key = hex::decode(public_key).map_err(|e| ValidateError::HexError(e))?;
-    let signature = hex::decode(signature).map_err(|e| ValidateError::HexError(e))?;
+    let public_key = hex::decode(public_key).map_err(ValidateError::HexError)?;
+    let signature = hex::decode(signature).map_err(ValidateError::HexError)?;
     validate_bytes(
         public_key.as_slice(),
         signature.as_slice(),
         timestamp.as_bytes(),
         body,
     )
-    .map_err(|e| ValidateError::SignatureError(e))
+    .map_err(ValidateError::SignatureError)
 }
 
 /// Validates the request using a public key, signature, timestamp, and body as bytes
@@ -33,8 +33,8 @@ fn validate_bytes(
 ) -> Result<(), SignatureError> {
     let message = [timestamp, body].concat();
 
-    let public_key = PublicKey::from_bytes(&public_key)?;
-    let signature = Signature::from_bytes(&signature)?;
+    let public_key = PublicKey::from_bytes(public_key)?;
+    let signature = Signature::from_bytes(signature)?;
 
     public_key.verify(&message, &signature)
 }

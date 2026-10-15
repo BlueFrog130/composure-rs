@@ -38,27 +38,27 @@ impl<'de> Deserialize<'de> for Interaction {
         match t {
             // Ping
             1 => Ok(Interaction::Ping(
-                PingInteraction::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                PingInteraction::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             // Application Command
             2 => Ok(Interaction::ApplicationCommand(
                 DataInteraction::<ApplicationCommandInteractionData>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                    .map_err(serde::de::Error::custom)?,
             )),
             // Message Component
             3 => Ok(Interaction::MessageComponent(
                 DataInteraction::<MessageComponentData>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                    .map_err(serde::de::Error::custom)?,
             )),
             // Autocomplete
             4 => Ok(Interaction::ApplicationCommandAutocomplete(
                 DataInteraction::<ApplicationCommandInteractionData>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                    .map_err(serde::de::Error::custom)?,
             )),
             // Modal Submit
             5 => Ok(Interaction::ModalSubmit(
                 DataInteraction::<ModalSubmitData>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                    .map_err(serde::de::Error::custom)?,
             )),
             _ => Err(serde::de::Error::custom("Unknown interaction")),
         }
@@ -265,39 +265,34 @@ impl<'de> Deserialize<'de> for ApplicationCommandInteractionDataOption {
 
         match t {
             1 => Ok(ApplicationCommandInteractionDataOption::Subcommand(
-                Subcommand::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                Subcommand::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             2 => Ok(ApplicationCommandInteractionDataOption::SubcommandGroup(
-                SubcommandGroup::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                SubcommandGroup::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             3 => Ok(ApplicationCommandInteractionDataOption::String(
-                ValueOption::<String>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<String>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             4 => Ok(ApplicationCommandInteractionDataOption::Integer(
-                ValueOption::<i64>::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<i64>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             5 => Ok(ApplicationCommandInteractionDataOption::Boolean(
-                ValueOption::<bool>::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<bool>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             6 => Ok(ApplicationCommandInteractionDataOption::User(
-                ValueOption::<Snowflake>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             7 => Ok(ApplicationCommandInteractionDataOption::Channel(
-                ValueOption::<Snowflake>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             8 => Ok(ApplicationCommandInteractionDataOption::Role(
-                ValueOption::<Snowflake>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             9 => Ok(ApplicationCommandInteractionDataOption::Mentionable(
-                ValueOption::<Snowflake>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             10 => Ok(ApplicationCommandInteractionDataOption::Number(
-                ValueOption::<f64>::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<f64>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             11 => Ok(ApplicationCommandInteractionDataOption::Attachment),
             _ => Err(serde::de::Error::custom("Unknown option")),
@@ -310,7 +305,7 @@ pub struct OptionList(Vec<ApplicationCommandInteractionDataOption>);
 
 impl OptionList {
     pub fn single(&self) -> Option<&ApplicationCommandInteractionDataOption> {
-        self.0.get(0)
+        self.0.first()
     }
 
     pub fn subcommand(&self) -> Option<&Subcommand> {
@@ -456,7 +451,7 @@ impl<'de> Deserialize<'de> for SubcommandGroup {
                     focused,
                 })
             }
-            _ => return Err(serde::de::Error::custom("Not a subcommand")),
+            _ => Err(serde::de::Error::custom("Not a subcommand")),
         }
     }
 }

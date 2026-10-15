@@ -2,6 +2,7 @@
 name = "composure_commands"
 version = "0.0.2"
 edition = "2021"
+rust-version.workspace = true
 readme = "README.md"
 description = "Discord bot framework for running on the edge"
 repository = "https://github.com/BlueFrog130/composure-rs/commands"

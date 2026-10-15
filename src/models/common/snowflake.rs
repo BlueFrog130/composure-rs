@@ -33,7 +33,7 @@ impl Snowflake {
     pub fn to_u64(&self) -> u64 {
         let mut snowflake: u64 = 0;
 
-        snowflake |= self.timestamp - DISCORD_EPOCH << TIMESTAMP_SHIFT;
+        snowflake |= (self.timestamp - DISCORD_EPOCH) << TIMESTAMP_SHIFT;
         snowflake |= (self.worker_id as u64) << WORKER_SHIFT;
         snowflake |= (self.internal_process_id as u64) << PROCESS_ID_SHIFT;
         snowflake |= self.increment as u64;
@@ -82,9 +82,9 @@ impl FromStr for Snowflake {
     }
 }
 
-impl Into<u64> for Snowflake {
-    fn into(self) -> u64 {
-        self.to_u64()
+impl From<Snowflake> for u64 {
+    fn from(val: Snowflake) -> Self {
+        val.to_u64()
     }
 }
 

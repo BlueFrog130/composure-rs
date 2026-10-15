@@ -65,6 +65,8 @@ impl Component {
         ))
     }
 
+    // Mirrors the Discord text input fields; a builder would be a breaking change.
+    #[allow(clippy::too_many_arguments)]
     pub fn new_text_input(
         custom_id: String,
         style: TextInputStyle,
@@ -413,6 +415,7 @@ pub struct TextInput {
 }
 
 impl TextInput {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         custom_id: String,
         style: TextInputStyle,

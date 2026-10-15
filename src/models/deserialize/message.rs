@@ -306,9 +306,7 @@ impl<'de> Deserialize<'de> for MessageFlags {
         D: serde::Deserializer<'de>,
     {
         let bit_str = String::deserialize(deserializer)?;
-        let bits = bit_str
-            .parse::<u16>()
-            .map_err(|e| serde::de::Error::custom(e))?;
+        let bits = bit_str.parse::<u16>().map_err(serde::de::Error::custom)?;
 
         // Permissions::from_bits(bits).ok_or(serde::de::Error::custom("Unexpected permissions flags"))
         Ok(MessageFlags::from_bits_retain(bits))
@@ -332,7 +330,7 @@ pub struct MessageReference {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::models::Component;
 
     use super::*;

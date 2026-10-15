@@ -39,6 +39,12 @@ pub struct CommandBuilder {
     options: Option<Vec<ApplicationCommandOption>>,
 }
 
+impl Default for CommandBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CommandBuilder {
     pub fn new() -> Self {
         Self {
@@ -114,6 +120,12 @@ pub struct SubcommandBuilder {
     options: Option<Vec<SubcommandCommandOption>>,
 }
 
+impl Default for SubcommandBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SubcommandBuilder {
     pub fn new() -> Self {
         Self {
@@ -163,6 +175,12 @@ pub struct SubcommandGroupBuilder {
     name: String,
     description: String,
     subcommands: Option<Vec<SubcommandOption>>,
+}
+
+impl Default for SubcommandGroupBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SubcommandGroupBuilder {
