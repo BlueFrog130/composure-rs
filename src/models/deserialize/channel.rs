@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{
+    Mentionable,
     models::{
         common::{Permissions, Snowflake},
         deserialize::{Member, User},
     },
-    Mentionable,
 };
 
 #[derive(Debug, Deserialize)]
@@ -161,7 +161,7 @@ impl PartialEq for Channel {
 }
 
 /// [Channel Types](https://discord.com/developers/docs/resources/channel#channel-object-channel-types)
-#[derive(Debug, Deserialize_repr, Serialize_repr, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize_repr, Serialize_repr, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum ChannelType {
     /// a text channel within a server

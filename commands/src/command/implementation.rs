@@ -23,6 +23,8 @@ impl ApplicationCommand {
                 name_localizations: None,
                 default_member_permissions,
                 dm_permission,
+                integration_types: None,
+                contexts: None,
                 nsfw,
                 version: None,
             },
@@ -47,6 +49,8 @@ impl ApplicationCommand {
             name_localizations: None,
             default_member_permissions,
             dm_permission,
+            integration_types: None,
+            contexts: None,
             nsfw,
             version: None,
         })
@@ -67,6 +71,8 @@ impl ApplicationCommand {
             name_localizations: None,
             default_member_permissions,
             dm_permission,
+            integration_types: None,
+            contexts: None,
             nsfw,
             version: None,
         })
@@ -95,13 +101,13 @@ impl<'de> Deserialize<'de> for ApplicationCommand {
 
         match t {
             1 => Ok(ApplicationCommand::ChatInputCommand(
-                ChatInputCommand::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ChatInputCommand::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             2 => Ok(ApplicationCommand::UserCommand(
-                CommandDetails::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                CommandDetails::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             3 => Ok(ApplicationCommand::MessageCommand(
-                CommandDetails::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                CommandDetails::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             _ => Err(serde::de::Error::custom("Unknown command")),
         }
@@ -206,7 +212,15 @@ impl ApplicationCommandOption {
         description: String,
         required: Option<bool>,
     ) -> ApplicationCommandOption {
-        ApplicationCommandOption::Channel(Self::new_base_option::<7>(name, description, required))
+        ApplicationCommandOption::Channel(ChannelOption {
+            t: TypeField,
+            name,
+            name_localizations: None,
+            description,
+            description_localizations: None,
+            required,
+            channel_types: None,
+        })
     }
 
     pub fn new_role_option(
@@ -294,38 +308,37 @@ impl<'de> Deserialize<'de> for ApplicationCommandOption {
 
         match t {
             1 => Ok(ApplicationCommandOption::Subcommand(
-                SubcommandOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                SubcommandOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             2 => Ok(ApplicationCommandOption::SubcommandGroup(
-                SubcommandGroupOption::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                SubcommandGroupOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             3 => Ok(ApplicationCommandOption::String(
-                StringOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                StringOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             4 => Ok(ApplicationCommandOption::Integer(
-                IntegerOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                IntegerOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             5 => Ok(ApplicationCommandOption::Boolean(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             6 => Ok(ApplicationCommandOption::User(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             7 => Ok(ApplicationCommandOption::Channel(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ChannelOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             8 => Ok(ApplicationCommandOption::Role(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             9 => Ok(ApplicationCommandOption::Mentionable(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             10 => Ok(ApplicationCommandOption::Number(
-                NumberOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                NumberOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             11 => Ok(ApplicationCommandOption::Attachment(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             _ => Err(serde::de::Error::custom("Unknown option")),
         }
@@ -400,7 +413,15 @@ impl SubcommandCommandOption {
         description: String,
         required: Option<bool>,
     ) -> SubcommandCommandOption {
-        SubcommandCommandOption::Channel(Self::new_base_option::<7>(name, description, required))
+        SubcommandCommandOption::Channel(ChannelOption {
+            t: TypeField,
+            name,
+            name_localizations: None,
+            description,
+            description_localizations: None,
+            required,
+            channel_types: None,
+        })
     }
 
     pub fn new_role_option(
@@ -508,31 +529,31 @@ impl<'de> Deserialize<'de> for SubcommandCommandOption {
 
         match t {
             3 => Ok(SubcommandCommandOption::String(
-                StringOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                StringOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             4 => Ok(SubcommandCommandOption::Integer(
-                IntegerOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                IntegerOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             5 => Ok(SubcommandCommandOption::Boolean(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             6 => Ok(SubcommandCommandOption::User(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             7 => Ok(SubcommandCommandOption::Channel(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ChannelOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             8 => Ok(SubcommandCommandOption::Role(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             9 => Ok(SubcommandCommandOption::Mentionable(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             10 => Ok(SubcommandCommandOption::Number(
-                NumberOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                NumberOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             11 => Ok(SubcommandCommandOption::Attachment(
-                BaseOption::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             _ => Err(serde::de::Error::custom("Unknown option")),
         }

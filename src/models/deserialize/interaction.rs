@@ -5,8 +5,8 @@ use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::models::{
-    ActionRow, Attachment, Channel, Member, Message, PartialChannel, PartialMember, Permissions,
-    Role, SelectOption, Snowflake, User,
+    ApplicationIntegrationType, Attachment, Channel, InteractionContextType, Member, Message,
+    PartialChannel, PartialMember, Permissions, Role, Snowflake, User,
 };
 
 pub type ApplicationCommandInteraction = DataInteraction<ApplicationCommandInteractionData>;
@@ -38,27 +38,27 @@ impl<'de> Deserialize<'de> for Interaction {
         match t {
             // Ping
             1 => Ok(Interaction::Ping(
-                PingInteraction::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                PingInteraction::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             // Application Command
             2 => Ok(Interaction::ApplicationCommand(
                 DataInteraction::<ApplicationCommandInteractionData>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                    .map_err(serde::de::Error::custom)?,
             )),
             // Message Component
             3 => Ok(Interaction::MessageComponent(
                 DataInteraction::<MessageComponentData>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                    .map_err(serde::de::Error::custom)?,
             )),
             // Autocomplete
             4 => Ok(Interaction::ApplicationCommandAutocomplete(
                 DataInteraction::<ApplicationCommandInteractionData>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                    .map_err(serde::de::Error::custom)?,
             )),
             // Modal Submit
             5 => Ok(Interaction::ModalSubmit(
                 DataInteraction::<ModalSubmitData>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                    .map_err(serde::de::Error::custom)?,
             )),
             _ => Err(serde::de::Error::custom("Unknown interaction")),
         }
@@ -85,7 +85,7 @@ pub struct InteractionCommon {
     /// Guild member data for the invoking user, including permissions
     pub member: Option<Member>,
 
-    /// User object for the invoking user, if invoked in a DM
+    /// User object for the invoking user, if invoked in a DM. Use [`InteractionCommon::invoking_user`] to get the user in any context.
     pub user: Option<User>,
 
     /// Continuation token for responding to the interaction
@@ -102,6 +102,45 @@ pub struct InteractionCommon {
 
     /// [Guild's preferred locale](https://discord.com/developers/docs/resources/guild#guild-object), if invoked in a guild
     pub guild_locale: Option<String>,
+
+    /// Installation contexts the interaction is authorized for, mapped to the guild id (guild install;
+    /// `"0"` in a DM with the bot) or the authorizing user's id (user install)
+    #[serde(default, deserialize_with = "deserialize_integration_owners")]
+    pub authorizing_integration_owners: HashMap<ApplicationIntegrationType, Snowflake>,
+
+    /// Context the interaction was triggered from
+    pub context: Option<InteractionContextType>,
+}
+
+/// Keys are integration types as strings (`"0"`, `"1"`); unknown types are skipped.
+fn deserialize_integration_owners<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<ApplicationIntegrationType, Snowflake>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let owners = HashMap::<String, Snowflake>::deserialize(deserializer)?;
+
+    Ok(owners
+        .into_iter()
+        .filter_map(|(key, owner)| {
+            let key = key.parse::<u8>().ok()?;
+            let integration_type =
+                ApplicationIntegrationType::deserialize(Value::from(key)).ok()?;
+            Some((integration_type, owner))
+        })
+        .collect())
+}
+
+impl InteractionCommon {
+    /// The user who invoked the interaction: `member.user` in a guild, `user` in DMs and private channels.
+    /// `None` only for pings.
+    pub fn invoking_user(&self) -> Option<&User> {
+        self.member
+            .as_ref()
+            .map(|member| &member.user)
+            .or(self.user.as_ref())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -166,8 +205,34 @@ impl ApplicationCommandInteractionData {
             .and_then(|u| u.get(snowflake))
     }
 
+    pub fn resolved_channel(&self, snowflake: &Snowflake) -> Option<&PartialChannel> {
+        self.resolved
+            .as_ref()
+            .and_then(|r| r.channels.as_ref())
+            .and_then(|c| c.get(snowflake))
+    }
+
+    pub fn resolved_message(&self, snowflake: &Snowflake) -> Option<&Message> {
+        self.resolved
+            .as_ref()
+            .and_then(|r| r.messages.as_ref())
+            .and_then(|m| m.get(snowflake))
+    }
+
+    pub fn resolved_attachment(&self, snowflake: &Snowflake) -> Option<&Attachment> {
+        self.resolved
+            .as_ref()
+            .and_then(|r| r.attachments.as_ref())
+            .and_then(|a| a.get(snowflake))
+    }
+
     pub fn first_option(&self) -> Option<&ApplicationCommandInteractionDataOption> {
         self.options.as_ref().and_then(|o| o.single())
+    }
+
+    /// The option the user is typing in, for autocomplete interactions
+    pub fn focused_option(&self) -> Option<&FocusedOption> {
+        self.options.as_ref().and_then(|o| o.focused())
     }
 }
 
@@ -180,8 +245,12 @@ pub struct MessageComponentData {
     /// the [type](https://discord.com/developers/docs/interactions/message-components#component-object-component-types) of the component
     pub component_type: MessageComponentType,
 
-    /// values the user selected in a [select menu](https://discord.com/developers/docs/interactions/message-components#select-menu-object) component
-    pub values: Option<Vec<SelectOption>>,
+    /// values the user selected in a [select menu](https://discord.com/developers/docs/interactions/message-components#select-menu-object) component:
+    /// option values for string selects, ids for user/role/mentionable/channel selects
+    pub values: Option<Vec<String>>,
+
+    /// resolved entities for user, role, mentionable, and channel selects
+    pub resolved: Option<ResolvedData>,
 }
 
 #[derive(Debug, Deserialize_repr)]
@@ -204,7 +273,61 @@ pub struct ModalSubmitData {
     pub custom_id: String,
 
     /// the values submitted by the user
-    pub components: Vec<ActionRow>, // TODO: this is a guess - might need to be a Vec<Component>
+    pub components: Vec<ModalSubmitComponent>,
+}
+
+impl ModalSubmitData {
+    /// The submitted value of the text input with `custom_id`, wherever it is nested
+    pub fn value(&self, custom_id: &str) -> Option<&str> {
+        self.find(custom_id).and_then(|c| c.value.as_deref())
+    }
+
+    /// The submitted values of the select with `custom_id`, wherever it is nested
+    pub fn values(&self, custom_id: &str) -> Option<&[String]> {
+        self.find(custom_id).and_then(|c| c.values.as_deref())
+    }
+
+    /// The component with `custom_id`, wherever it is nested
+    pub fn find(&self, custom_id: &str) -> Option<&ModalSubmitComponent> {
+        self.components.iter().find_map(|c| c.find(custom_id))
+    }
+}
+
+/// A component in a [modal submission](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-modal-submit-data-structure):
+/// an action row or label wrapping inputs, or an input carrying the submitted value
+#[derive(Debug, Deserialize)]
+pub struct ModalSubmitComponent {
+    /// [component type](https://discord.com/developers/docs/components/reference#component-object-component-types)
+    #[serde(rename = "type")]
+    pub t: u8,
+
+    /// Developer-defined id of an input
+    pub custom_id: Option<String>,
+
+    /// Submitted text of a text input
+    pub value: Option<String>,
+
+    /// Submitted values of a select
+    pub values: Option<Vec<String>>,
+
+    /// Children of an action row
+    pub components: Option<Vec<ModalSubmitComponent>>,
+
+    /// Child of a label
+    pub component: Option<Box<ModalSubmitComponent>>,
+}
+
+impl ModalSubmitComponent {
+    fn find(&self, custom_id: &str) -> Option<&ModalSubmitComponent> {
+        if self.custom_id.as_deref() == Some(custom_id) {
+            return Some(self);
+        }
+        self.components
+            .iter()
+            .flatten()
+            .chain(self.component.as_deref())
+            .find_map(|c| c.find(custom_id))
+    }
 }
 
 /// [Resolved Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-resolved-data-structure)
@@ -248,7 +371,39 @@ pub enum ApplicationCommandInteractionDataOption {
     Role(SnowflakeOption),
     Mentionable(SnowflakeOption),
     Number(NumberOption),
-    Attachment, // TODO: Figure out value type
+    /// Value is the attachment id; see [`ApplicationCommandInteractionData::resolved_attachment`]
+    Attachment(SnowflakeOption),
+    /// The option being typed in an autocomplete interaction, whatever its declared type
+    Focused(FocusedOption),
+}
+
+/// The option a user is typing in an autocomplete interaction. Discord sends the partial input,
+/// which for integer and number options may not parse yet, so it is kept as text.
+#[derive(Debug)]
+pub struct FocusedOption {
+    pub name: String,
+
+    /// [Option type](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type)
+    pub t: u8,
+
+    /// What the user has typed so far
+    pub value: String,
+}
+
+impl ApplicationCommandInteractionDataOption {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Subcommand(s) => &s.name,
+            Self::SubcommandGroup(s) => &s.name,
+            Self::String(s) => &s.name,
+            Self::Integer(s) => &s.name,
+            Self::Boolean(s) => &s.name,
+            Self::User(s) | Self::Channel(s) | Self::Role(s) | Self::Mentionable(s) => &s.name,
+            Self::Number(s) => &s.name,
+            Self::Attachment(s) => &s.name,
+            Self::Focused(s) => &s.name,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ApplicationCommandInteractionDataOption {
@@ -263,54 +418,100 @@ impl<'de> Deserialize<'de> for ApplicationCommandInteractionDataOption {
             .and_then(Value::as_u64)
             .ok_or(serde::de::Error::missing_field("type"))?;
 
+        if value.get("focused").and_then(Value::as_bool) == Some(true) && t > 2 {
+            let name = value
+                .get("name")
+                .and_then(Value::as_str)
+                .ok_or(serde::de::Error::missing_field("name"))?;
+            let typed = match value.get("value") {
+                Some(Value::String(s)) => s.clone(),
+                Some(Value::Null) | None => String::new(),
+                Some(other) => other.to_string(),
+            };
+            return Ok(ApplicationCommandInteractionDataOption::Focused(
+                FocusedOption {
+                    name: name.to_string(),
+                    t: t as u8,
+                    value: typed,
+                },
+            ));
+        }
+
         match t {
             1 => Ok(ApplicationCommandInteractionDataOption::Subcommand(
-                Subcommand::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                Subcommand::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             2 => Ok(ApplicationCommandInteractionDataOption::SubcommandGroup(
-                SubcommandGroup::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                SubcommandGroup::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             3 => Ok(ApplicationCommandInteractionDataOption::String(
-                ValueOption::<String>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<String>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             4 => Ok(ApplicationCommandInteractionDataOption::Integer(
-                ValueOption::<i64>::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<i64>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             5 => Ok(ApplicationCommandInteractionDataOption::Boolean(
-                ValueOption::<bool>::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<bool>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             6 => Ok(ApplicationCommandInteractionDataOption::User(
-                ValueOption::<Snowflake>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             7 => Ok(ApplicationCommandInteractionDataOption::Channel(
-                ValueOption::<Snowflake>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             8 => Ok(ApplicationCommandInteractionDataOption::Role(
-                ValueOption::<Snowflake>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             9 => Ok(ApplicationCommandInteractionDataOption::Mentionable(
-                ValueOption::<Snowflake>::deserialize(value)
-                    .map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             10 => Ok(ApplicationCommandInteractionDataOption::Number(
-                ValueOption::<f64>::deserialize(value).map_err(|e| serde::de::Error::custom(e))?,
+                ValueOption::<f64>::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
-            11 => Ok(ApplicationCommandInteractionDataOption::Attachment),
+            11 => Ok(ApplicationCommandInteractionDataOption::Attachment(
+                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
+            )),
             _ => Err(serde::de::Error::custom("Unknown option")),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct OptionList(Vec<ApplicationCommandInteractionDataOption>);
 
 impl OptionList {
+    pub fn iter(&self) -> impl Iterator<Item = &ApplicationCommandInteractionDataOption> {
+        self.0.iter()
+    }
+
+    /// The option being typed in an autocomplete interaction, searching into subcommands
+    pub fn focused(&self) -> Option<&FocusedOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Focused(f) => Some(f),
+            ApplicationCommandInteractionDataOption::Subcommand(s) => s.options.focused(),
+            ApplicationCommandInteractionDataOption::SubcommandGroup(g) => {
+                g.subcommand.options.focused()
+            }
+            _ => None,
+        })
+    }
+
+    pub fn get_number_option(&self, name: &str) -> Option<&NumberOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Number(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn get_attachment_option(&self, name: &str) -> Option<&SnowflakeOption> {
+        self.0.iter().find_map(|o| match o {
+            ApplicationCommandInteractionDataOption::Attachment(s) if s.name == name => Some(s),
+            _ => None,
+        })
+    }
+
     pub fn single(&self) -> Option<&ApplicationCommandInteractionDataOption> {
-        self.0.get(0)
+        self.0.first()
     }
 
     pub fn subcommand(&self) -> Option<&Subcommand> {
@@ -328,19 +529,7 @@ impl OptionList {
     }
 
     pub fn get_option(&self, name: &str) -> Option<&ApplicationCommandInteractionDataOption> {
-        self.0.iter().find(|o| match o {
-            ApplicationCommandInteractionDataOption::Subcommand(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::SubcommandGroup(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::String(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::Integer(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::Boolean(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::User(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::Channel(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::Role(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::Mentionable(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::Number(s) => s.name == name,
-            ApplicationCommandInteractionDataOption::Attachment => false,
-        })
+        self.0.iter().find(|o| o.name() == name)
     }
 
     pub fn get_string_option(&self, name: &str) -> Option<&StringOption> {
@@ -410,6 +599,7 @@ pub struct Subcommand {
     pub name: String,
 
     /// Present if this option is a group or subcommand
+    #[serde(default)]
     pub options: OptionList,
 
     /// true if this option is the currently focused option for autocomplete
@@ -443,20 +633,18 @@ impl<'de> Deserialize<'de> for SubcommandGroup {
         let InnerData {
             name,
             focused,
-            mut options,
+            options,
         } = InnerData::deserialize(deserializer)?;
 
-        let option = options.remove(0);
-
-        match option {
-            ApplicationCommandInteractionDataOption::Subcommand(subcommand) => {
+        match options.into_iter().next() {
+            Some(ApplicationCommandInteractionDataOption::Subcommand(subcommand)) => {
                 Ok(SubcommandGroup {
                     name,
                     subcommand,
                     focused,
                 })
             }
-            _ => return Err(serde::de::Error::custom("Not a subcommand")),
+            _ => Err(serde::de::Error::custom("Not a subcommand")),
         }
     }
 }
@@ -687,5 +875,220 @@ mod tests {
         println!("{:#?}", interaction);
 
         assert!(interaction.is_ok());
+    }
+
+    #[test]
+    pub fn current_format_interaction() {
+        let json = r#"{
+            "app_permissions": "2248473465835073",
+            "application_id": "1052322265397739523",
+            "attachment_size_limit": 10485760,
+            "authorizing_integration_owners": { "0": "798662131062931547" },
+            "channel": {
+                "flags": 0,
+                "guild_id": "798662131062931547",
+                "id": "941169456686723122",
+                "last_message_id": "1100155827400229026",
+                "name": "bot-stuff",
+                "nsfw": false,
+                "parent_id": "798662131678969866",
+                "permissions": "2251799813685247",
+                "position": 1,
+                "rate_limit_per_user": 0,
+                "topic": null,
+                "type": 0
+            },
+            "channel_id": "941169456686723122",
+            "context": 0,
+            "data": {
+                "guild_id": "798662131062931547",
+                "id": "1052358444704862218",
+                "name": "ping",
+                "type": 1
+            },
+            "entitlement_sku_ids": [],
+            "entitlements": [],
+            "guild": { "features": [], "id": "798662131062931547", "locale": "en-US" },
+            "guild_id": "798662131062931547",
+            "guild_locale": "en-US",
+            "id": "1100173248714518568",
+            "locale": "en-US",
+            "member": {
+                "avatar": null,
+                "banner": null,
+                "collectibles": null,
+                "communication_disabled_until": null,
+                "deaf": false,
+                "flags": 0,
+                "joined_at": "2021-01-12T21:18:10.481000+00:00",
+                "mute": false,
+                "nick": null,
+                "pending": false,
+                "permissions": "2251799813685247",
+                "premium_since": null,
+                "roles": ["943607715639484456"],
+                "unusual_dm_activity_until": null,
+                "user": {
+                    "avatar": "fa82e15e24ee16c9fcbf8dd34d10b4cc",
+                    "avatar_decoration_data": null,
+                    "clan": null,
+                    "collectibles": null,
+                    "discriminator": "0",
+                    "global_name": "Blue Frog",
+                    "id": "282265607313817601",
+                    "primary_guild": null,
+                    "public_flags": 0,
+                    "username": "bluefrog"
+                }
+            },
+            "token": "A_UNIQUE_TOKEN",
+            "type": 2,
+            "version": 1
+        }"#;
+
+        let Interaction::ApplicationCommand(interaction) =
+            serde_json::from_str::<Interaction>(json).unwrap()
+        else {
+            panic!("expected application command");
+        };
+
+        let member = interaction.common.member.unwrap();
+        assert_eq!(member.user.discriminator, "0");
+        assert_eq!(member.user.global_name.as_deref(), Some("Blue Frog"));
+        assert_eq!(member.display_name(), "Blue Frog");
+    }
+
+    fn user_install_interaction(context: u8, location: &str) -> ApplicationCommandInteraction {
+        let json = format!(
+            r#"{{
+                "app_permissions": "562949953601536",
+                "application_id": "1052322265397739523",
+                "attachment_size_limit": 10485760,
+                "authorizing_integration_owners": {{ "1": "282265607313817601" }},
+                "context": {context},
+                "data": {{ "id": "1052358444704862218", "name": "ping", "type": 1 }},
+                "entitlements": [],
+                "id": "1100173248714518568",
+                "locale": "en-US",
+                {location},
+                "token": "A_UNIQUE_TOKEN",
+                "type": 2,
+                "version": 1
+            }}"#
+        );
+
+        match serde_json::from_str::<Interaction>(&json).unwrap() {
+            Interaction::ApplicationCommand(interaction) => interaction,
+            other => panic!("expected application command, got {other:?}"),
+        }
+    }
+
+    const USER: &str = r#"{
+        "avatar": null,
+        "discriminator": "0",
+        "global_name": "Blue Frog",
+        "id": "282265607313817601",
+        "public_flags": 0,
+        "username": "bluefrog"
+    }"#;
+
+    #[test]
+    pub fn user_install_guild_context() {
+        let location = format!(
+            r#""guild_id": "798662131062931547",
+            "guild_locale": "en-US",
+            "channel_id": "941169456686723122",
+            "member": {{
+                "avatar": null,
+                "deaf": false,
+                "flags": 0,
+                "joined_at": "2021-01-12T21:18:10.481000+00:00",
+                "mute": false,
+                "nick": "Froggy",
+                "pending": false,
+                "permissions": "2251799813685247",
+                "premium_since": null,
+                "roles": [],
+                "user": {USER}
+            }}"#
+        );
+        let interaction = user_install_interaction(0, &location);
+        let common = &interaction.common;
+
+        assert_eq!(common.context, Some(InteractionContextType::Guild));
+        assert_eq!(
+            common.authorizing_integration_owners[&ApplicationIntegrationType::UserInstall],
+            Snowflake::from_u64(282265607313817601)
+        );
+        assert!(common.user.is_none());
+        assert_eq!(
+            common.invoking_user().unwrap().id,
+            Snowflake::from_u64(282265607313817601)
+        );
+    }
+
+    #[test]
+    pub fn bot_dm_context() {
+        let location = format!(
+            r#""channel": {{
+                "flags": 0,
+                "id": "1100155827400229026",
+                "last_message_id": null,
+                "recipients": [{USER}],
+                "type": 1
+            }},
+            "channel_id": "1100155827400229026",
+            "user": {USER}"#
+        );
+        let interaction = user_install_interaction(1, &location);
+        let common = &interaction.common;
+
+        assert_eq!(common.context, Some(InteractionContextType::BotDm));
+        assert!(common.member.is_none());
+        assert_eq!(common.invoking_user().unwrap().username, "bluefrog");
+    }
+
+    #[test]
+    pub fn private_channel_context() {
+        let location = format!(
+            r#""channel": {{ "id": "1100155827400229026", "type": 3 }},
+            "channel_id": "1100155827400229026",
+            "user": {USER}"#
+        );
+        let interaction = user_install_interaction(2, &location);
+        let common = &interaction.common;
+
+        assert_eq!(common.context, Some(InteractionContextType::PrivateChannel));
+        assert!(common.guild_id.is_none());
+        assert!(common.member.is_none());
+        assert_eq!(common.invoking_user().unwrap().display_name(), "Blue Frog");
+    }
+
+    #[test]
+    pub fn guild_install_owners() {
+        let json = r#"{
+            "application_id": "1052322265397739523",
+            "authorizing_integration_owners": { "0": "798662131062931547", "1": "282265607313817601" },
+            "context": 0,
+            "id": "1100173248714518568",
+            "token": "A_UNIQUE_TOKEN",
+            "type": 1,
+            "version": 1
+        }"#;
+
+        let Interaction::Ping(ping) = serde_json::from_str::<Interaction>(json).unwrap() else {
+            panic!("expected ping");
+        };
+
+        let owners = &ping.common.authorizing_integration_owners;
+        assert_eq!(
+            owners[&ApplicationIntegrationType::GuildInstall],
+            Snowflake::from_u64(798662131062931547)
+        );
+        assert_eq!(
+            owners[&ApplicationIntegrationType::UserInstall],
+            Snowflake::from_u64(282265607313817601)
+        );
+        assert!(ping.common.invoking_user().is_none());
     }
 }

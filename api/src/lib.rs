@@ -1,13 +1,14 @@
 use composure_commands::command::{ApplicationCommand, CommandsBuilder};
+use std::{thread, time::Duration};
+
 use reqwest::{
-    header::{self, AUTHORIZATION},
     IntoUrl, StatusCode,
+    blocking::RequestBuilder,
+    header::{self, AUTHORIZATION},
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod application_commands;
-
-pub use application_commands::*;
 
 pub const DISCORD_API: &str = "https://discord.com/api/v10";
 
@@ -33,13 +34,13 @@ impl DiscordClient {
         headers.insert(
             AUTHORIZATION,
             header::HeaderValue::from_str(format!("Bot {token}").as_str())
-                .map_err(|e| Error::HeaderError(e))?,
+                .map_err(Error::HeaderError)?,
         );
 
         let client = reqwest::blocking::Client::builder()
             .default_headers(headers)
             .build()
-            .map_err(|e| Error::RequestError(e))?;
+            .map_err(Error::RequestError)?;
 
         Ok(DiscordClient {
             client,
@@ -51,16 +52,8 @@ impl DiscordClient {
     where
         T: IntoUrl,
     {
-        let response = self
-            .client
-            .get(url)
-            .send()
-            .map_err(|e| Error::RequestError(e))?;
-
-        match response.status() {
-            StatusCode::UNAUTHORIZED => Err(Error::Unauthorized),
-            _ => Ok(response.json().map_err(|e| Error::RequestError(e))?),
-        }
+        let url = url.into_url().map_err(Error::RequestError)?;
+        self.send(|| self.client.get(url.clone()))
     }
 
     fn post<T, U, R: DeserializeOwned>(&self, url: T, body: &U) -> Result<R>
@@ -68,17 +61,8 @@ impl DiscordClient {
         T: IntoUrl,
         U: Serialize,
     {
-        let response = self
-            .client
-            .post(url)
-            .json(body)
-            .send()
-            .map_err(|e| Error::RequestError(e))?;
-
-        match response.status() {
-            StatusCode::UNAUTHORIZED => Err(Error::Unauthorized),
-            _ => Ok(response.json().map_err(|e| Error::RequestError(e))?),
-        }
+        let url = url.into_url().map_err(Error::RequestError)?;
+        self.send(|| self.client.post(url.clone()).json(body))
     }
 
     fn put<T, U, R: DeserializeOwned>(&self, url: T, body: &U) -> Result<R>
@@ -86,22 +70,50 @@ impl DiscordClient {
         T: IntoUrl,
         U: Serialize,
     {
-        let response = self
-            .client
-            .put(url)
-            .json(body)
-            .send()
-            .map_err(|e| Error::RequestError(e))?;
+        let url = url.into_url().map_err(Error::RequestError)?;
+        self.send(|| self.client.put(url.clone()).json(body))
+    }
 
-        match response.status() {
-            StatusCode::UNAUTHORIZED => Err(Error::Unauthorized),
-            StatusCode::OK | StatusCode::CREATED => {
-                Ok(response.json().map_err(|e| Error::RequestError(e))?)
+    /// Sends the request, waiting out and retrying [rate limits](https://discord.com/developers/docs/topics/rate-limits)
+    /// up to [`MAX_RATE_LIMIT_RETRIES`] times. Waits longer than [`MAX_RATE_LIMIT_WAIT`] are returned as errors.
+    fn send<R: DeserializeOwned>(&self, request: impl Fn() -> RequestBuilder) -> Result<R> {
+        for _ in 0..MAX_RATE_LIMIT_RETRIES {
+            let response = request().send().map_err(Error::RequestError)?;
+            if response.status() != StatusCode::TOO_MANY_REQUESTS {
+                return handle_response(response);
             }
-            _ => Err(Error::UnknownResponse(
-                response.text().map_err(|e| Error::RequestError(e))?,
-            )),
+
+            let body = response.text().map_err(Error::RequestError)?;
+            match serde_json::from_str::<RateLimited>(&body) {
+                Ok(limited) if limited.retry_after <= MAX_RATE_LIMIT_WAIT.as_secs_f64() => {
+                    thread::sleep(Duration::from_secs_f64(limited.retry_after));
+                }
+                _ => return Err(Error::UnknownResponse(body)),
+            }
         }
+
+        handle_response(request().send().map_err(Error::RequestError)?)
+    }
+}
+
+const MAX_RATE_LIMIT_RETRIES: u32 = 3;
+const MAX_RATE_LIMIT_WAIT: Duration = Duration::from_secs(60);
+
+/// Body of a 429 response
+#[derive(Deserialize)]
+struct RateLimited {
+    /// Seconds to wait before retrying
+    retry_after: f64,
+}
+
+/// 401 is [`Error::Unauthorized`], other non-2xx statuses are [`Error::UnknownResponse`] with the body.
+fn handle_response<R: DeserializeOwned>(response: reqwest::blocking::Response) -> Result<R> {
+    match response.status() {
+        StatusCode::UNAUTHORIZED => Err(Error::Unauthorized),
+        status if status.is_success() => response.json().map_err(Error::RequestError),
+        _ => Err(Error::UnknownResponse(
+            response.text().map_err(Error::RequestError)?,
+        )),
     }
 }
 
@@ -113,7 +125,7 @@ impl UpdateCommands for CommandsBuilder {
     fn update_commands(&self, token: &str) -> Result<Vec<ApplicationCommand>> {
         let client = DiscordClient::new(token, &self.application_id.to_string())?;
 
-        let ref_vec = self.commands.iter().map(|c| c).collect();
+        let ref_vec = self.commands.iter().collect();
 
         let updated_commands = match &self.guild_id {
             Some(snowflake) => client.overwrite_guild_commands(&snowflake.to_string(), &ref_vec),

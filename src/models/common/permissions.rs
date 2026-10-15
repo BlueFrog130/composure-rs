@@ -154,9 +154,7 @@ impl<'de> Deserialize<'de> for Permissions {
         D: serde::Deserializer<'de>,
     {
         let bit_str = String::deserialize(deserializer)?;
-        let bits = bit_str
-            .parse::<u64>()
-            .map_err(|e| serde::de::Error::custom(e))?;
+        let bits = bit_str.parse::<u64>().map_err(serde::de::Error::custom)?;
 
         // Permissions::from_bits(bits).ok_or(serde::de::Error::custom("Unexpected permissions flags"))
         Ok(Permissions::from_bits_retain(bits))
@@ -164,7 +162,7 @@ impl<'de> Deserialize<'de> for Permissions {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::Permissions;
 
     #[test]

@@ -47,7 +47,6 @@ pub struct Sticker {
 /// [Sticker Types](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-types)
 #[derive(Debug, Deserialize_repr)]
 #[repr(u8)]
-
 pub enum StickerType {
     /// an official sticker in a pack, part of Nitro or in a removed purchasable pack
     Standard = 1,
@@ -59,7 +58,6 @@ pub enum StickerType {
 /// [Sticker Format Types](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-format-types)
 #[derive(Debug, Deserialize_repr)]
 #[repr(u8)]
-
 pub enum StickerFormatTypes {
     Png = 1,
 

@@ -1,8 +1,8 @@
-use serde::{de::Visitor, Deserialize};
+use serde::{Deserialize, de::Visitor};
 
 use crate::{
-    models::{Permissions, Snowflake},
     Mentionable,
+    models::{Permissions, Snowflake},
 };
 
 /// [Role Object](https://discord.com/developers/docs/topics/permissions#role-object)
@@ -91,7 +91,7 @@ impl<'de> Deserialize<'de> for RoleTags {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &'static [&'static str] = &[
+        const FIELDS: &[&str] = &[
             "bot_id",
             "integration_id",
             "premium_subscriber",
@@ -171,7 +171,7 @@ impl<'de> Deserialize<'de> for RoleTags {
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::AvailableForPurchase => {
-                            _ = map.next_value()?;
+                            map.next_value::<serde::de::IgnoredAny>()?;
                             available_for_purchase = true;
                         }
                         Field::BotId => {
@@ -181,14 +181,14 @@ impl<'de> Deserialize<'de> for RoleTags {
                             integration_id = map.next_value()?;
                         }
                         Field::PremiumSubscriber => {
-                            _ = map.next_value()?;
+                            map.next_value::<serde::de::IgnoredAny>()?;
                             premium_subscriber = true;
                         }
                         Field::SubscriptionListingId => {
                             subscription_listing_id = map.next_value()?;
                         }
                         Field::GuildConnections => {
-                            _ = map.next_value()?;
+                            map.next_value::<serde::de::IgnoredAny>()?;
                             guild_connections = true;
                         }
                     }
@@ -230,9 +230,9 @@ mod tests {
 
         let role_tags = result.unwrap();
 
-        assert_eq!(role_tags.premium_subscriber, true);
-        assert_eq!(role_tags.available_for_purchase, true);
-        assert_eq!(role_tags.guild_connections, true);
+        assert!(role_tags.premium_subscriber);
+        assert!(role_tags.available_for_purchase);
+        assert!(role_tags.guild_connections);
     }
 
     #[test]
@@ -249,8 +249,8 @@ mod tests {
 
         let role_tags = result.unwrap();
 
-        assert_eq!(role_tags.premium_subscriber, false);
-        assert_eq!(role_tags.available_for_purchase, false);
-        assert_eq!(role_tags.guild_connections, false);
+        assert!(!role_tags.premium_subscriber);
+        assert!(!role_tags.available_for_purchase);
+        assert!(!role_tags.guild_connections);
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use serde::{ser::SerializeMap, Serialize};
+use serde::{Serialize, ser::SerializeMap};
 
 use crate::models::{ActionRow, AllowedMentions, Embed, MessageFlags, PartialAttachment};
 
@@ -40,6 +40,19 @@ impl InteractionResponse {
             embeds: None,
             allowed_mentions: None,
             flags: None,
+            components: None,
+            attachments: None,
+        })
+    }
+
+    /// Respond with a message only the invoking user can see
+    pub fn respond_with_ephemeral_message(content: String) -> Self {
+        InteractionResponse::ChannelMessageWithSource(MessageCallbackData {
+            tts: None,
+            content: Some(content),
+            embeds: None,
+            allowed_mentions: None,
+            flags: Some(MessageFlags::Ephemeral),
             components: None,
             attachments: None,
         })
@@ -196,7 +209,7 @@ pub struct ModalCallbackData {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     #[test]
@@ -212,5 +225,15 @@ pub mod tests {
         });
 
         println!("{}", serde_json::to_string_pretty(&response).unwrap());
+    }
+
+    #[test]
+    pub fn serialize_ephemeral_message() {
+        let response = InteractionResponse::respond_with_ephemeral_message(String::from("hello"));
+
+        assert_eq!(
+            serde_json::to_value(&response).unwrap(),
+            serde_json::json!({ "type": 4, "data": { "content": "hello", "flags": 64 } })
+        );
     }
 }

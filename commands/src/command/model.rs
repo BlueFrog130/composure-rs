@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use composure::models::{Permissions, Snowflake, TypeField};
+use composure::models::{
+    ApplicationIntegrationType, ChannelType, InteractionContextType, Permissions, Snowflake,
+    TypeField,
+};
 use serde::{Deserialize, Serialize};
 
 /// [Application Command Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
@@ -67,8 +70,18 @@ pub struct CommandDetails<const T: u8> {
     pub default_member_permissions: Option<Permissions>,
 
     /// Indicates whether the command is available in DMs with the app, only for globally-scoped commands. By default, commands are visible.
+    ///
+    /// Deprecated by Discord: use [`CommandDetails::contexts`] instead.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dm_permission: Option<bool>,
+
+    /// [Installation contexts](https://discord.com/developers/docs/resources/application#installation-context) where the command is available, only for globally-scoped commands. Defaults to the app's configured contexts
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub integration_types: Option<Vec<ApplicationIntegrationType>>,
+
+    /// [Interaction contexts](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-context-types) where the command can be used, only for globally-scoped commands
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contexts: Option<Vec<InteractionContextType>>,
 
     /// Not recommended for use as field will soon be deprecated. Indicates whether the command is enabled by default when the app is added to a guild, defaults to true
     // #[serde(skip_serializing_if = "Option::is_none")]
@@ -102,7 +115,6 @@ pub struct ChatInputCommand<const T: u8> {
 
 pub type BooleanOption = BaseOption<5>;
 pub type UserOption = BaseOption<6>;
-pub type ChannelOption = BaseOption<7>;
 pub type RoleOption = BaseOption<8>;
 pub type MentionableOption = BaseOption<9>;
 pub type AttachmentOption = BaseOption<11>;
@@ -159,6 +171,7 @@ pub struct SubcommandOption {
     pub description_localizations: Option<HashMap<String, String>>,
 
     /// If the option is a subcommand or subcommand group type, these nested options will be the parameters
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub options: Option<Vec<SubcommandCommandOption>>,
 }
 
@@ -182,6 +195,7 @@ pub struct SubcommandGroupOption {
     pub description_localizations: Option<HashMap<String, String>>,
 
     /// If the option is a subcommand or subcommand group type, these nested options will be the parameters
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub options: Option<Vec<SubcommandOption>>,
 }
 
@@ -329,6 +343,34 @@ pub struct BaseOption<const T: u8> {
     pub required: Option<bool>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChannelOption {
+    #[serde(rename = "type")]
+    pub t: TypeField<7>,
+
+    /// [1-32 character name](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming)
+    pub name: String,
+
+    /// Localization dictionary for the name field. Values follow the same restrictions as name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_localizations: Option<HashMap<String, String>>,
+
+    /// 1-100 character description
+    pub description: String,
+
+    /// Localization dictionary for the description field. Values follow the same restrictions as description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description_localizations: Option<HashMap<String, String>>,
+
+    /// If the parameter is required or optional--default false
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
+
+    /// The channel types the option is restricted to; any channel type if unset
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel_types: Option<Vec<ChannelType>>,
+}
+
 /// [Application Command Option Choice Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApplicationCommandOptionChoice<T> {
@@ -340,5 +382,5 @@ pub struct ApplicationCommandOptionChoice<T> {
     pub name_localizations: Option<HashMap<String, String>>,
 
     /// Value for the choice, up to 100 characters if string
-    pub value: Vec<T>,
+    pub value: T,
 }

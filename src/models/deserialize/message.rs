@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 
 use crate::models::{
-    ActionRow, Application, Attachment, Channel, Embed, Emoji, Interaction, Role,
-    RoleSubscriptionData, Snowflake, StickerItem, User,
+    ActionRow, Application, Attachment, Channel, Embed, Emoji, RoleSubscriptionData, Snowflake,
+    StickerItem, User,
 };
 
 /// [Message Structure](https://discord.com/developers/docs/resources/channel#message-object-message-structure)
@@ -39,7 +39,7 @@ pub struct Message {
     pub mentions: Vec<User>,
 
     /// roles specifically mentioned in this message
-    pub mention_roles: Vec<Role>,
+    pub mention_roles: Vec<Snowflake>,
 
     /// channels specifically mentioned in this message
     pub mention_channels: Option<Vec<ChannelMention>>,
@@ -83,7 +83,7 @@ pub struct Message {
     // /// the message associated with the message_reference
     // pub referenced_message: Option<Message>,
     /// sent if the message is a response to an [Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding)
-    pub interaction: Option<Interaction>,
+    pub interaction: Option<MessageInteraction>,
 
     /// the thread that was started from this message, includes [thread member](https://discord.com/developers/docs/resources/channel#thread-member-object) object
     pub thread: Option<Channel>,
@@ -296,7 +296,7 @@ impl Serialize for MessageFlags {
     where
         S: serde::Serializer,
     {
-        self.bits().to_string().serialize(serializer)
+        self.bits().serialize(serializer)
     }
 }
 
@@ -305,14 +305,26 @@ impl<'de> Deserialize<'de> for MessageFlags {
     where
         D: serde::Deserializer<'de>,
     {
-        let bit_str = String::deserialize(deserializer)?;
-        let bits = bit_str
-            .parse::<u16>()
-            .map_err(|e| serde::de::Error::custom(e))?;
-
-        // Permissions::from_bits(bits).ok_or(serde::de::Error::custom("Unexpected permissions flags"))
+        let bits = u16::deserialize(deserializer)?;
         Ok(MessageFlags::from_bits_retain(bits))
     }
+}
+
+/// [Message Interaction Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#message-interaction-object)
+#[derive(Debug, Deserialize)]
+pub struct MessageInteraction {
+    /// ID of the interaction
+    pub id: Snowflake,
+
+    /// [Interaction type](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-type)
+    #[serde(rename = "type")]
+    pub t: u8,
+
+    /// Name of the application command, including subcommands and subcommand groups
+    pub name: String,
+
+    /// User who invoked the interaction
+    pub user: User,
 }
 
 /// [Message Reference Structure](https://discord.com/developers/docs/resources/channel#message-reference-object-message-reference-structure)
@@ -332,7 +344,7 @@ pub struct MessageReference {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::models::Component;
 
     use super::*;

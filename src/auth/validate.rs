@@ -1,6 +1,7 @@
-use ed25519_dalek::{PublicKey, Signature, SignatureError, Verifier};
+use ed25519_dalek::{Signature, SignatureError, Verifier, VerifyingKey};
 use hex::FromHexError;
 
+#[derive(Debug)]
 pub enum ValidateError {
     HexError(FromHexError),
     SignatureError(SignatureError),
@@ -13,15 +14,15 @@ pub fn validate_request(
     timestamp: &str,
     body: &[u8],
 ) -> Result<(), ValidateError> {
-    let public_key = hex::decode(public_key).map_err(|e| ValidateError::HexError(e))?;
-    let signature = hex::decode(signature).map_err(|e| ValidateError::HexError(e))?;
+    let public_key = hex::decode(public_key).map_err(ValidateError::HexError)?;
+    let signature = hex::decode(signature).map_err(ValidateError::HexError)?;
     validate_bytes(
         public_key.as_slice(),
         signature.as_slice(),
         timestamp.as_bytes(),
         body,
     )
-    .map_err(|e| ValidateError::SignatureError(e))
+    .map_err(ValidateError::SignatureError)
 }
 
 /// Validates the request using a public key, signature, timestamp, and body as bytes
@@ -33,8 +34,8 @@ fn validate_bytes(
 ) -> Result<(), SignatureError> {
     let message = [timestamp, body].concat();
 
-    let public_key = PublicKey::from_bytes(&public_key)?;
-    let signature = Signature::from_bytes(&signature)?;
+    let public_key = VerifyingKey::try_from(public_key)?;
+    let signature = Signature::from_slice(signature)?;
 
     public_key.verify(&message, &signature)
 }
@@ -65,5 +66,29 @@ mod tests {
         let res = validate_request(public_key, sig, timestamp, body);
 
         assert!(res.is_err());
+    }
+
+    const PUBLIC_KEY: &str = "852aec10972ef6dd0431747902c779342cc411ad6d42c2de16ef4c87895c61ad";
+    const SIGNATURE: &str = "c91641b5c3d12f9c819d9b5c568ef7d660e7f9abc2c312f296c562f6d7b028dac80c6c8e5c8a11f7a21ee28dbb8c6cf2762118bee45c00b2df78065b3b59f20c";
+
+    #[test]
+    pub fn validate_request_malformed_hex() {
+        let res = validate_request("not hex", SIGNATURE, "1682372142", b"{}");
+        assert!(matches!(res, Err(ValidateError::HexError(_))));
+
+        let res = validate_request(PUBLIC_KEY, "zz", "1682372142", b"{}");
+        assert!(matches!(res, Err(ValidateError::HexError(_))));
+    }
+
+    #[test]
+    pub fn validate_request_wrong_length_public_key() {
+        let res = validate_request(&PUBLIC_KEY[..62], SIGNATURE, "1682372142", b"{}");
+        assert!(matches!(res, Err(ValidateError::SignatureError(_))));
+    }
+
+    #[test]
+    pub fn validate_request_wrong_length_signature() {
+        let res = validate_request(PUBLIC_KEY, &SIGNATURE[..126], "1682372142", b"{}");
+        assert!(matches!(res, Err(ValidateError::SignatureError(_))));
     }
 }

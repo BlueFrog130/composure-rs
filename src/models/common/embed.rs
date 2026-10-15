@@ -41,6 +41,12 @@ pub struct Embed {
     pub fields: Option<Vec<EmbedField>>,
 }
 
+impl Default for Embed {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Embed {
     pub fn new() -> Self {
         Self {
@@ -324,7 +330,7 @@ impl EmbedField {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     #[test]

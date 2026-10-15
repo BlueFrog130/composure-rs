@@ -1,11 +1,8 @@
 use serde::Deserialize;
 
 use crate::{
-    models::{
-        common::{Permissions, Snowflake},
-        Avatar, ImageFormat,
-    },
     Mentionable,
+    models::common::{Permissions, Snowflake},
 };
 
 /// User object
@@ -14,50 +11,28 @@ pub struct User {
     /// User's [avatar hash](https://discord.com/developers/docs/reference#image-formatting)
     pub avatar: Option<String>,
 
-    /// User's 4 digit discord tag
+    /// User's 4 digit discord tag; `"0"` for users migrated to unique usernames
     pub discriminator: String,
 
-    /// User's display name
-    pub display_name: Option<String>,
+    /// User's display name, if set. Prefer [`User::display_name`] for showing a name.
+    #[serde(default)]
+    pub global_name: Option<String>,
 
     /// User Id
     pub id: Snowflake,
 
     /// Public [flags](https://discord.com/developers/docs/resources/user#user-object-user-flags) on a user's account
+    #[serde(default)]
     pub public_flags: u64,
 
     /// Users name - not unique
     pub username: String,
 }
 
-impl Avatar for User {
-    fn get_avatar_url(&self, preferred_format: ImageFormat) -> Option<String> {
-        if let Some(avatar) = &self.avatar {
-            let mut hash = avatar.clone();
-
-            if preferred_format == ImageFormat::Gif {
-                hash.insert_str(0, "a_");
-            }
-
-            return Some(format!(
-                "{}/avatars/{}/{}.{}",
-                Self::get_cdn_url(),
-                self.id.to_string(),
-                hash,
-                preferred_format.as_ref().to_lowercase()
-            ));
-        }
-
-        let discriminator = self
-            .discriminator
-            .parse::<u16>()
-            .expect("Valid discriminator");
-
-        Some(format!(
-            "{}/embed/avatars/{}.png",
-            Self::get_cdn_url(),
-            discriminator % 5
-        ))
+impl User {
+    /// Name to show for this user: global display name, falling back to username
+    pub fn display_name(&self) -> &str {
+        self.global_name.as_deref().unwrap_or(&self.username)
     }
 }
 
@@ -131,6 +106,15 @@ pub struct Member {
     pub communication_disabled_until: Option<String>,
 }
 
+impl Member {
+    /// Name to show for this member: server nickname, then global display name, then username
+    pub fn display_name(&self) -> &str {
+        self.nick
+            .as_deref()
+            .unwrap_or_else(|| self.user.display_name())
+    }
+}
+
 impl Mentionable for Member {
     fn to_mention(&self) -> String {
         format!("<@{}>", self.user.id)
@@ -139,48 +123,68 @@ impl Mentionable for Member {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
-    #[test]
-    pub fn avatar_url_valid() {
-        let user = User {
-            avatar: Some("fa82e15e24ee16c9fcbf8dd34d10b4cc".to_string()),
-            discriminator: "9846".to_string(),
-            display_name: None,
-            id: Snowflake::from_u64(282265607313817601),
-            public_flags: 0,
-            username: "BlueFrog".to_string(),
-        };
+    fn user(global_name: Option<&str>) -> User {
+        serde_json::from_value(json!({
+            "id": "282265607313817601",
+            "username": "bluefrog",
+            "discriminator": "0",
+            "global_name": global_name,
+            "avatar": null,
+        }))
+        .unwrap()
+    }
 
-        let url = user.get_avatar_url(ImageFormat::Webp);
-
-        assert!(url.is_some());
-
-        let url = url.unwrap();
-
-        assert_eq!("https://cdn.discordapp.com/avatars/282265607313817601/fa82e15e24ee16c9fcbf8dd34d10b4cc.webp", url.as_str());
+    fn member(nick: Option<&str>, global_name: Option<&str>) -> Member {
+        Member {
+            user: user(global_name),
+            nick: nick.map(String::from),
+            avatar: None,
+            roles: Vec::new(),
+            joined_at: String::from("2021-01-12T21:18:10.481000+00:00"),
+            premium_since: None,
+            deaf: false,
+            mute: false,
+            flags: 0,
+            pending: None,
+            permissions: None,
+            communication_disabled_until: None,
+        }
     }
 
     #[test]
-    pub fn default_avatar_url_valid() {
-        let user = User {
-            avatar: None,
-            discriminator: "9846".to_string(),
-            display_name: None,
-            id: Snowflake::from_u64(282265607313817601),
-            public_flags: 0,
-            username: "BlueFrog".to_string(),
-        };
+    fn display_name_prefers_nick() {
+        assert_eq!(member(Some("Nick"), Some("Global")).display_name(), "Nick");
+    }
 
-        let url = user.get_avatar_url(ImageFormat::Webp);
+    #[test]
+    fn display_name_falls_back_to_global_name() {
+        assert_eq!(member(None, Some("Global")).display_name(), "Global");
+        assert_eq!(user(Some("Global")).display_name(), "Global");
+    }
 
-        assert!(url.is_some());
+    #[test]
+    fn display_name_falls_back_to_username() {
+        assert_eq!(member(None, None).display_name(), "bluefrog");
+        assert_eq!(user(None).display_name(), "bluefrog");
+    }
 
-        let url = url.unwrap();
+    #[test]
+    fn legacy_user_deserializes() {
+        let user: User = serde_json::from_value(json!({
+            "id": "282265607313817601",
+            "username": "BlueFrog",
+            "discriminator": "9846",
+            "avatar": "fa82e15e24ee16c9fcbf8dd34d10b4cc",
+            "public_flags": 131141,
+        }))
+        .unwrap();
 
-        assert_eq!(
-            "https://cdn.discordapp.com/embed/avatars/1.png",
-            url.as_str()
-        );
+        assert_eq!(user.global_name, None);
+        assert_eq!(user.public_flags, 131141);
+        assert_eq!(user.display_name(), "BlueFrog");
     }
 }
