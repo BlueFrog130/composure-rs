@@ -15,8 +15,8 @@ license = "Apache-2.0"
 reqwest = { version = "0.13.5", features = ["blocking", "json"] }
 composure = { path = "../", version = "0.0.2" }
 composure_commands = { path = "../commands", version = "0.0.2" }
-serde = "1.0.229"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 
 [dev-dependencies]
 dotenvy = "0.15.7"
-serde_json = "1.0.154"
