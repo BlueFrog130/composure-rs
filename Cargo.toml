@@ -27,7 +27,7 @@ members = ["commands", "api", "adapters/cloudflare"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.99"
+rust-version = "1.88"
 
 [profile.release]
 lto = true

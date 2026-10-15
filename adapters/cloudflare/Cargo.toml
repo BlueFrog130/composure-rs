@@ -2,7 +2,7 @@
 name = "composure_adapter_cloudflare"
 version = "0.0.2"
 edition.workspace = true
-rust-version.workspace = true
+rust-version = "1.91"
 readme = "README.md"
 description = "Discord bot framework for running on the edge"
 repository = "https://github.com/BlueFrog130/composure-rs/adapters/cloudflare"
