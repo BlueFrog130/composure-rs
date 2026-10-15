@@ -21,4 +21,4 @@ DISCORD_GUILD_ID=...
 cargo test -p composure_api --test regression -- --ignored --test-threads=1 --nocapture
 ```
 
-CI runs the same test when the repository secrets `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, and `DISCORD_GUILD_ID` are set (`gh secret set -f api/.env.test`).
+It is local-only; CI runs just the offline tests.

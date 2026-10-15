@@ -7,7 +7,7 @@
 //! global and guild commands, publish the suites, read them back raw and through the models, then
 //! exercise POST, `UpdateCommands`, and error paths, leaving the guild suite installed. It reads
 //! `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID` from `api/.env.test` or the
-//! environment (CI). Run with `cargo test -p composure_api --test regression -- --ignored`.
+//! environment. Run with `cargo test -p composure_api --test regression -- --ignored`.
 
 use std::{collections::BTreeSet, env, thread, time::Duration};
 
