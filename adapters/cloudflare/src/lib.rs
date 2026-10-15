@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use async_trait::async_trait;
 use composure::models::{
     ApplicationCommandInteraction, Embed, Interaction, InteractionResponse,
@@ -26,17 +28,17 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub fn validate_request(env: &Env, headers: &Headers, body: &[u8]) -> Result<()> {
     let signature = headers
         .get("X-Signature-Ed25519")
-        .map_err(|e| Error::WorkerError(e))?
+        .map_err(Error::WorkerError)?
         .expect("Missing Ed25519");
 
     let timestamp = headers
         .get("X-Signature-Timestamp")
-        .map_err(|e| Error::WorkerError(e))?
+        .map_err(Error::WorkerError)?
         .expect("Missing Timestamp");
 
     let public_key = env
         .secret("DISCORD_PUBLIC_KEY")
-        .map_err(|e| Error::WorkerError(e))?
+        .map_err(Error::WorkerError)?
         .to_string();
 
     composure::auth::validate_request(&public_key, &signature, &timestamp, body)
@@ -89,47 +91,50 @@ impl<F: CloudflareCommandHandler + 'static> CloudflareInteractionBot<F> {
             }
         }
 
-        // console_debug!("{}", str::from_utf8(&bytes).unwrap());
-
         let interaction: Interaction = serde_json::from_slice(&bytes)?;
 
-        // console_debug!("Interaction: {:#?}", interaction);
-
-        let interaction_response = match interaction {
-            Interaction::Ping(_) => Ok(InteractionResponse::Pong),
-            Interaction::ApplicationCommand(command) => match self.handler {
-                Some(handler) => handler.command(command).await,
-                None => Ok(InteractionResponse::respond_with_embed(
-                    Embed::new()
-                        .with_title("No command handler")
-                        .with_color(0xf04747),
-                )),
-            },
-            Interaction::MessageComponent(component) => match self.handler {
-                Some(handler) => handler.component(component).await,
-                None => Ok(InteractionResponse::respond_with_embed(
-                    Embed::new()
-                        .with_title("No component handler")
-                        .with_color(0xf04747),
-                )),
-            },
-            Interaction::ApplicationCommandAutocomplete(_) => todo!(),
-            Interaction::ModalSubmit(_) => todo!(),
-        };
-
-        match interaction_response {
+        match dispatch(interaction, self.handler.as_ref()).await {
             Ok(interaction_response) => Response::from_json(&interaction_response),
-            Err(e) => match e {
-                _ => {
-                    console_error!("Unknown error: {:?}", e);
-                    Response::error("Unknown error", 400)
-                }
-            },
+            Err(e) => {
+                console_error!("Unknown error: {:?}", e);
+                Response::error("Unknown error", 400)
+            }
         }
     }
 }
 
-#[async_trait]
+/// Routes an interaction to the handler. Ping is answered with Pong.
+async fn dispatch<F: CloudflareCommandHandler>(
+    interaction: Interaction,
+    handler: Option<&F>,
+) -> worker::Result<InteractionResponse> {
+    match interaction {
+        Interaction::Ping(_) => Ok(InteractionResponse::Pong),
+        Interaction::ApplicationCommand(command) => match handler {
+            Some(handler) => handler.command(command).await,
+            None => Ok(InteractionResponse::respond_with_embed(
+                Embed::new()
+                    .with_title("No command handler")
+                    .with_color(0xf04747),
+            )),
+        },
+        Interaction::MessageComponent(component) => match handler {
+            Some(handler) => handler.component(component).await,
+            None => Ok(InteractionResponse::respond_with_embed(
+                Embed::new()
+                    .with_title("No component handler")
+                    .with_color(0xf04747),
+            )),
+        },
+        Interaction::ApplicationCommandAutocomplete(_) => todo!(),
+        Interaction::ModalSubmit(_) => todo!(),
+    }
+}
+
+/// Handles interactions dispatched by [`CloudflareInteractionBot`].
+///
+/// Workers futures are not `Send`, so implement with `#[async_trait(?Send)]`.
+#[async_trait(?Send)]
 pub trait CloudflareCommandHandler {
     async fn command(
         &self,
@@ -140,4 +145,89 @@ pub trait CloudflareCommandHandler {
         &self,
         component: MessageComponentInteraction,
     ) -> worker::Result<InteractionResponse>;
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::executor::block_on;
+    use serde_json::{json, Value};
+
+    use super::*;
+
+    struct EchoHandler;
+
+    #[async_trait(?Send)]
+    impl CloudflareCommandHandler for EchoHandler {
+        async fn command(
+            &self,
+            command: ApplicationCommandInteraction,
+        ) -> worker::Result<InteractionResponse> {
+            Ok(InteractionResponse::respond_with_message(format!(
+                "command {}",
+                command.data.name
+            )))
+        }
+
+        async fn component(
+            &self,
+            component: MessageComponentInteraction,
+        ) -> worker::Result<InteractionResponse> {
+            Ok(InteractionResponse::respond_with_message(format!(
+                "component {}",
+                component.data.custom_id
+            )))
+        }
+    }
+
+    fn interaction(t: u8, data: Option<Value>) -> Interaction {
+        let mut value = json!({
+            "id": "1100173248714518568",
+            "application_id": "1052322265397739523",
+            "type": t,
+            "token": "token",
+            "version": 1,
+        });
+        if let Some(data) = data {
+            value["data"] = data;
+        }
+        serde_json::from_value(value).unwrap()
+    }
+
+    fn command_interaction(t: u8) -> Interaction {
+        interaction(
+            t,
+            Some(json!({ "id": "1052358444704862218", "name": "ping", "type": 1 })),
+        )
+    }
+
+    fn component_interaction() -> Interaction {
+        interaction(
+            3,
+            Some(json!({ "custom_id": "button", "component_type": 2 })),
+        )
+    }
+
+    fn respond(interaction: Interaction) -> Value {
+        let response = block_on(dispatch(interaction, Some(&EchoHandler))).unwrap();
+        serde_json::to_value(response).unwrap()
+    }
+
+    #[test]
+    fn ping_returns_pong() {
+        assert_eq!(respond(interaction(1, None)), json!({ "type": 1 }));
+    }
+
+    #[test]
+    fn command_reaches_handler() {
+        let response = respond(command_interaction(2));
+        assert_eq!(response["type"], 4);
+        assert_eq!(response["data"]["content"], "command ping");
+    }
+
+    #[test]
+    fn component_reaches_handler() {
+        let response = respond(component_interaction());
+        assert_eq!(response["type"], 4);
+        assert_eq!(response["data"]["content"], "component button");
+    }
 }
