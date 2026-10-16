@@ -1,0 +1,23 @@
+[package]
+name = "composure_sync"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+description = "Sync a Composure Command Set's definitions with Discord"
+repository = "https://github.com/BlueFrog130/composure-rs/sync"
+keywords = ["discord", "bot", "edge", "serverless", "wasm"]
+license = "Apache-2.0"
+
+[dependencies]
+composure = { path = "../composure", version = "0.1.0" }
+composure_api = { path = "../api", version = "0.1.0" }
+serde_json = "1.0.154"
+clap = { version = "4.6.7", features = ["derive"], optional = true }
+cliclack = { version = "0.5.6", optional = true }
+console = { version = "0.16.6", optional = true }
+
+[features]
+default = ["cli"]
+## `sync_from_env`: the interactive / CI Sync command line (clap + cliclack)
+cli = ["dep:clap", "dep:cliclack", "dep:console"]

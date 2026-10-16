@@ -9,11 +9,6 @@ use reqwest::{
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod application_commands;
-pub mod sync;
-
-#[cfg(feature = "cli")]
-pub use sync::sync_from_env;
-pub use sync::{SyncConfig, SyncError, SyncPlan};
 
 pub const DISCORD_API: &str = "https://discord.com/api/v10";
 

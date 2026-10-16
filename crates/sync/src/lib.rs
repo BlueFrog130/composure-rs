@@ -17,7 +17,7 @@ use composure::{
 };
 use serde_json::Value;
 
-use crate::DiscordClient;
+use composure_api::DiscordClient;
 
 #[cfg(feature = "cli")]
 mod cli;
@@ -119,7 +119,7 @@ pub enum SyncError {
         target: Target,
         name: String,
     },
-    Api(crate::Error),
+    Api(composure_api::Error),
 }
 
 impl fmt::Display for SyncError {
@@ -142,8 +142,8 @@ impl fmt::Display for SyncError {
     }
 }
 
-impl From<crate::Error> for SyncError {
-    fn from(error: crate::Error) -> Self {
+impl From<composure_api::Error> for SyncError {
+    fn from(error: composure_api::Error) -> Self {
         SyncError::Api(error)
     }
 }

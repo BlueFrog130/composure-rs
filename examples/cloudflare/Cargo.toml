@@ -17,7 +17,7 @@ worker = "0.8.7"
 
 # Sync runs on the host only; keeps the HTTP client out of the worker bundle
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-composure_api = { path = "../../crates/api" }
+composure_sync = { path = "../../crates/sync" }
 dotenvy = "0.15.7"
 
 [dev-dependencies]

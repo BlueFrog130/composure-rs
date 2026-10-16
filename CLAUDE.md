@@ -26,7 +26,8 @@ cargo fmt --all
 | `composure` | `crates/composure/` | Core: Discord models (serde), ed25519 request validation, `command` runtime (`InteractionHandler`, `Ctx`, Command Set traits), `definition` models. Must stay WASM-friendly and small — no async runtime, no HTTP client. `macros` feature re-exports `composure_macros`. |
 | `composure_macros` | `crates/macros/` | Proc macros: `#[command]`, `#[group]`, `#[derive(Choice)]`. `commands!` is a `macro_rules!` in core. Runtime + trybuild UI tests in `crates/macros/tests`. |
 | `composure_commands` | `crates/commands/` | Definition builder (`CommandsBuilder` → `CommandBuilder` → `SubcommandBuilder`/group); re-exports `composure::definition`. |
-| `composure_api` | `crates/api/` | Blocking `reqwest` Discord REST client + Sync (`plan`, `apply`; `sync_from_env` CLI via clap + cliclack behind default `cli` feature). Deploy-time only. |
+| `composure_api` | `crates/api/` | Blocking `reqwest` Discord REST client (`DiscordClient`, `UpdateCommands`). Discord API interactions only. Deploy-time only. |
+| `composure_sync` | `crates/sync/` | Sync (`plan`, `apply`; `sync_from_env` CLI via clap + cliclack behind default `cli` feature) on top of `composure_api`. Deploy-time only. |
 | `composure_adapter_cloudflare` | `crates/adapters/cloudflare/` | Cloudflare Workers adapter (`worker` crate). `bench/` (own workspace member, `exclude`d from the adapter package) = `validate_request` dalek vs `web-crypto` benchmark on `wrangler dev` (`cargo test -p composure_bench_cloudflare --test wrangler --release -- --ignored --nocapture`). |
 | `composure_example_commands` | `examples/cloudflare/` | Example `#[command]` bot on Workers with a `sync` bin; `tests/regression.rs` runs signed fixtures for every interaction shape. |
 

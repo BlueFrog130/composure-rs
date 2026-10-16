@@ -10,7 +10,7 @@ Composure is a lightweight interaction bot that aims to run on the edge. Everyth
 
 - Parse interactions
 - Define each command once with `#[command]`: options, description, and response are inferred from the function
-- Sync commands with Discord from the same definitions (`composure_api::sync_from_env`)
+- Sync commands with Discord from the same definitions (`composure_sync::sync_from_env`)
 - Flexible [adapter](#adapters) system
 
 ```rust,ignore
@@ -30,7 +30,7 @@ commands! {
 }
 ```
 
-`Bot` is handed to an adapter to serve interactions, and to `composure_api::sync_from_env` in a host-only bin to sync the command definitions. See [the Cloudflare commands example](./examples/cloudflare).
+`Bot` is handed to an adapter to serve interactions, and to `composure_sync::sync_from_env` in a host-only bin to sync the command definitions. See [the Cloudflare commands example](./examples/cloudflare).
 
 ### Adapters
 

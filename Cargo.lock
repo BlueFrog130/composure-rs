@@ -288,11 +288,8 @@ dependencies = [
 name = "composure_api"
 version = "0.1.0"
 dependencies = [
- "clap",
- "cliclack",
  "composure",
  "composure_commands",
- "console",
  "dotenvy",
  "reqwest",
  "serde",
@@ -326,7 +323,7 @@ version = "0.1.0"
 dependencies = [
  "composure",
  "composure_adapter_cloudflare",
- "composure_api",
+ "composure_sync",
  "dotenvy",
  "ed25519-dalek",
  "futures",
@@ -346,6 +343,18 @@ dependencies = [
  "serde_json",
  "syn 2.0.119",
  "trybuild",
+]
+
+[[package]]
+name = "composure_sync"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "cliclack",
+ "composure",
+ "composure_api",
+ "console",
+ "serde_json",
 ]
 
 [[package]]

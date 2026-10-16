@@ -42,9 +42,9 @@ cargo run -p composure_example_commands --bin sync -- --yes     # apply without 
 cargo run -p composure_example_commands --bin sync -- --guild <guild id>  # everything to one guild, for testing
 ```
 
-`--help` lists every flag; outside a terminal it only applies with `--yes`. See the [`composure_api` README](../../crates/api/README.md#sync).
+`--help` lists every flag; outside a terminal it only applies with `--yes`. See the [`composure_sync` README](../../crates/sync/README.md).
 
-`composure_api` is a non-wasm dependency only, so it never reaches the worker bundle.
+`composure_sync` is a non-wasm dependency only, so it never reaches the worker bundle.
 
 ## Deploy
 

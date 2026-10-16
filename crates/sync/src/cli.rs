@@ -15,10 +15,11 @@ use cliclack::{confirm, intro, log, outro, outro_cancel, spinner};
 use composure::command::CommandSetDefinition;
 use console::{StyledObject, style};
 
-use super::{
+use composure_api::DiscordClient;
+
+use crate::{
     Change, ChangeCounts, SyncConfig, SyncError, SyncPlan, Target, apply_target, guild_id, plan,
 };
-use crate::DiscordClient;
 
 /// `--check` found changes
 const OUT_OF_DATE: u8 = 2;
@@ -74,7 +75,7 @@ fn parse_guild(id: &str) -> Result<String, String> {
 /// ```ignore
 /// // src/bin/sync.rs
 /// fn main() -> std::process::ExitCode {
-///     composure_api::sync_from_env(&my_bot::Bot)
+///     composure_sync::sync_from_env(&my_bot::Bot)
 /// }
 /// ```
 pub fn sync_from_env<C: CommandSetDefinition>(_commands: &C) -> ExitCode {
@@ -344,8 +345,8 @@ impl From<SyncError> for Abort {
     }
 }
 
-impl From<crate::Error> for Abort {
-    fn from(error: crate::Error) -> Self {
+impl From<composure_api::Error> for Abort {
+    fn from(error: composure_api::Error) -> Self {
         Abort::Failed(error.into())
     }
 }

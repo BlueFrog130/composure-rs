@@ -14,7 +14,7 @@ fn main() -> std::process::ExitCode {
         }
     }
 
-    composure_api::sync_from_env(&composure_example_commands::Bot)
+    composure_sync::sync_from_env(&composure_example_commands::Bot)
 }
 
 #[cfg(target_arch = "wasm32")]
