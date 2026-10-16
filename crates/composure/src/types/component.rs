@@ -2,7 +2,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use crate::types::{ChannelType, PartialEmoji, TypeField};
+use crate::types::{ChannelType, PartialEmoji, Snowflake, TypeField};
 
 /// Select menu for picking from defined text options
 pub type StringSelect = SelectMenu<3>;
@@ -253,6 +253,10 @@ pub struct ButtonComponent {
 
     /// Whether the button is disabled (defaults to false)
     pub disabled: Option<bool>,
+
+    /// Premium buttons: the SKU to buy
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sku_id: Option<Snowflake>,
 }
 
 impl ButtonComponent {
@@ -272,6 +276,16 @@ impl ButtonComponent {
             custom_id,
             url,
             disabled,
+            sku_id: None,
+        }
+    }
+
+    /// A [premium button](https://discord.com/developers/docs/monetization/implementing-app-subscriptions#prompting-users-to-subscribe)
+    /// offering `sku_id`
+    pub fn premium(sku_id: Snowflake) -> Self {
+        Self {
+            sku_id: Some(sku_id),
+            ..Self::new(ButtonStyle::Premium, None, None, None, None, None)
         }
     }
 }
@@ -293,6 +307,9 @@ pub enum ButtonStyle {
 
     /// Grey, navigates to URL
     Link = 5,
+
+    /// Shows a premium SKU to buy; no custom_id, label, url, or emoji
+    Premium = 6,
 }
 
 /// [Select Menu Structure](https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-menu-structure)

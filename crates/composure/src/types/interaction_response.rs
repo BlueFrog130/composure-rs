@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use serde::{Serialize, ser::SerializeMap};
 
-use crate::types::{ActionRow, AllowedMentions, Embed, File, MessageFlags, PartialAttachment};
+use crate::types::{
+    ActionRow, AllowedMentions, Embed, File, MessageFlags, PartialAttachment, PollCreate,
+};
 
 const TYPE_KEY: &str = "type";
 const DATA_KEY: &str = "data";
@@ -177,6 +179,10 @@ pub struct MessageCallbackData {
     /// attachment objects with filename and description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<PartialAttachment>>,
+
+    /// a poll sent with the message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poll: Option<PollCreate>,
 
     /// files to upload; sent as multipart, so the Adapter answers through the callback endpoint
     #[serde(skip)]

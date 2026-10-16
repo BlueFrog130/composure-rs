@@ -9,8 +9,8 @@ use composure::{
     rest::InteractionClient,
     types::{Interaction, InteractionResponse, Snowflake, WebhookEventPayload},
 };
-pub use state::Worker;
 use state::log_handler_error;
+pub use state::{Worker, bot_client};
 pub use transport::FetchTransport;
 use worker::{
     Context, Env, Headers, Request, Response, console_debug, console_error, console_warn,

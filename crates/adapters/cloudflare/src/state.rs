@@ -1,11 +1,38 @@
 use std::{ops::Deref, rc::Rc};
 
-use composure::command::{BackgroundWork, ErrorKind, HandlerError, Platform};
+use composure::{
+    command::{BackgroundWork, ErrorKind, HandlerError, Platform},
+    rest::BotClient,
+    types::Snowflake,
+};
 use worker::{Context, Env, console_debug, console_error};
 
 use crate::FetchTransport;
 
 const BOT_TOKEN_SECRET: &str = "DISCORD_TOKEN";
+const APPLICATION_ID: &str = "DISCORD_APPLICATION_ID";
+
+/// A Bot Client outside Interactions (cron triggers, queues, ...): the `DISCORD_TOKEN` secret and
+/// the `DISCORD_APPLICATION_ID` var (or secret), over [`FetchTransport`].
+///
+/// ```ignore
+/// #[event(scheduled)]
+/// async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
+///     let bot = composure_adapter_cloudflare::bot_client(&env).unwrap();
+///     bot.send_message(channel_id, "Daily reminder").await.unwrap();
+/// }
+/// ```
+pub fn bot_client(env: &Env) -> worker::Result<BotClient<FetchTransport>> {
+    let token = env.secret(BOT_TOKEN_SECRET)?.to_string();
+    let application_id = env
+        .var(APPLICATION_ID)
+        .map(|var| var.to_string())
+        .or_else(|_| env.secret(APPLICATION_ID).map(|secret| secret.to_string()))?;
+    let application_id: Snowflake = application_id
+        .parse()
+        .map_err(|_| worker::Error::RustError(format!("{APPLICATION_ID} is not an id")))?;
+    Ok(BotClient::new(FetchTransport, &token, application_id))
+}
 
 /// The State Commands get on Workers: the worker's [`Env`] (also via `Deref`) plus its
 /// [`Context`], which runs Background Work with `wait_until`. Implements [`Platform`], so

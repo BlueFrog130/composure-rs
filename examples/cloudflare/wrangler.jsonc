@@ -9,9 +9,17 @@
     "command": "worker-build --release"
   },
 
-  // Read by the /greet command through Ctx<Env>
+  // GREETING is read by /greet through the Worker State
   "vars": {
-    "GREETING": "Hello"
+    "GREETING": "Hello",
+    // Needed by bot_client() outside Interactions (the cron trigger below)
+    "DISCORD_APPLICATION_ID": ""
+    // "STATUS_CHANNEL_ID": "<channel id>" enables the daily heartbeat
+  },
+
+  // Runs the scheduled() handler daily at 09:00 UTC
+  "triggers": {
+    "crons": ["0 9 * * *"]
   }
 
   // DISCORD_PUBLIC_KEY (required) and DISCORD_TOKEN (for REST commands) are secrets:

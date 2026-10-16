@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::types::{Permissions, Snowflake, User};
 
@@ -16,15 +16,18 @@ pub struct Application {
     pub icon: Option<String>,
 
     /// the description of the app
+    #[serde(default)]
     pub description: String,
 
     /// an array of rpc origin urls, if rpc is enabled
     pub rpc_origins: Option<Vec<String>>,
 
     /// when false only app owner can join the app's bot to guilds
+    #[serde(default)]
     pub bot_public: bool,
 
     /// when true the app's bot will only join upon completion of the full oauth2 code grant flow
+    #[serde(default)]
     pub bot_require_code_grant: bool,
 
     /// the url of the app's terms of service
@@ -37,6 +40,7 @@ pub struct Application {
     pub owner: Option<User>,
 
     /// the hex encoded key for verification in interactions and the GameSDK's [GetTicket](https://discord.com/developers/docs/game-sdk/applications#getticket)
+    #[serde(default)]
     pub verify_key: String,
 
     // /// if the application belongs to a team, this will be a list of the members of that team
@@ -67,6 +71,27 @@ pub struct Application {
 
     /// the application's role connection verification entry point, which when configured will render the app as a verification method in the guild role verification configuration
     pub role_connections_verification_url: Option<String>,
+
+    /// the app's bot user
+    pub bot: Option<User>,
+
+    /// where Interactions are sent, when using HTTP interactions
+    pub interactions_endpoint_url: Option<String>,
+
+    /// where Webhook Events are sent
+    pub event_webhooks_url: Option<String>,
+
+    /// 1 disabled, 2 enabled, 3 disabled by Discord
+    pub event_webhooks_status: Option<u8>,
+
+    /// Webhook Event types subscribed to
+    pub event_webhooks_types: Option<Vec<String>>,
+
+    /// guilds the app is in (current application only)
+    pub approximate_guild_count: Option<u32>,
+
+    /// users who installed the app (current application only)
+    pub approximate_user_install_count: Option<u32>,
 }
 
 /// [Install Params Object](https://discord.com/developers/docs/resources/application#install-params-object)
@@ -112,6 +137,12 @@ bitflags! {
 
         /// Indicates if an app has registered global [application commands](https://discord.com/developers/docs/interactions/application-commands)
         const ApplicationCommandBadge = 1 << 23;
+    }
+}
+
+impl Serialize for ApplicationFlags {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_u32(self.bits())
     }
 }
 

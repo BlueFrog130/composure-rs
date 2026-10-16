@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 
 use crate::types::{
-    ActionRow, Application, Attachment, Channel, Embed, Emoji, RoleSubscriptionData, Snowflake,
-    StickerItem, User,
+    ActionRow, Application, Attachment, Channel, Embed, Emoji, Poll, RoleSubscriptionData,
+    Snowflake, StickerItem, User,
 };
 
 /// [Message Structure](https://discord.com/developers/docs/resources/channel#message-object-message-structure)
@@ -79,6 +79,9 @@ pub struct Message {
 
     /// [message flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
     pub flags: Option<MessageFlags>,
+
+    /// The message's poll
+    pub poll: Option<Poll>,
 
     // /// the message associated with the message_reference
     // pub referenced_message: Option<Message>,

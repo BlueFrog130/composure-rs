@@ -8,8 +8,7 @@ use super::Route;
 /// Route tables per module; a route may appear in two modules (webhook execution and
 /// interaction follow-ups share paths)
 fn modules() -> Vec<&'static [Route]> {
-    let mut modules = Vec::new();
-    modules.push(super::interaction::ROUTES);
+    let mut modules = vec![super::interaction::ROUTES];
     #[cfg(feature = "rest-commands")]
     modules.push(super::commands::ROUTES);
     #[cfg(feature = "rest-messages")]
@@ -42,6 +41,14 @@ fn modules() -> Vec<&'static [Route]> {
     modules.push(super::audit_log::ROUTES);
     #[cfg(feature = "rest-webhooks")]
     modules.push(super::webhooks::ROUTES);
+    #[cfg(feature = "rest-monetization")]
+    modules.push(super::monetization::ROUTES);
+    #[cfg(feature = "rest-polls")]
+    modules.push(super::polls::ROUTES);
+    #[cfg(feature = "rest-soundboard")]
+    modules.push(super::soundboard::ROUTES);
+    #[cfg(feature = "rest-application")]
+    modules.push(super::application::ROUTES);
     modules
 }
 

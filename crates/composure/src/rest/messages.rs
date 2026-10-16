@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::types::{
     ActionRow, AllowedMentions, Embed, File, Message, MessageFlags, PartialAttachment,
-    PinnedMessages, Snowflake, User,
+    PinnedMessages, PollCreate, Snowflake, User,
 };
 
 use super::{
@@ -73,6 +73,10 @@ pub struct CreateMessage<'a> {
     /// only `SUPPRESS_EMBEDS`, `SUPPRESS_NOTIFICATIONS` and `IS_COMPONENTS_V2` can be set
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
+
+    /// A poll sent with the message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poll: Option<&'a PollCreate>,
 
     #[serde(skip)]
     pub files: &'a [File],

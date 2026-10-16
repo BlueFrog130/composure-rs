@@ -5,8 +5,8 @@ use serde_json::{Value, value::RawValue};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::types::{
-    ApplicationIntegrationType, Attachment, Channel, InteractionContextType, Member, Message,
-    PartialChannel, PartialMember, Permissions, Role, Snowflake, User,
+    ApplicationIntegrationType, Attachment, Channel, Entitlement, InteractionContextType, Member,
+    Message, PartialChannel, PartialMember, Permissions, Role, Snowflake, User,
 };
 
 pub type ApplicationCommandInteraction = DataInteraction<ApplicationCommandInteractionData>;
@@ -39,8 +39,10 @@ impl<'de> Deserialize<'de> for Interaction {
             user: envelope.user,
             token: envelope.token,
             version: envelope.version,
+            message: envelope.message,
             app_permissions: envelope.app_permissions,
             guild_locale: envelope.guild_locale,
+            entitlements: envelope.entitlements,
             authorizing_integration_owners: envelope.authorizing_integration_owners,
             context: envelope.context,
         };
@@ -77,8 +79,11 @@ struct Envelope {
     user: Option<User>,
     token: String,
     version: u8,
+    message: Option<Box<Message>>,
     app_permissions: Option<Permissions>,
     guild_locale: Option<String>,
+    #[serde(default)]
+    entitlements: Vec<Entitlement>,
     #[serde(default, deserialize_with = "deserialize_integration_owners")]
     authorizing_integration_owners: HashMap<ApplicationIntegrationType, Snowflake>,
     context: Option<InteractionContextType>,
@@ -113,8 +118,8 @@ pub struct InteractionCommon {
     /// Read-only property, always 1
     pub version: u8,
 
-    /// For components, the message they were attached to
-    // pub message: Option<>,
+    /// For components, the message they are attached to
+    pub message: Option<Box<Message>>,
 
     /// Bitwise set of permissions the app or bot has within the channel the interaction was sent from
     pub app_permissions: Option<Permissions>,
@@ -129,6 +134,11 @@ pub struct InteractionCommon {
 
     /// Context the interaction was triggered from
     pub context: Option<InteractionContextType>,
+
+    /// [Entitlements](https://discord.com/developers/docs/resources/entitlement) of the invoking
+    /// user and guild for the app's premium SKUs
+    #[serde(default)]
+    pub entitlements: Vec<Entitlement>,
 }
 
 /// Keys are integration types as strings (`"0"`, `"1"`); unknown types are skipped.

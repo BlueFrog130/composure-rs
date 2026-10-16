@@ -1,5 +1,5 @@
 use crate::types::{
-    ApplicationCommandInteractionData, DataInteraction, Member, MessageComponentData,
+    ApplicationCommandInteractionData, DataInteraction, Entitlement, Member, MessageComponentData,
     ModalSubmitData, Snowflake, User,
 };
 
@@ -65,6 +65,19 @@ impl<'a, S, D> Ctx<'a, S, D> {
     /// The invoking user's selected language
     pub fn locale(&self) -> Option<&'a str> {
         self.interaction.locale.as_deref()
+    }
+
+    /// The invoking user's and guild's [entitlements](https://discord.com/developers/docs/resources/entitlement)
+    /// to the app's premium SKUs
+    pub fn entitlements(&self) -> &'a [Entitlement] {
+        &self.interaction.common.entitlements
+    }
+
+    /// Whether the user or guild is entitled to `sku_id` right now (not deleted or consumed)
+    pub fn is_entitled(&self, sku_id: Snowflake) -> bool {
+        self.entitlements()
+            .iter()
+            .any(|e| e.sku_id == sku_id && !e.deleted && e.consumed != Some(true))
     }
 }
 

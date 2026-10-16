@@ -1,6 +1,9 @@
 //! [Application Commands](https://discord.com/developers/docs/interactions/application-commands#endpoints)
 
-use crate::{definition::ApplicationCommand, types::Snowflake};
+use crate::{
+    definition::ApplicationCommand,
+    types::{GuildCommandPermissions, Snowflake},
+};
 
 use super::{Body, BotClient, Response, Result, Route, Transport, route::Query, route::routes};
 
@@ -17,6 +20,8 @@ routes! {
     GET_GUILD_COMMAND = Get "/applications/{application_id}/guilds/{guild_id}/commands/{command_id}";
     EDIT_GUILD_COMMAND = Patch "/applications/{application_id}/guilds/{guild_id}/commands/{command_id}";
     DELETE_GUILD_COMMAND = Delete "/applications/{application_id}/guilds/{guild_id}/commands/{command_id}";
+    GET_GUILD_COMMAND_PERMISSIONS = Get "/applications/{application_id}/guilds/{guild_id}/commands/permissions";
+    GET_COMMAND_PERMISSIONS = Get "/applications/{application_id}/guilds/{guild_id}/commands/{command_id}/permissions";
 }
 
 /// Where a Command Definition lives on Discord
@@ -120,6 +125,36 @@ impl<T: Transport> BotClient<T> {
         let (route, url) =
             self.command_url(EDIT_GLOBAL_COMMAND, EDIT_GUILD_COMMAND, scope, command_id);
         self.rest.call(route, url, Body::Json(command), None).await
+    }
+
+    /// [Get Guild Application Command Permissions](https://discord.com/developers/docs/interactions/application-commands#get-guild-application-command-permissions)
+    /// for every command in `guild_id`. Setting them needs a user's Bearer token, not the bot's.
+    pub async fn get_guild_command_permissions(
+        &self,
+        guild_id: Snowflake,
+    ) -> Result<Response<Vec<GuildCommandPermissions>>> {
+        let url = self.rest.url(
+            GET_GUILD_COMMAND_PERMISSIONS,
+            &[&self.application_id, &guild_id],
+        );
+        self.rest
+            .call(GET_GUILD_COMMAND_PERMISSIONS, url, Body::NONE, None)
+            .await
+    }
+
+    /// [Get Application Command Permissions](https://discord.com/developers/docs/interactions/application-commands#get-application-command-permissions)
+    pub async fn get_command_permissions(
+        &self,
+        guild_id: Snowflake,
+        command_id: Snowflake,
+    ) -> Result<Response<GuildCommandPermissions>> {
+        let url = self.rest.url(
+            GET_COMMAND_PERMISSIONS,
+            &[&self.application_id, &guild_id, &command_id],
+        );
+        self.rest
+            .call(GET_COMMAND_PERMISSIONS, url, Body::NONE, None)
+            .await
     }
 
     /// [Delete Global](https://discord.com/developers/docs/interactions/application-commands#delete-global-application-command) /

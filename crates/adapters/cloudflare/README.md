@@ -71,6 +71,18 @@ Requests go through `FetchTransport` (Workers `fetch`). A response carrying file
 
 Requests to `/events` (change with `.with_events_path(..)`) are Webhook Events: verified like Interactions, acknowledged with 204 at once, then handed to the handler's `EventHandler` as Background Work. Register one on the Command Set with `commands! { ...; events = MyEvents; }` and set the app's Webhook Events URL to `https://<worker>/events`. Unknown events reach `EventHandler::unknown` with their raw JSON. `handle_event(..)` runs the same steps without the Workers runtime for tests.
 
+## Outside Interactions
+
+`bot_client(&env)` builds a Bot Client from the `DISCORD_TOKEN` secret and the `DISCORD_APPLICATION_ID` var, for cron triggers, queues, or other events:
+
+```rust,ignore
+#[event(scheduled)]
+async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
+    let bot = composure_adapter_cloudflare::bot_client(&env).unwrap();
+    bot.send_message(channel_id, "Good morning").await.unwrap();
+}
+```
+
 `Ctx<Worker>` ties a Command (and its Command Set) to Workers. To run it in host tests, take `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) and implement it for a stand-in; see `examples/cloudflare/tests/offline.rs`.
 
 Workers futures are not `Send`; handlers are dispatched statically, so no `Send` bounds or `async_trait` are needed.

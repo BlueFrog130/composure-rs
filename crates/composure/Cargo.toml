@@ -69,10 +69,18 @@ rest-automod = ["rest"]
 rest-audit-log = ["rest"]
 ## Webhooks: management on `BotClient`, `WebhookClient` for executing
 rest-webhooks = ["rest"]
+## Entitlements and SKU subscriptions on `BotClient`
+rest-monetization = ["rest"]
+## Poll voters and ending polls on `BotClient`
+rest-polls = ["rest"]
+## Soundboard sounds on `BotClient`
+rest-soundboard = ["rest"]
+## The app's own settings on `BotClient`
+rest-application = ["rest"]
 ## What most bots need
 tier1 = ["rest", "rest-commands", "rest-messages", "rest-users", "rest-channels", "rest-guilds", "rest-members", "rest-roles"]
 ## Every Endpoint
-full = ["tier1", "rest-bans", "rest-threads", "rest-invites", "rest-emojis", "rest-stickers", "rest-scheduled-events", "rest-automod", "rest-audit-log", "rest-webhooks"]
+full = ["tier1", "rest-bans", "rest-threads", "rest-invites", "rest-emojis", "rest-stickers", "rest-scheduled-events", "rest-automod", "rest-audit-log", "rest-webhooks", "rest-monetization", "rest-polls", "rest-soundboard", "rest-application"]
 ## Native blocking Transport for deploy-time tools (not for wasm)
 reqwest = ["rest", "dep:reqwest"]
 

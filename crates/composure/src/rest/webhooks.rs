@@ -6,8 +6,8 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::types::{
-    ActionRow, AllowedMentions, Embed, File, Message, MessageFlags, PartialAttachment, Snowflake,
-    Webhook,
+    ActionRow, AllowedMentions, Embed, File, Message, MessageFlags, PartialAttachment, PollCreate,
+    Snowflake, Webhook,
 };
 
 use super::{
@@ -90,6 +90,10 @@ pub struct ExecuteWebhook<'a> {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub applied_tags: Option<&'a [Snowflake]>,
+
+    /// A poll sent with the message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poll: Option<&'a PollCreate>,
 
     #[serde(skip)]
     pub files: &'a [File],

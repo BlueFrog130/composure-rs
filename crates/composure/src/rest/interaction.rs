@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use crate::types::{
     ActionRow, AllowedMentions, Embed, File, InteractionResponse, Message, MessageCallbackData,
-    MessageFlags, PartialAttachment, Snowflake,
+    MessageFlags, PartialAttachment, PollCreate, Snowflake,
 };
 
 use super::{Body, Response, Rest, Result, Transport, route::routes};
@@ -209,6 +209,10 @@ pub struct CreateFollowup<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
 
+    /// A poll sent with the message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poll: Option<&'a PollCreate>,
+
     #[serde(skip)]
     pub files: &'a [File],
 }
@@ -249,6 +253,7 @@ impl<'a> From<&'a MessageCallbackData> for CreateFollowup<'a> {
             components: data.components.as_deref(),
             attachments: data.attachments.as_deref(),
             flags: data.flags,
+            poll: data.poll.as_ref(),
             files: &data.files,
         }
     }
