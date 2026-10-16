@@ -3,7 +3,7 @@
 //!
 //! - [`basics`]: answering with text, embeds, Options, Choices, State, Groups, context menus
 //! - [`api`]: REST calls with the bot token, Deferred Responses, follow-ups, file uploads
-//! - [`interactive`]: buttons and modals
+//! - [`interactive`]: buttons, select menus, and modals with `#[component]` / `#[modal]`
 
 pub mod api;
 pub mod basics;
@@ -21,14 +21,16 @@ commands! {
     pub struct Bot = [
         hello, echo, ice_cream, greet, Mod, avatar, word_count,
         whoami, remind, countdown, announce, thumbs_up, dm_me, report, export,
-        counter, feedback,
+        counter, roll, colors, feedback,
     ];
+    components = [counter_click, reroll, pick_colors];
+    modals = [on_feedback];
 }
 
 #[event(fetch)]
 async fn fetch(req: Request, env: Env, ctx: Context) -> worker::Result<Response> {
     CloudflareInteractionBot::new(req, env, ctx)
-        .with_handler(Bot.with_fallback(Components))
+        .with_handler(Bot)
         .process()
         .await
 }

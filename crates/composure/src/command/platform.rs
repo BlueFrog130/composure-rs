@@ -1,11 +1,12 @@
-//! REST and Background Work for Commands, when the Adapter's State provides them (ADR 0006).
+//! REST and Background Work for handlers, when the Adapter's State provides them (ADR 0006).
 
 use std::{future::Future, pin::Pin, rc::Rc, time::Duration};
 
 use crate::{
     rest::{BotClient, EditMessage, Error, InteractionClient, Transport},
     types::{
-        ApplicationCommandInteraction, InteractionResponse, Member, MessageFlags, Snowflake, User,
+        ApplicationCommandInteractionData, DataInteraction, InteractionCommon, InteractionResponse,
+        Member, MessageComponentData, MessageFlags, ModalSubmitData, Snowflake, User,
     },
 };
 
@@ -33,9 +34,8 @@ pub trait Platform: Clone + 'static {
 
 fn interaction_client<S: Platform>(
     state: &S,
-    interaction: &ApplicationCommandInteraction,
+    common: &InteractionCommon,
 ) -> InteractionClient<S::Transport> {
-    let common = &interaction.common;
     InteractionClient::new(
         state.transport(),
         common.application_id,
@@ -46,7 +46,7 @@ fn interaction_client<S: Platform>(
 
 fn bot_client<S: Platform>(
     state: &S,
-    interaction: &ApplicationCommandInteraction,
+    common: &InteractionCommon,
 ) -> Result<BotClient<S::Transport>, HandlerError> {
     let token = state
         .bot_token()
@@ -54,25 +54,25 @@ fn bot_client<S: Platform>(
     Ok(BotClient::new(
         state.transport(),
         &token,
-        interaction.common.application_id,
+        common.application_id,
     ))
 }
 
-impl<'a, S: Platform> Ctx<'a, S> {
-    /// Follow-ups and the original response of this Interaction. Before the Command returns,
+impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
+    /// Follow-ups and the original response of this Interaction. Before the handler returns,
     /// only Endpoints that do not depend on the initial response work; use [`defer`](Self::defer)
     /// to act after it.
     pub fn client(&self) -> InteractionClient<S::Transport> {
-        interaction_client(self.state(), self.interaction())
+        interaction_client(self.state(), &self.interaction().common)
     }
 
     /// Client authorized by the bot token; an error when the Adapter has none
     pub fn bot(&self) -> Result<BotClient<S::Transport>, HandlerError> {
-        bot_client(self.state(), self.interaction())
+        bot_client(self.state(), &self.interaction().common)
     }
 
     /// Answers with a Deferred Response (the user sees "thinking...") and runs `work` as
-    /// Background Work; its output then replaces the original response, like a Command's return
+    /// Background Work; its output then replaces the original response, like a handler's return
     /// value would have been sent. Wrap in [`Ephemeral`](super::Ephemeral) to make the response
     /// ephemeral; that is decided now, not by `work`'s output.
     ///
@@ -87,7 +87,17 @@ impl<'a, S: Platform> Ctx<'a, S> {
     /// ```
     pub fn defer<F, Fut>(&self, work: F) -> Deferred
     where
-        F: FnOnce(DeferredCtx<S>) -> Fut,
+        F: FnOnce(DeferredCtx<S, D>) -> Fut,
+        Fut: Future<Output: CommandOutput> + 'static,
+    {
+        self.spawn_completion(work);
+        Deferred(())
+    }
+
+    /// Runs `work` as Background Work, then edits the original response with its output
+    fn spawn_completion<F, Fut>(&self, work: F)
+    where
+        F: FnOnce(DeferredCtx<S, D>) -> Fut,
         Fut: Future<Output: CommandOutput> + 'static,
     {
         let ctx = DeferredCtx {
@@ -117,7 +127,31 @@ impl<'a, S: Platform> Ctx<'a, S> {
             }
             error.map_or(Ok(()), Err)
         }));
-        Deferred(())
+    }
+}
+
+/// Interaction data whose original response is a message that can be updated in place
+pub trait Updatable: private::Sealed {}
+
+impl Updatable for MessageComponentData {}
+impl Updatable for ModalSubmitData {}
+
+mod private {
+    pub trait Sealed {}
+    impl Sealed for crate::types::MessageComponentData {}
+    impl Sealed for crate::types::ModalSubmitData {}
+}
+
+impl<'a, S: Platform, D: Updatable + Clone + 'static> Ctx<'a, S, D> {
+    /// Acknowledges without a loading message (Discord type 6) and runs `work` as Background
+    /// Work; its output then replaces the message the component is on
+    pub fn defer_update<F, Fut>(&self, work: F) -> DeferredUpdate
+    where
+        F: FnOnce(DeferredCtx<S, D>) -> Fut,
+        Fut: Future<Output: CommandOutput> + 'static,
+    {
+        self.spawn_completion(work);
+        DeferredUpdate(())
     }
 }
 
@@ -144,7 +178,7 @@ async fn edit_original<T: Transport>(
 
 /// Returned by [`Ctx::defer`]: a Deferred Response whose Background Work is already scheduled
 #[derive(Debug)]
-#[must_use = "return it from the Command, or the user sees no response"]
+#[must_use = "return it from the handler, or the user sees no response"]
 pub struct Deferred(());
 
 impl IntoResponse for Deferred {
@@ -153,16 +187,40 @@ impl IntoResponse for Deferred {
     }
 }
 
+/// Returned by [`Ctx::defer_update`]: an acknowledgement whose Background Work will update the
+/// component's message
+#[derive(Debug)]
+#[must_use = "return it from the handler, or the user sees no response"]
+pub struct DeferredUpdate(());
+
+impl IntoResponse for DeferredUpdate {
+    fn into_response(self) -> InteractionResponse {
+        InteractionResponse::DeferredUpdateMessage
+    }
+}
+
 /// What deferred Background Work sees: an owned, `'static` copy of the Interaction and State
-#[derive(Clone)]
-pub struct DeferredCtx<S> {
-    interaction: Rc<ApplicationCommandInteraction>,
+pub struct DeferredCtx<S, D = ApplicationCommandInteractionData> {
+    interaction: Rc<DataInteraction<D>>,
     state: S,
 }
 
-impl<S: Platform> DeferredCtx<S> {
-    pub fn interaction(&self) -> &ApplicationCommandInteraction {
+impl<S: Clone, D> Clone for DeferredCtx<S, D> {
+    fn clone(&self) -> Self {
+        Self {
+            interaction: self.interaction.clone(),
+            state: self.state.clone(),
+        }
+    }
+}
+
+impl<S: Platform, D> DeferredCtx<S, D> {
+    pub fn interaction(&self) -> &DataInteraction<D> {
         &self.interaction
+    }
+
+    pub fn data(&self) -> &D {
+        &self.interaction.data
     }
 
     pub fn state(&self) -> &S {
@@ -187,12 +245,12 @@ impl<S: Platform> DeferredCtx<S> {
 
     /// Follow-ups and the original response of this Interaction
     pub fn client(&self) -> InteractionClient<S::Transport> {
-        interaction_client(&self.state, &self.interaction)
+        interaction_client(&self.state, &self.interaction.common)
     }
 
     /// Client authorized by the bot token; an error when the Adapter has none
     pub fn bot(&self) -> Result<BotClient<S::Transport>, HandlerError> {
-        bot_client(&self.state, &self.interaction)
+        bot_client(&self.state, &self.interaction.common)
     }
 
     /// Waits on the platform's timer (counts toward the Background Work time limit)
@@ -209,7 +267,11 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::{command::Ephemeral, rest::testing::MockTransport, types::Interaction};
+    use crate::{
+        command::Ephemeral,
+        rest::testing::MockTransport,
+        types::{ApplicationCommandInteraction, Interaction},
+    };
 
     #[derive(Clone, Default)]
     struct TestPlatform {

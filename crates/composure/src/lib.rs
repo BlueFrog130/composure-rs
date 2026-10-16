@@ -7,7 +7,7 @@ pub mod types;
 
 pub use command::Ctx;
 #[cfg(feature = "macros")]
-pub use composure_macros::{Choice, command, group};
+pub use composure_macros::{Choice, Modal, command, component, group, modal};
 
 pub trait Mentionable {
     fn to_mention(&self) -> String;

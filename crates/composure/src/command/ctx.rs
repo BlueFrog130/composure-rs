@@ -1,29 +1,45 @@
-use crate::types::{ApplicationCommandInteraction, Member, Snowflake, User};
+use crate::types::{
+    ApplicationCommandInteractionData, DataInteraction, Member, MessageComponentData,
+    ModalSubmitData, Snowflake, User,
+};
 
-/// What a Command sees besides its Options: the Interaction it answers and the Adapter's State.
-pub struct Ctx<'a, S = ()> {
-    interaction: &'a ApplicationCommandInteraction,
+/// What a handler sees besides its inputs: the Interaction it answers and the Adapter's State.
+/// `D` is the Interaction's data: a Command's by default, see [`ComponentCtx`] and [`ModalCtx`].
+pub struct Ctx<'a, S = (), D = ApplicationCommandInteractionData> {
+    interaction: &'a DataInteraction<D>,
     state: &'a S,
 }
 
-impl<S> Clone for Ctx<'_, S> {
+/// [`Ctx`] of a Component Handler: the clicked component's data (custom_id, select values)
+pub type ComponentCtx<'a, S = ()> = Ctx<'a, S, MessageComponentData>;
+
+/// [`Ctx`] of a Modal Handler: the submitted modal's data
+pub type ModalCtx<'a, S = ()> = Ctx<'a, S, ModalSubmitData>;
+
+impl<S, D> Clone for Ctx<'_, S, D> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<S> Copy for Ctx<'_, S> {}
+impl<S, D> Copy for Ctx<'_, S, D> {}
 
-impl<'a, S> Ctx<'a, S> {
-    pub fn new(interaction: &'a ApplicationCommandInteraction, state: &'a S) -> Self {
+impl<'a, S, D> Ctx<'a, S, D> {
+    pub fn new(interaction: &'a DataInteraction<D>, state: &'a S) -> Self {
         Self { interaction, state }
     }
 
-    pub fn interaction(&self) -> &'a ApplicationCommandInteraction {
+    pub fn interaction(&self) -> &'a DataInteraction<D> {
         self.interaction
     }
 
-    /// Platform resources passed through by the Adapter (e.g. `worker::Env` on Cloudflare)
+    /// The Interaction's data: options for Commands, custom_id and values for components,
+    /// submitted fields for modals
+    pub fn data(&self) -> &'a D {
+        &self.interaction.data
+    }
+
+    /// Platform resources passed through by the Adapter (e.g. `Worker` on Cloudflare)
     pub fn state(&self) -> &'a S {
         self.state
     }
@@ -49,5 +65,19 @@ impl<'a, S> Ctx<'a, S> {
     /// The invoking user's selected language
     pub fn locale(&self) -> Option<&'a str> {
         self.interaction.locale.as_deref()
+    }
+}
+
+impl<'a, S> ComponentCtx<'a, S> {
+    /// Selected values of a select menu: option values, or user/role/channel ids
+    pub fn values(&self) -> &'a [String] {
+        self.interaction.data.values.as_deref().unwrap_or_default()
+    }
+}
+
+impl<'a, S> ModalCtx<'a, S> {
+    /// The submitted value of the text input with `custom_id`
+    pub fn value(&self, custom_id: &str) -> Option<&'a str> {
+        self.interaction.data.value(custom_id)
     }
 }

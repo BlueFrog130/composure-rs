@@ -9,7 +9,7 @@ use composure::{
     rest::{Method, RawResponse, Request, Transport, TransportError},
 };
 use composure_adapter_cloudflare::handle_interaction;
-use composure_example_commands::{Bot, Components, Vars};
+use composure_example_commands::{Bot, Vars};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
 use serde_json::{Value, json};
@@ -400,44 +400,104 @@ fn errors_become_ephemeral_messages() {
     assert_eq!(response["data"]["flags"], 64);
 }
 
-fn click(custom_id: &str) -> Value {
+fn click(custom_id: &str, values: &[&str]) -> Value {
     json!({
-        "id": "1", "application_id": "1", "type": 3, "token": "t", "version": 1,
-        "data": { "custom_id": custom_id, "component_type": 2 },
+        "id": "1100173248714518568", "application_id": "1052322265397739523", "type": 3,
+        "token": "token", "version": 1, "user": alice(),
+        "data": { "custom_id": custom_id, "component_type": 2, "values": values },
     })
 }
 
-#[test]
-fn buttons_and_modals() {
-    let bot = Bot.with_fallback(Components);
+fn custom_id(response: &Value) -> &str {
+    response["data"]["components"][0]["components"][0]["custom_id"]
+        .as_str()
+        .unwrap()
+}
 
+#[test]
+fn buttons_carry_state_in_the_custom_id() {
     let (_, response) = send(
-        &bot,
+        &Bot,
         command(json!({ "id": "1", "name": "counter", "type": 1 })),
     );
     assert_eq!(response["data"]["content"], "Clicked 0 times");
-    assert_eq!(
-        response["data"]["components"][0]["components"][0]["custom_id"],
-        "counter:0"
-    );
+    assert_eq!(custom_id(&response), "counter:0");
 
-    let (_, response) = send(&bot, click("counter:4"));
+    let (_, response) = send(&Bot, click("counter:4", &[]));
     assert_eq!(response["type"], 7, "updates the clicked message");
     assert_eq!(response["data"]["content"], "Clicked 5 times");
+    assert_eq!(custom_id(&response), "counter:5");
+
+    // No handler for the prefix: the default "not handled" message
+    let (_, response) = send(&Bot, click("button", &[]));
     assert_eq!(
-        response["data"]["components"][0]["components"][0]["custom_id"],
-        "counter:5"
+        response["data"]["content"],
+        "This bot does not handle components."
     );
+}
 
-    let (_, response) = send(&bot, click("button"));
-    assert_eq!(response["data"]["content"], "Clicked button");
+#[test]
+fn deferred_update_edits_the_message_later() {
+    let env = TestEnv::default();
+    let (_, response, _) = send_with(&Bot, &env, click("roll:2", &[]));
+    assert_eq!(response, json!({ "type": 6 }));
+    assert!(env.sent().is_empty());
 
+    env.run_background().unwrap();
+    let sent = env.sent();
+    assert_eq!((sent[0].0, sent[0].1.as_str()), (Method::Patch, ORIGINAL));
+    let body: Value = serde_json::from_str(&sent[0].3).unwrap();
+    assert!(
+        body["content"].as_str().unwrap().ends_with("(3 rolls)"),
+        "{body}"
+    );
+    assert_eq!(
+        body["components"][0]["components"][0]["custom_id"],
+        "roll:3"
+    );
+}
+
+#[test]
+fn select_menus_read_values() {
     let (_, response) = send(
-        &bot,
+        &Bot,
+        command(json!({ "id": "1", "name": "colors", "type": 1 })),
+    );
+    assert_eq!(custom_id(&response), "colors");
+    let (_, response) = send(&Bot, click("colors", &["red", "blue"]));
+    assert_eq!(response["data"]["content"], "You picked red, blue");
+    assert_eq!(response["data"]["flags"], 64);
+}
+
+#[test]
+fn modals_show_and_submit_typed_forms() {
+    let (_, response) = send(
+        &Bot,
         command(json!({ "id": "1", "name": "feedback", "type": 1 })),
     );
     assert_eq!(response["type"], 9);
     assert_eq!(response["data"]["custom_id"], "feedback");
+    assert_eq!(response["data"]["title"], "Feedback");
+    let inputs: Vec<_> = response["data"]["components"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            let input = &row["components"][0];
+            (
+                input["custom_id"].clone(),
+                input["label"].clone(),
+                input["required"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        inputs,
+        [
+            (json!("topic"), json!("Topic"), json!(true)),
+            (json!("details"), json!("Details"), json!(false)),
+        ]
+    );
 
     let submit = json!({
         "id": "1", "application_id": "1", "type": 5, "token": "t", "version": 1,
@@ -446,7 +506,7 @@ fn buttons_and_modals() {
             { "type": 1, "components": [{ "type": 4, "custom_id": "details", "value": "" }] },
         ] },
     });
-    let (_, response) = send(&bot, submit);
+    let (_, response) = send(&Bot, submit);
     assert_eq!(response["data"]["content"], "Thanks! **Docs**: (none)");
     assert_eq!(response["data"]["flags"], 64);
 }
@@ -480,6 +540,8 @@ fn definitions_for_sync() {
             (None, json!("report"), json!(1)),
             (None, json!("export"), json!(1)),
             (None, json!("counter"), json!(1)),
+            (None, json!("roll"), json!(1)),
+            (None, json!("colors"), json!(1)),
             (None, json!("feedback"), json!(1)),
         ]
     );

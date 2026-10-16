@@ -98,6 +98,14 @@ _Avoid_: Button handler, listener
 **Modal Handler**:
 Code answering a modal submit routed by `custom_id` prefix, receiving the submitted fields as a typed Modal.
 
+**Modal**:
+A typed form of text inputs shown to the user and read back on submit (`#[derive(Modal)]`).
+_Avoid_: Form (alone), dialog
+
+**Custom ID State**:
+Values a Component or Modal Handler needs, carried in the `custom_id` after its prefix instead of stored anywhere.
+_Avoid_: Session, payload
+
 **Autocomplete Handler**:
 Code suggesting Choices for one Option while the user types.
 

@@ -26,12 +26,14 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 | `/report` | Bot Client in Background Work (Get Commands), a CSV file uploaded with the edit (multipart) |
 | `/export` | A file in the initial response (the Adapter answers through the callback endpoint) |
 
-[`src/interactive.rs`](src/interactive.rs): components and modals, routed by `Components` via `Bot.with_fallback(Components)`
+[`src/interactive.rs`](src/interactive.rs): `#[component]` / `#[modal]` handlers, listed in `commands!` under `components` / `modals`
 
 | Command | Shows |
 |---|---|
-| `/counter` | A button whose `custom_id` carries the count; clicks update the message (type 7) |
-| `/feedback` | A modal; the submit is answered from `modal_submit` |
+| `/counter` | `#[component("counter")]` with the count as `custom_id` state (`counter_click::custom_id(n)`); `Update(..)` edits the clicked message |
+| `/roll` | `ctx.defer_update(..)`: acknowledge without a loading message, edit the message from Background Work |
+| `/colors` | A string select; `ComponentCtx::values()` |
+| `/feedback` | `#[derive(Modal)]` form opened with `on_feedback::show()`, submitted to `#[modal("feedback")]` typed |
 
 ## Prerequisites
 

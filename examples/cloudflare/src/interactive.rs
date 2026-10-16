@@ -1,117 +1,138 @@
-//! Components and modals. Until Component Handlers have macros, they are routed by hand in
-//! [`Components`], the Command Set's fallback.
+//! Components and modals: `#[component]` / `#[modal]` handlers routed by `custom_id` prefix, with
+//! their state carried in the `custom_id` itself.
+
+use std::time::Duration;
 
 use composure::{
-    command,
-    command::{HandlerError, InteractionHandler},
+    Modal, command,
+    command::{
+        ComponentCtx, DeferredUpdate, Ephemeral, HandlerError, Platform, Update,
+        custom_id::CustomIdError,
+    },
+    component, modal,
     types::{
-        ActionRow, ButtonStyle, Component, InteractionResponse, MessageCallbackData,
-        MessageComponentInteraction, MessageFlags, ModalCallbackData, ModalSubmitInteraction,
-        TextInputStyle,
+        ActionRow, ButtonStyle, Component, InteractionResponse, MessageCallbackData, SelectOption,
     },
 };
 
-const COUNTER: &str = "counter:";
-const FEEDBACK: &str = "feedback";
-
 /// A message with a button that counts its clicks
 #[command]
-pub fn counter() -> InteractionResponse {
-    InteractionResponse::ChannelMessageWithSource(counter_message(0))
+pub fn counter() -> Result<InteractionResponse, CustomIdError> {
+    Ok(InteractionResponse::ChannelMessageWithSource(
+        counter_message(0)?,
+    ))
 }
 
 /// The count lives in the button's custom_id, so no storage is needed
-fn counter_message(count: u32) -> MessageCallbackData {
-    let button = Component::new_button(
+#[component("counter")]
+pub fn counter_click(count: u32) -> Result<Update<InteractionResponse>, CustomIdError> {
+    Ok(Update(InteractionResponse::ChannelMessageWithSource(
+        counter_message(count + 1)?,
+    )))
+}
+
+fn counter_message(count: u32) -> Result<MessageCallbackData, CustomIdError> {
+    Ok(MessageCallbackData {
+        content: Some(format!("Clicked {count} times")),
+        components: Some(vec![ActionRow::new(vec![button(
+            "+1",
+            counter_click::custom_id(count)?,
+        )])]),
+        ..Default::default()
+    })
+}
+
+/// Roll a die; re-rolls take a moment
+#[command]
+pub fn roll() -> Result<InteractionResponse, CustomIdError> {
+    Ok(InteractionResponse::ChannelMessageWithSource(dice_message(
+        "Roll the die",
+        0,
+    )?))
+}
+
+/// Acknowledges at once (no loading message), then edits the message from Background Work
+#[component("roll")]
+pub fn reroll(ctx: ComponentCtx<impl Platform>, rolls: u32) -> DeferredUpdate {
+    ctx.defer_update(async move |ctx| {
+        ctx.sleep(Duration::from_secs(1)).await;
+        // No randomness source needed for a demo: the interaction id is unique enough
+        let face = ctx.interaction().common.id.to_u64() % 6 + 1;
+        let message = dice_message(&format!("Rolled a {face}"), rolls + 1)?;
+        Ok::<_, HandlerError>(InteractionResponse::ChannelMessageWithSource(message))
+    })
+}
+
+fn dice_message(content: &str, rolls: u32) -> Result<MessageCallbackData, CustomIdError> {
+    Ok(MessageCallbackData {
+        content: Some(format!("{content} ({rolls} rolls)")),
+        components: Some(vec![ActionRow::new(vec![button(
+            "Roll",
+            reroll::custom_id(rolls)?,
+        )])]),
+        ..Default::default()
+    })
+}
+
+fn button(label: &str, custom_id: String) -> Component {
+    Component::new_button(
         ButtonStyle::Primary,
-        Some("+1".to_string()),
+        Some(label.to_string()),
         None,
-        Some(format!("{COUNTER}{count}")),
+        Some(custom_id),
         None,
+        None,
+    )
+}
+
+/// Pick colors from a menu
+#[command]
+pub fn colors() -> Result<InteractionResponse, CustomIdError> {
+    let options = ["Red", "Green", "Blue"]
+        .map(|color| SelectOption::new(color.to_string(), color.to_lowercase(), None, None, None))
+        .to_vec();
+    let menu = Component::new_string_select(
+        pick_colors::custom_id()?,
+        Some(options),
+        None,
+        Some("Pick some".to_string()),
+        Some(1),
+        Some(3),
         None,
     );
-    MessageCallbackData {
-        content: Some(format!("Clicked {count} times")),
-        components: Some(vec![ActionRow::new(vec![button])]),
-        ..Default::default()
-    }
+    Ok(InteractionResponse::ChannelMessageWithSource(
+        MessageCallbackData {
+            content: Some("Favorite colors?".to_string()),
+            components: Some(vec![ActionRow::new(vec![menu])]),
+            ..Default::default()
+        },
+    ))
+}
+
+/// The selected values come from `ComponentCtx::values`
+#[component("colors")]
+pub fn pick_colors(ctx: ComponentCtx) -> Ephemeral<String> {
+    Ephemeral(format!("You picked {}", ctx.values().join(", ")))
+}
+
+#[derive(Modal)]
+#[modal(title = "Feedback")]
+pub struct FeedbackForm {
+    #[input(max_len = 100, placeholder = "What is it about?")]
+    topic: String,
+    #[input(paragraph, max_len = 1000)]
+    details: Option<String>,
 }
 
 /// Send feedback through a form
 #[command]
-pub fn feedback() -> InteractionResponse {
-    let input = |id: &str, label: &str, style, required| {
-        ActionRow::new(vec![Component::new_text_input(
-            id.to_string(),
-            style,
-            label.to_string(),
-            None,
-            Some(1000),
-            Some(required),
-            None,
-            None,
-        )])
-    };
-    InteractionResponse::Modal(ModalCallbackData {
-        custom_id: FEEDBACK.to_string(),
-        title: "Feedback".to_string(),
-        components: Some(vec![
-            input("topic", "Topic", TextInputStyle::Short, true),
-            input("details", "Details", TextInputStyle::Paragraph, false),
-        ]),
-        tts: None,
-        content: None,
-        embeds: None,
-        allowed_mentions: None,
-        flags: None,
-    })
+pub fn feedback() -> Result<InteractionResponse, CustomIdError> {
+    on_feedback::show()
 }
 
-/// Everything that isn't a command: button clicks and modal submits
-pub struct Components;
-
-impl<S> InteractionHandler<S> for Components {
-    async fn component(
-        &self,
-        component: MessageComponentInteraction,
-        _state: &S,
-    ) -> Result<InteractionResponse, HandlerError> {
-        let custom_id = &component.data.custom_id;
-        if let Some(count) = custom_id.strip_prefix(COUNTER) {
-            let count: u32 = count.parse().map_err(HandlerError::new)?;
-            // Edits the message the button is on
-            return Ok(InteractionResponse::UpdateMessage(counter_message(
-                count + 1,
-            )));
-        }
-        Ok(InteractionResponse::respond_with_ephemeral_message(
-            format!("Clicked {custom_id}"),
-        ))
-    }
-
-    async fn modal_submit(
-        &self,
-        modal: ModalSubmitInteraction,
-        _state: &S,
-    ) -> Result<InteractionResponse, HandlerError> {
-        if modal.data.custom_id != FEEDBACK {
-            return Err(HandlerError::new(format!(
-                "unknown modal {}",
-                modal.data.custom_id
-            )));
-        }
-        let topic = modal.data.value("topic").unwrap_or_default();
-        let details = modal
-            .data
-            .value("details")
-            .filter(|d| !d.is_empty())
-            .unwrap_or("(none)");
-        Ok(InteractionResponse::ChannelMessageWithSource(
-            MessageCallbackData {
-                content: Some(format!("Thanks! **{topic}**: {details}")),
-                flags: Some(MessageFlags::Ephemeral),
-                ..Default::default()
-            },
-        ))
-    }
+/// The submitted form arrives typed
+#[modal("feedback")]
+pub fn on_feedback(form: FeedbackForm) -> Ephemeral<String> {
+    let details = form.details.as_deref().unwrap_or("(none)");
+    Ephemeral(format!("Thanks! **{}**: {details}", form.topic))
 }

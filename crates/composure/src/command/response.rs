@@ -54,6 +54,25 @@ impl<T: IntoResponse> IntoResponse for Ephemeral<T> {
     }
 }
 
+/// For components (and modals opened from one): edit the message the component is on instead of
+/// sending a new one. `Update("Saved")`, `Update(InteractionResponse::...)`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Update<T>(pub T);
+
+impl<T: IntoResponse> IntoResponse for Update<T> {
+    fn into_response(self) -> InteractionResponse {
+        match self.0.into_response() {
+            InteractionResponse::ChannelMessageWithSource(data) => {
+                InteractionResponse::UpdateMessage(data)
+            }
+            InteractionResponse::DeferredChannelMessageWithSource(_) => {
+                InteractionResponse::DeferredUpdateMessage
+            }
+            other => other,
+        }
+    }
+}
+
 /// What a Command function may return: a Response, or a `Result` of one.
 ///
 /// An `Err` is logged by the Adapter and shown to the user as a generic failure, except a

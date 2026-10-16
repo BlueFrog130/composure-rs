@@ -6,8 +6,9 @@ use crate::{
     types::{
         ApplicationCommandInteraction, ApplicationCommandInteractionData,
         ApplicationCommandInteractionDataOption as DataOption, ApplicationCommandType,
-        ApplicationIntegrationType, InteractionContextType, InteractionResponse, OptionList,
-        Permissions, Subcommand, TypeField,
+        ApplicationIntegrationType, InteractionContextType, InteractionResponse,
+        MessageComponentInteraction, ModalSubmitInteraction, OptionList, Permissions, Subcommand,
+        TypeField,
     },
 };
 
@@ -223,6 +224,24 @@ pub trait CommandSet<S> {
         interaction: &ApplicationCommandInteraction,
         state: &S,
     ) -> Option<Result<InteractionResponse, HandlerError>>;
+
+    /// Runs the Component Handler whose prefix the `custom_id` starts with, or `None`
+    async fn dispatch_component(
+        &self,
+        _interaction: &MessageComponentInteraction,
+        _state: &S,
+    ) -> Option<Result<InteractionResponse, HandlerError>> {
+        None
+    }
+
+    /// Runs the Modal Handler whose prefix the `custom_id` starts with, or `None`
+    async fn dispatch_modal(
+        &self,
+        _interaction: &ModalSubmitInteraction,
+        _state: &S,
+    ) -> Option<Result<InteractionResponse, HandlerError>> {
+        None
+    }
 }
 
 /// The Command Definitions of a Command Set, for Sync
@@ -265,7 +284,7 @@ pub const fn check_commands(commands: &[(&str, ApplicationCommandType, Option<&s
     }
 }
 
-const fn str_eq(a: &str, b: &str) -> bool {
+pub(crate) const fn str_eq(a: &str, b: &str) -> bool {
     let (a, b) = (a.as_bytes(), b.as_bytes());
     if a.len() != b.len() {
         return false;

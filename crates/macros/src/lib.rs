@@ -1,12 +1,14 @@
-//! Macros for defining Composure Commands. Use them through `composure` with the `macros`
-//! feature: `composure::{command, group, Choice}`.
+//! Macros for defining Composure Commands and handlers. Use them through `composure` with the
+//! `macros` feature: `composure::{command, group, component, modal, Choice, Modal}`.
 
 use proc_macro::TokenStream;
 
 mod choice;
 mod command;
 mod group;
+mod handler;
 mod meta;
+mod modal;
 
 /// Defines a Command from a function. Parameters after an optional leading `ctx: Ctx` become
 /// Options; the doc comment becomes the description.
@@ -54,6 +56,64 @@ pub fn command(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn group(args: TokenStream, item: TokenStream) -> TokenStream {
     group::expand(args.into(), item.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// Defines a Component Handler from a function: it answers components whose `custom_id` starts
+/// with the prefix. Parameters after an optional leading `ctx: ComponentCtx` are state carried in
+/// the `custom_id` (owned, serde-serializable), built with the generated `name::custom_id(..)`.
+///
+/// ```ignore
+/// #[component("vote")]
+/// fn vote(ctx: ComponentCtx, poll: u32, up: bool) -> Update<String> { ... }
+///
+/// // In a Command's response:
+/// Component::new_button(ButtonStyle::Success, Some("Up".into()), None,
+///     Some(vote::custom_id(poll, true)?), None, None)
+/// ```
+///
+/// The return value answers like a Command's: a new message by default, `Update(..)` to edit the
+/// message the component is on, `ctx.defer_update(..)` to do that later. List the handler in
+/// `commands!` under `components = [...]`.
+#[proc_macro_attribute]
+pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
+    handler::expand(handler::Kind::Component, args.into(), item.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// Defines a Modal Handler from a function: it answers submits of modals whose `custom_id`
+/// starts with the prefix. After an optional leading `ctx: ModalCtx` comes the form (a
+/// `#[derive(Modal)]` type), then state carried in the `custom_id`. `name::show(..)` is the
+/// modal response that opens the form.
+///
+/// ```ignore
+/// #[modal("rename")]
+/// fn rename(ctx: ModalCtx, form: Rename, item: u32) -> Ephemeral<String> { ... }
+///
+/// #[command]
+/// fn edit(#[option("Item")] item: u32) -> Result<InteractionResponse, CustomIdError> {
+///     rename::show(item)
+/// }
+/// ```
+///
+/// List the handler in `commands!` under `modals = [...]`.
+#[proc_macro_attribute]
+pub fn modal(args: TokenStream, item: TokenStream) -> TokenStream {
+    handler::expand(handler::Kind::Modal, args.into(), item.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// A form shown as a modal: one text input per named field (`String` required,
+/// `Option<String>` optional; at most 5). `#[modal(title = "...")]` on the struct;
+/// `#[input(label = "...", paragraph, min_len = N, max_len = N, placeholder = "...", value =
+/// "...", id = "...")]` on fields (the label defaults to the field name, the input id to the
+/// field name).
+#[proc_macro_derive(Modal, attributes(modal, input))]
+pub fn derive_modal(item: TokenStream) -> TokenStream {
+    modal::expand(item.into())
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
