@@ -1,34 +1,14 @@
-[package]
-name = "composure"
-edition.workspace = true
-version = "0.1.0"
-rust-version.workspace = true
-readme = "README.md"
-description = "Discord bot framework for running on the edge"
-repository = "https://github.com/BlueFrog130/composure-rs"
-keywords = ["discord", "bot", "edge", "serverless", "wasm"]
-license = "Apache-2.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-bitflags = "2.13.2"
-ed25519-dalek = "3.0.0"
-hex = "0.4.3"
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = { version = "1.0.154", features = ["raw_value"] }
-serde_repr = "0.1.21"
-strum = { version = "0.28.0", features = ["derive"] }
-composure_macros = { path = "macros", version = "0.1.0", optional = true }
-
-[features]
-## `#[command]`, `#[group]`, and `#[derive(Choice)]`
-macros = ["dep:composure_macros"]
-
-[dev-dependencies]
-
 [workspace]
-members = ["macros", "commands", "api", "adapters/cloudflare", "adapters/cloudflare/example", "adapters/cloudflare/commands-example"]
+resolver = "3"
+members = [
+    "crates/composure",
+    "crates/macros",
+    "crates/commands",
+    "crates/api",
+    "crates/adapters/cloudflare",
+    "crates/adapters/cloudflare/bench",
+    "examples/cloudflare",
+]
 
 [workspace.package]
 edition = "2024"

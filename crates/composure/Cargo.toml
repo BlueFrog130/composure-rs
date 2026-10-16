@@ -1,0 +1,37 @@
+[package]
+name = "composure"
+edition.workspace = true
+version = "0.1.0"
+rust-version.workspace = true
+readme = "../../README.md"
+description = "Discord bot framework for running on the edge"
+repository = "https://github.com/BlueFrog130/composure-rs"
+keywords = ["discord", "bot", "edge", "serverless", "wasm"]
+license = "Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitflags = "2.13.2"
+ed25519-dalek = "3.0.0"
+hex = "0.4.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["raw_value"] }
+serde_repr = "0.1.21"
+strum = { version = "0.28.0", features = ["derive"] }
+composure_macros = { path = "../macros", version = "0.1.0", optional = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+js-sys = { version = "0.3.106", optional = true }
+wasm-bindgen = { version = "0.2.129", optional = true }
+wasm-bindgen-futures = { version = "0.4.79", optional = true }
+
+[features]
+## `#[command]`, `#[group]`, and `#[derive(Choice)]`
+macros = ["dep:composure_macros"]
+## Validate requests with the host's Web Crypto (`crypto.subtle`, Ed25519) instead of
+## ed25519-dalek. Only takes effect on `wasm32-unknown-unknown`; the host must support Ed25519.
+web-crypto = ["dep:js-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+
+[dev-dependencies]
+futures = { version = "0.3.34", default-features = false, features = ["executor"] }

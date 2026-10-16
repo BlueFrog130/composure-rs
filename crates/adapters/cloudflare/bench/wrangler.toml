@@ -1,0 +1,4 @@
+# No [build]: tests/wrangler.rs runs worker-build once per backend (build-dalek/, build-web-crypto/)
+# and passes the script to `wrangler dev`.
+name = "composure-auth-bench"
+compatibility_date = "2026-09-01"

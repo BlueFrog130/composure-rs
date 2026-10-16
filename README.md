@@ -30,7 +30,7 @@ commands! {
 }
 ```
 
-`Bot` is handed to an adapter to serve interactions, and to `composure_api::sync_from_env` in a host-only bin to sync the command definitions. See [the Cloudflare commands example](./adapters/cloudflare/commands-example).
+`Bot` is handed to an adapter to serve interactions, and to `composure_api::sync_from_env` in a host-only bin to sync the command definitions. See [the Cloudflare commands example](./examples/cloudflare).
 
 ### Adapters
 
@@ -38,7 +38,7 @@ Adapters are responsible for verifying the request, parsing the request body, th
 
 |Adapters                           |
 |-----------------------------------|
-|[Cloudflare](./adapters/cloudflare)|
+|[Cloudflare](./crates/adapters/cloudflare)|
 
 ## Todo
 

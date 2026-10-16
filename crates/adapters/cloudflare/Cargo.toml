@@ -1,0 +1,27 @@
+[package]
+name = "composure_adapter_cloudflare"
+version = "0.1.0"
+edition.workspace = true
+rust-version = "1.91"
+readme = "README.md"
+description = "Discord bot framework for running on the edge"
+repository = "https://github.com/BlueFrog130/composure-rs/adapters/cloudflare"
+keywords = ["discord", "bot", "edge", "wasm", "cloudflare"]
+license = "Apache-2.0"
+exclude = ["bench"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+worker = "0.8.7"
+composure = { path = "../../composure", version = "0.1.0" }
+serde_json = "1.0.154"
+futures = { version = "0.3.34", default-features = false }
+
+[features]
+## Validate requests with Workers' Web Crypto (Ed25519) instead of ed25519-dalek: faster, smaller bundle
+web-crypto = ["composure/web-crypto"]
+
+[dev-dependencies]
+composure = { path = "../../composure", features = ["macros"] }
+futures = { version = "0.3.34", default-features = false, features = ["executor"] }
