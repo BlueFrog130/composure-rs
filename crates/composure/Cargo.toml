@@ -43,8 +43,16 @@ rest-commands = ["rest"]
 rest-messages = ["rest"]
 ## Users and DMs on `BotClient`
 rest-users = ["rest"]
+## Channel settings, permission overwrites, typing, following on `BotClient`
+rest-channels = ["rest"]
+## Guild settings, preview, channels, the bot's guilds on `BotClient`
+rest-guilds = ["rest"]
+## Guild members: reading, editing, roles, kicking on `BotClient`
+rest-members = ["rest"]
+## Roles on `BotClient`
+rest-roles = ["rest"]
 ## What most bots need
-tier1 = ["rest", "rest-commands", "rest-messages", "rest-users"]
+tier1 = ["rest", "rest-commands", "rest-messages", "rest-users", "rest-channels", "rest-guilds", "rest-members", "rest-roles"]
 ## Every Endpoint
 full = ["tier1"]
 ## Native blocking Transport for deploy-time tools (not for wasm)

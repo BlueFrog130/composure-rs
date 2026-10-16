@@ -199,7 +199,8 @@ pub enum ChannelType {
 }
 
 /// [Video Quality Modes](https://discord.com/developers/docs/resources/channel#channel-object-video-quality-modes)
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
+#[repr(u8)]
 pub enum VideoQualityMode {
     /// Discord chooses the quality for optimal performance
     Auto = 1,
@@ -240,7 +241,8 @@ impl<'de> Deserialize<'de> for ChannelFlags {
 }
 
 /// [Sort Order Types](https://discord.com/developers/docs/resources/channel#channel-object-sort-order-types)
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
+#[repr(u8)]
 pub enum SortOrderType {
     /// Sort forum posts by activity
     LatestActivity = 0,
@@ -250,7 +252,8 @@ pub enum SortOrderType {
 }
 
 /// [Forum Layout Types](https://discord.com/developers/docs/resources/channel#channel-object-forum-layout-types)
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
+#[repr(u8)]
 pub enum ForumLayoutType {
     /// No default has been set for forum channel
     NotSet = 0,
@@ -262,8 +265,17 @@ pub enum ForumLayoutType {
     GalleryView = 2,
 }
 
-/// [Overwrite Object](https://discord.com/developers/docs/resources/channel#overwrite-object)
+/// [Followed Channel](https://discord.com/developers/docs/resources/channel#followed-channel-object)
 #[derive(Debug, Clone, Deserialize)]
+pub struct FollowedChannel {
+    /// The source channel
+    pub channel_id: Snowflake,
+    /// The webhook created in the target channel
+    pub webhook_id: Snowflake,
+}
+
+/// [Overwrite Object](https://discord.com/developers/docs/resources/channel#overwrite-object)
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Overwrite {
     /// role or user id
     pub id: Snowflake,
@@ -279,7 +291,7 @@ pub struct Overwrite {
     pub deny: Permissions,
 }
 
-#[derive(Debug, Clone, Deserialize_repr)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum OverwriteType {
     Role = 0,
@@ -334,7 +346,7 @@ impl PartialEq for ThreadMember {
 }
 
 /// [Forum Tag Object](https://discord.com/developers/docs/resources/channel#forum-tag-object)
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ForumTag {
     /// the id of the tag
     pub id: Snowflake,
@@ -359,7 +371,7 @@ impl PartialEq for ForumTag {
 }
 
 /// [Default Reaction Object](https://discord.com/developers/docs/resources/channel#default-reaction-object)
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DefaultReaction {
     /// the id of a guild's custom emoji
     pub emoji_id: Option<Snowflake>,
@@ -409,5 +421,28 @@ mod tests {
         let channel = channel.unwrap();
 
         println!("{:#?}", channel);
+    }
+
+    #[test]
+    fn rest_channels_with_integer_enums() {
+        let channel: Channel = serde_json::from_value(serde_json::json!({
+            "id": "1", "type": 2, "video_quality_mode": 2, "bitrate": 64000,
+            "permission_overwrites": [{ "id": "2", "type": 0, "allow": "1024", "deny": "0" }],
+        }))
+        .unwrap();
+        assert_eq!(channel.video_quality_mode, Some(VideoQualityMode::Full));
+        let forum: Channel = serde_json::from_value(serde_json::json!({
+            "id": "1", "type": 15, "default_sort_order": 1, "default_forum_layout": 2,
+        }))
+        .unwrap();
+        assert_eq!(
+            forum.default_forum_layout,
+            Some(ForumLayoutType::GalleryView)
+        );
+        let overwrite = &channel.permission_overwrites.unwrap()[0];
+        assert_eq!(
+            serde_json::to_value(overwrite).unwrap(),
+            serde_json::json!({ "id": "2", "type": 0, "allow": "1024", "deny": "0" })
+        );
     }
 }

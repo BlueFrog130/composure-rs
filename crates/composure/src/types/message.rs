@@ -252,6 +252,20 @@ pub enum MessageActivityType {
     JoinRequest = 5,
 }
 
+/// A page of [pinned messages](https://discord.com/developers/docs/resources/message#get-channel-pins)
+#[derive(Debug, Clone, Deserialize)]
+pub struct PinnedMessages {
+    pub items: Vec<PinnedMessage>,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PinnedMessage {
+    /// When it was pinned (ISO 8601)
+    pub pinned_at: String,
+    pub message: Message,
+}
+
 bitflags::bitflags! {
     /// [Message Flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags)
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

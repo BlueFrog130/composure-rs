@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::VecDeque, time::Duration};
 
-use super::{RawResponse, Request, Transport, TransportError};
+use super::{Method, RawResponse, Request, Transport, TransportError};
 
 /// Records requests and answers them from a queue (200 `{}` once empty)
 #[derive(Default)]
@@ -22,6 +22,15 @@ impl MockTransport {
 
     pub(crate) fn request(&self, index: usize) -> Request {
         self.requests.borrow()[index].clone()
+    }
+
+    /// (method, path after the API version) of every request sent
+    pub(crate) fn sent(&self) -> Vec<(Method, String)> {
+        self.requests
+            .borrow()
+            .iter()
+            .map(|r| (r.method, r.url.split_once("/v10").unwrap().1.to_string()))
+            .collect()
     }
 
     pub(crate) fn body(&self, index: usize) -> serde_json::Value {

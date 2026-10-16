@@ -14,6 +14,14 @@ fn implemented() -> Vec<Route> {
     routes.extend_from_slice(super::messages::ROUTES);
     #[cfg(feature = "rest-users")]
     routes.extend_from_slice(super::users::ROUTES);
+    #[cfg(feature = "rest-channels")]
+    routes.extend_from_slice(super::channels::ROUTES);
+    #[cfg(feature = "rest-guilds")]
+    routes.extend_from_slice(super::guilds::ROUTES);
+    #[cfg(feature = "rest-members")]
+    routes.extend_from_slice(super::members::ROUTES);
+    #[cfg(feature = "rest-roles")]
+    routes.extend_from_slice(super::roles::ROUTES);
     routes
 }
 
