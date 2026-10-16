@@ -53,6 +53,7 @@ pub(crate) use routes;
 
 /// A path parameter that is free text (emoji, names): percent-encoded, keeping `:` for
 /// custom emoji (`name:id`)
+#[allow(dead_code)] // only some Endpoint features take free-text path parameters
 pub(crate) struct PathSegment<'a>(pub(crate) &'a str);
 
 impl Display for PathSegment<'_> {

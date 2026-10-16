@@ -4,15 +4,18 @@
 //! - [`basics`]: answering with text, embeds, Options, Choices, State, Groups, context menus
 //! - [`api`]: REST calls with the bot token, Deferred Responses, follow-ups, file uploads
 //! - [`interactive`]: buttons, select menus, and modals with `#[component]` / `#[modal]`
+//! - [`events`]: Webhook Events (app installs)
 
 pub mod api;
 pub mod basics;
+pub mod events;
 pub mod interactive;
 
 pub use api::*;
 pub use basics::*;
 use composure::commands;
 use composure_adapter_cloudflare::CloudflareInteractionBot;
+pub use events::*;
 pub use interactive::*;
 use worker::{Context, Env, Request, Response, event};
 
@@ -25,6 +28,7 @@ commands! {
     ];
     components = [counter_click, reroll, pick_colors];
     modals = [on_feedback];
+    events = Events;
 }
 
 #[event(fetch)]

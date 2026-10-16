@@ -67,6 +67,10 @@ async fn fetch(req: Request, env: Env, ctx: Context) -> Result<Response> {
 
 Requests go through `FetchTransport` (Workers `fetch`). A response carrying files (`InteractionResponse::with_file`) is sent through the callback endpoint as multipart and the request is answered with 202.
 
+## Webhook Events
+
+Requests to `/events` (change with `.with_events_path(..)`) are Webhook Events: verified like Interactions, acknowledged with 204 at once, then handed to the handler's `EventHandler` as Background Work. Register one on the Command Set with `commands! { ...; events = MyEvents; }` and set the app's Webhook Events URL to `https://<worker>/events`. Unknown events reach `EventHandler::unknown` with their raw JSON. `handle_event(..)` runs the same steps without the Workers runtime for tests.
+
 `Ctx<Worker>` ties a Command (and its Command Set) to Workers. To run it in host tests, take `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) and implement it for a stand-in; see `examples/cloudflare/tests/offline.rs`.
 
 Workers futures are not `Send`; handlers are dispatched statically, so no `Send` bounds or `async_trait` are needed.

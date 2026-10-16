@@ -73,10 +73,36 @@ fn noop(_ctx: Ctx<u32>) -> &'static str {
     ""
 }
 
+struct Events;
+
+impl composure::command::EventHandler<u32> for Events {
+    async fn unknown(
+        &self,
+        ctx: composure::command::EventCtx<'_, u32>,
+        kind: &str,
+        _data: Option<&serde_json::value::RawValue>,
+    ) -> Result<(), HandlerError> {
+        Err(HandlerError::new(format!(
+            "{kind} with state {}",
+            ctx.state()
+        )))
+    }
+}
+
 commands! {
     pub struct Bot = [edit, noop];
     components = [count, step, plain];
     modals = [rename];
+    events = Events;
+}
+
+/// No `events`: every event is ignored
+mod quiet {
+    use super::*;
+
+    commands! {
+        pub struct Quiet = [noop];
+    }
 }
 
 fn interaction(t: u8, data: Value) -> Interaction {
@@ -188,4 +214,20 @@ fn modals_show_and_submit() {
 fn modal_trait_is_usable_directly() {
     assert_eq!(Rename::TITLE, "Rename");
     assert_eq!(Rename::components().len(), 2);
+}
+
+#[test]
+fn events_go_to_the_registered_handler() {
+    use composure::{command::dispatch_event, types::EventBody};
+
+    let body: EventBody = serde_json::from_value(json!({
+        "type": "SOMETHING_NEW", "timestamp": "2024-10-18T14:42:53.064834",
+    }))
+    .unwrap();
+    let app = composure::types::Snowflake::from_u64(1);
+    let error = block_on(dispatch_event(&Bot, &7u32, app, &body)).unwrap_err();
+    assert_eq!(error.to_string(), "SOMETHING_NEW with state 7");
+    let error = block_on(dispatch_event(&Bot.with_fallback(()), &7u32, app, &body)).unwrap_err();
+    assert_eq!(error.to_string(), "SOMETHING_NEW with state 7");
+    assert!(block_on(dispatch_event(&quiet::Quiet, &7u32, app, &body)).is_ok());
 }

@@ -37,6 +37,12 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 | `/colors` | A string select; `ComponentCtx::values()` |
 | `/feedback` | `#[derive(Modal)]` form opened with `on_feedback::show()`, submitted to `#[modal("feedback")]` typed |
 
+[`src/events.rs`](src/events.rs): Webhook Events (`commands! { ..; events = Events; }`), served on `/events`
+
+| Event | Shows |
+|---|---|
+| `APPLICATION_AUTHORIZED` | A user install gets a welcome DM, sent after the 204 with `EventCtx::bot()` |
+
 ## Prerequisites
 
 - Node (for `npx wrangler`) and `cargo install worker-build@0.8.7`
@@ -79,7 +85,7 @@ npx wrangler secret put DISCORD_PUBLIC_KEY
 npx wrangler secret put DISCORD_TOKEN   # /whoami, /announce, /dm-me, /report, Thumbs up
 ```
 
-Set the Interactions Endpoint URL to `https://composure-commands-example.<subdomain>.workers.dev`.
+Set the Interactions Endpoint URL to `https://composure-commands-example.<subdomain>.workers.dev`. For Webhook Events, set the Webhook Events URL to the same address plus `/events` and enable `Application Authorized`.
 
 ## Test
 

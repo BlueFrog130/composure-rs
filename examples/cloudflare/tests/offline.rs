@@ -8,7 +8,7 @@ use composure::{
     command::{BackgroundWork, CommandSetDefinition, HandlerError, InteractionHandler, Platform},
     rest::{Method, RawResponse, Request, Transport, TransportError},
 };
-use composure_adapter_cloudflare::handle_interaction;
+use composure_adapter_cloudflare::{handle_event, handle_interaction};
 use composure_example_commands::{Bot, Vars};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
@@ -548,6 +548,64 @@ fn autocomplete_suggests_while_typing() {
         ),
     );
     assert_eq!(response["data"]["content"], "`/hello`: Say hello");
+}
+
+/// (status, Background Work spawned) for a signed Webhook Events request
+fn send_event(env: &TestEnv, payload: Value, tamper: bool) -> (u16, usize) {
+    let body = payload.to_string().into_bytes();
+    let key = SigningKey::from_bytes(&KEY);
+    let signature = hex::encode(key.sign(&[TIMESTAMP.as_bytes(), &body].concat()).to_bytes());
+    let body = if tamper {
+        [&body[..], b" "].concat()
+    } else {
+        body
+    };
+    let outcome = block_on(handle_event(
+        &hex::encode(key.verifying_key().as_bytes()),
+        Some(&signature),
+        Some(TIMESTAMP),
+        &body,
+        Bot,
+        env,
+    ));
+    (outcome.status(), env.work.borrow().len())
+}
+
+fn authorized(integration_type: u8) -> Value {
+    json!({
+        "version": 1, "application_id": "1052322265397739523", "type": 1,
+        "event": { "type": "APPLICATION_AUTHORIZED", "timestamp": "2024-10-18T14:42:53.064834",
+                   "data": { "integration_type": integration_type, "user": alice(),
+                             "scopes": ["applications.commands"] } },
+    })
+}
+
+#[test]
+fn webhook_events_are_acknowledged_then_handled() {
+    // Discord verifies the URL with a Ping
+    let env = TestEnv::default();
+    let ping = json!({ "version": 1, "application_id": "1052322265397739523", "type": 0 });
+    assert_eq!(send_event(&env, ping, false), (204, 0));
+
+    // A user install: acknowledged at once, the welcome DM is sent afterwards
+    let env = TestEnv::default();
+    assert_eq!(send_event(&env, authorized(1), false), (204, 1));
+    assert!(env.sent().is_empty());
+    env.run_background().unwrap();
+    let paths: Vec<_> = env.sent().into_iter().map(|(_, path, ..)| path).collect();
+    assert_eq!(paths, ["/users/@me/channels", "/channels/77/messages"]);
+
+    // A server install is ignored
+    let env = TestEnv::default();
+    send_event(&env, authorized(0), false);
+    env.run_background().unwrap();
+    assert!(env.sent().is_empty());
+
+    // Discord sends bad signatures on purpose; they must be refused
+    assert_eq!(
+        send_event(&TestEnv::default(), authorized(1), true),
+        (401, 0)
+    );
 }
 
 #[test]

@@ -23,6 +23,7 @@ mod component;
 mod ctx;
 pub mod custom_id;
 mod error;
+mod event;
 mod handler;
 mod option;
 #[cfg(feature = "rest")]
@@ -34,6 +35,7 @@ pub use autocomplete::*;
 pub use component::*;
 pub use ctx::*;
 pub use error::*;
+pub use event::*;
 pub use handler::*;
 pub use option::*;
 #[cfg(feature = "rest")]
@@ -50,12 +52,14 @@ pub use set::*;
 ///     pub struct Bot = [ping, echo, Admin];
 ///     components = [counter_click];
 ///     modals = [on_feedback];
+///     events = MyEvents;
 /// }
 /// ```
 ///
 /// The struct implements [`InteractionHandler`] for every State its Commands accept; an
 /// Interaction for a Command not in the set is answered with an "Unknown command" message.
 /// Autocomplete goes to the invoked Command's Autocomplete Handler for the focused Option.
+/// Webhook Events go to `events` (a unit struct implementing [`EventHandler`]), or are ignored.
 /// Components and modals are routed by the `custom_id` prefix; unmatched ones get a "not
 /// handled" message. Two Commands with the same name and type, two handlers with the same
 /// prefix, or more Commands than Discord allows in one Scope fail to compile.
@@ -67,6 +71,7 @@ macro_rules! commands {
         $(#[$attr:meta])* $vis:vis struct $name:ident = [$($command:path),* $(,)?];
         $(components = [$($component:path),* $(,)?];)?
         $(modals = [$($modal:path),* $(,)?];)?
+        $(events = $events:path;)?
     ) => {
         $(#[$attr])*
         #[derive(Debug, Clone, Copy, Default)]
@@ -252,6 +257,8 @@ macro_rules! commands {
                 }
             }
         }
+
+        $crate::__command_set_events!($name $(, $events)?);
 
         impl $crate::command::CommandSetDefinition for $name {
             fn definitions() -> ::std::vec::Vec<$crate::command::ScopedDefinition> {

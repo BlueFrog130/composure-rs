@@ -88,6 +88,10 @@ impl<C, F> WithFallback<C, F> {
     pub fn new(commands: C, fallback: F) -> Self {
         Self { commands, fallback }
     }
+
+    pub fn commands(&self) -> &C {
+        &self.commands
+    }
 }
 
 impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for WithFallback<C, F> {

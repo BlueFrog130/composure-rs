@@ -3,11 +3,11 @@
 mod state;
 mod transport;
 
-pub use composure::command::{HandlerError, InteractionHandler, NoHandler};
+pub use composure::command::{EventHandler, HandlerError, InteractionHandler, NoHandler};
 use composure::{
-    command::dispatch,
+    command::{Platform, dispatch, spawn_event},
     rest::InteractionClient,
-    types::{Interaction, InteractionResponse, Snowflake},
+    types::{Interaction, InteractionResponse, Snowflake, WebhookEventPayload},
 };
 pub use state::Worker;
 use state::log_handler_error;
@@ -27,6 +27,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 const SIGNATURE_HEADER: &str = "X-Signature-Ed25519";
 const TIMESTAMP_HEADER: &str = "X-Signature-Timestamp";
 const PUBLIC_KEY_SECRET: &str = "DISCORD_PUBLIC_KEY";
+
+/// Path Webhook Events are served on unless changed with
+/// [`CloudflareInteractionBot::with_events_path`]
+pub const DEFAULT_EVENTS_PATH: &str = "/events";
 
 /// Validates a request from Discord
 ///
@@ -145,12 +149,65 @@ pub async fn handle_interaction<S, H: InteractionHandler<S>>(
     }
 }
 
+/// What to answer one Webhook Events request with. Produced by [`handle_event`].
+#[derive(Debug)]
+pub enum EventOutcome {
+    /// Signature headers missing or invalid
+    Unauthorized,
+
+    /// Signature valid but the body is not a Webhook Event payload
+    BadRequest(serde_json::Error),
+
+    /// A Ping, or an event handed to the handler as Background Work
+    Acknowledged,
+}
+
+impl EventOutcome {
+    /// HTTP status to send; acknowledgements have no body
+    pub fn status(&self) -> u16 {
+        match self {
+            Self::Unauthorized => 401,
+            Self::BadRequest(_) => 400,
+            Self::Acknowledged => 204,
+        }
+    }
+}
+
+/// Verifies and parses one Webhook Events request and spawns its handling as Background Work,
+/// without needing the Workers runtime. [`CloudflareInteractionBot::process`] calls it for the
+/// events path; call it directly to test an [`EventHandler`] with signed payloads.
+pub async fn handle_event<S: Platform, H: EventHandler<S> + 'static>(
+    public_key: &str,
+    signature: Option<&str>,
+    timestamp: Option<&str>,
+    body: &[u8],
+    handler: H,
+    state: &S,
+) -> EventOutcome {
+    if verify(public_key, signature, timestamp, body)
+        .await
+        .is_err()
+    {
+        return EventOutcome::Unauthorized;
+    }
+    let payload: WebhookEventPayload = match serde_json::from_slice(body) {
+        Ok(payload) => payload,
+        Err(e) => return EventOutcome::BadRequest(e),
+    };
+    if let Some(event) = payload.event {
+        spawn_event(handler, state, payload.application_id, event);
+    }
+    EventOutcome::Acknowledged
+}
+
 /// Interaction bot for Cloudflare. The handler receives a [`Worker`] (the worker's [`Env`] and
-/// [`Context`]) as its State.
+/// [`Context`]) as its State. Webhook Events on the events path (default `/events`) go to the
+/// same handler's [`EventHandler`] implementation.
 pub struct CloudflareInteractionBot<H = NoHandler> {
     req: Request,
     state: Worker,
     handler: H,
+    events_path: String,
 }
 
 impl CloudflareInteractionBot {
@@ -161,6 +218,7 @@ impl CloudflareInteractionBot {
             req,
             state: Worker::new(env, ctx),
             handler: NoHandler,
+            events_path: DEFAULT_EVENTS_PATH.to_string(),
         }
     }
 }
@@ -176,13 +234,24 @@ impl<H: InteractionHandler<Worker>> CloudflareInteractionBot<H> {
             req: self.req,
             state: self.state,
             handler,
+            events_path: self.events_path,
         }
     }
 
+    /// Serves Webhook Events on `path` instead of `/events`; set the app's Webhook Events URL to
+    /// match. Every other path serves Interactions.
+    pub fn with_events_path(mut self, path: impl Into<String>) -> Self {
+        self.events_path = path.into();
+        self
+    }
+}
+
+impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareInteractionBot<H> {
     /// Validates and handles the request. Every outcome is an HTTP response:
     /// bad signature is 401, unparseable body is 400, a missing public key secret is 500,
     /// handler errors are logged and answered with an ephemeral error message. Responses with
     /// files are sent through the callback endpoint and the request is answered with 202.
+    /// Webhook Events are acknowledged with 204 and handled as Background Work.
     pub async fn process(mut self) -> worker::Result<Response> {
         console_debug!("Processing request");
 
@@ -204,6 +273,33 @@ impl<H: InteractionHandler<Worker>> CloudflareInteractionBot<H> {
         let headers = self.req.headers();
         let signature = headers.get(SIGNATURE_HEADER).ok().flatten();
         let timestamp = headers.get(TIMESTAMP_HEADER).ok().flatten();
+
+        if self.req.path() == self.events_path {
+            let outcome = handle_event(
+                &public_key,
+                signature.as_deref(),
+                timestamp.as_deref(),
+                &bytes,
+                self.handler,
+                &self.state,
+            )
+            .await;
+            return match outcome {
+                EventOutcome::Unauthorized => {
+                    console_warn!("Event validation failed");
+                    Response::error("Validation failed", 401)
+                }
+                EventOutcome::BadRequest(e) => {
+                    console_error!("Failed to parse event: {}", e);
+                    Response::error("Bad request", 400)
+                }
+                EventOutcome::Acknowledged => {
+                    let headers = Headers::new();
+                    headers.set("Content-Type", "application/json")?;
+                    Ok(Response::empty()?.with_status(204).with_headers(headers))
+                }
+            };
+        }
 
         let outcome = handle_interaction(
             &public_key,
