@@ -19,7 +19,7 @@ pub type MentionableSelect = SelectMenu<7>;
 /// Select menu for picking from channels
 pub type ChannelSelect = SelectMenu<8>;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum Component {
     Button(ButtonComponent),
@@ -213,7 +213,7 @@ impl<'de> Deserialize<'de> for Component {
 }
 
 /// Container for other components
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ActionRow {
     #[serde(rename = "type")]
     pub t: TypeField<1>,
@@ -231,7 +231,7 @@ impl ActionRow {
 }
 
 /// Button Object
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ButtonComponent {
     #[serde(rename = "type")]
     pub t: TypeField<2>,
@@ -276,7 +276,7 @@ impl ButtonComponent {
     }
 }
 
-#[derive(Debug, Deserialize_repr, Serialize_repr)]
+#[derive(Debug, Clone, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum ButtonStyle {
     /// Blurple
@@ -296,7 +296,7 @@ pub enum ButtonStyle {
 }
 
 /// [Select Menu Structure](https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-menu-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SelectMenu<const T: u8> {
     /// [Type](https://discord.com/developers/docs/interactions/message-components#component-object-component-types) of select menu component (text: 3, user: 5, role: 6, mentionable: 7, channels: 8)
     #[serde(rename = "type")]
@@ -348,7 +348,7 @@ impl<const T: u8> SelectMenu<T> {
 }
 
 /// [Select Option Structure](https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SelectOption {
     /// User-facing name of the option; max 100 characters
     pub label: String,
@@ -384,7 +384,7 @@ impl SelectOption {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TextInput {
     #[serde(rename = "type")]
     pub t: TypeField<4>,
@@ -441,7 +441,7 @@ impl TextInput {
 }
 
 /// [Text Input Styles](https://discord.com/developers/docs/interactions/message-components#text-inputs-text-input-styles)
-#[derive(Debug, Deserialize_repr, Serialize_repr)]
+#[derive(Debug, Clone, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum TextInputStyle {
     /// Single-line input

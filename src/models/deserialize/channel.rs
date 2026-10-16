@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct PartialChannel {
     /// the id of this channel
     pub id: Snowflake,
@@ -39,7 +39,7 @@ impl Mentionable for PartialChannel {
 }
 
 /// [Channel Structure](https://discord.com/developers/docs/resources/channel#channel-object-channel-structure)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Channel {
     /// the id of this channel
     pub id: Snowflake,
@@ -202,7 +202,7 @@ pub enum ChannelType {
 }
 
 /// [Video Quality Modes](https://discord.com/developers/docs/resources/channel#channel-object-video-quality-modes)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum VideoQualityMode {
     /// Discord chooses the quality for optimal performance
     Auto = 1,
@@ -213,7 +213,7 @@ pub enum VideoQualityMode {
 
 bitflags! {
     /// [Channel Flags](https://discord.com/developers/docs/resources/channel#channel-object-channel-flags)
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct ChannelFlags: u32 {
         /// this thread is pinned to the top of its parent GUILD_FORUM channel
         const Pinned = 1 << 1;
@@ -243,7 +243,7 @@ impl<'de> Deserialize<'de> for ChannelFlags {
 }
 
 /// [Sort Order Types](https://discord.com/developers/docs/resources/channel#channel-object-sort-order-types)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum SortOrderType {
     /// Sort forum posts by activity
     LatestActivity = 0,
@@ -253,7 +253,7 @@ pub enum SortOrderType {
 }
 
 /// [Forum Layout Types](https://discord.com/developers/docs/resources/channel#channel-object-forum-layout-types)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum ForumLayoutType {
     /// No default has been set for forum channel
     NotSet = 0,
@@ -266,7 +266,7 @@ pub enum ForumLayoutType {
 }
 
 /// [Overwrite Object](https://discord.com/developers/docs/resources/channel#overwrite-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Overwrite {
     /// role or user id
     pub id: Snowflake,
@@ -282,7 +282,7 @@ pub struct Overwrite {
     pub deny: Permissions,
 }
 
-#[derive(Debug, Deserialize_repr)]
+#[derive(Debug, Clone, Deserialize_repr)]
 #[repr(u8)]
 pub enum OverwriteType {
     Role = 0,
@@ -290,7 +290,7 @@ pub enum OverwriteType {
 }
 
 /// [Thread Metadata Object](https://discord.com/developers/docs/resources/channel#thread-metadata-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ThreadMetadata {
     /// whether the thread is archived
     pub archived: bool,
@@ -312,7 +312,7 @@ pub struct ThreadMetadata {
 }
 
 /// [Thread Member Object](https://discord.com/developers/docs/resources/channel#thread-member-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ThreadMember {
     /// ID of the thread
     pub id: Option<Snowflake>,
@@ -337,7 +337,7 @@ impl PartialEq for ThreadMember {
 }
 
 /// [Forum Tag Object](https://discord.com/developers/docs/resources/channel#forum-tag-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ForumTag {
     /// the id of the tag
     pub id: Snowflake,
@@ -362,7 +362,7 @@ impl PartialEq for ForumTag {
 }
 
 /// [Default Reaction Object](https://discord.com/developers/docs/resources/channel#default-reaction-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DefaultReaction {
     /// the id of a guild's custom emoji
     pub emoji_id: Option<Snowflake>,

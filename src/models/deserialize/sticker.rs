@@ -4,7 +4,7 @@ use serde_repr::Deserialize_repr;
 use crate::models::{Snowflake, User};
 
 /// [Sticker Structure](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-structure)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Sticker {
     /// [id of the sticker](https://discord.com/developers/docs/reference#image-formatting)
     pub id: Snowflake,
@@ -45,7 +45,7 @@ pub struct Sticker {
 }
 
 /// [Sticker Types](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-types)
-#[derive(Debug, Deserialize_repr)]
+#[derive(Debug, Clone, Deserialize_repr)]
 #[repr(u8)]
 pub enum StickerType {
     /// an official sticker in a pack, part of Nitro or in a removed purchasable pack
@@ -56,7 +56,7 @@ pub enum StickerType {
 }
 
 /// [Sticker Format Types](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-format-types)
-#[derive(Debug, Deserialize_repr)]
+#[derive(Debug, Clone, Deserialize_repr)]
 #[repr(u8)]
 pub enum StickerFormatTypes {
     Png = 1,
@@ -69,7 +69,7 @@ pub enum StickerFormatTypes {
 }
 
 /// [Sticker Item Structure](https://discord.com/developers/docs/resources/sticker#sticker-item-object-sticker-item-structure)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct StickerItem {
     /// id of the sticker
     pub id: Snowflake,
@@ -82,7 +82,7 @@ pub struct StickerItem {
 }
 
 /// [Sticker Pack Structure](https://discord.com/developers/docs/resources/sticker#sticker-pack-object-sticker-pack-structure)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct StickerPack {
     /// id of the sticker pack
     pub id: Snowflake,

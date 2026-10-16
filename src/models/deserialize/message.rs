@@ -9,7 +9,7 @@ use crate::models::{
 };
 
 /// [Message Structure](https://discord.com/developers/docs/resources/channel#message-object-message-structure)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Message {
     /// id of the message
     pub id: Snowflake,
@@ -101,7 +101,7 @@ pub struct Message {
     pub role_subscription_data: Option<RoleSubscriptionData>,
 }
 /// [Channel Mention Object](https://discord.com/developers/docs/resources/channel#channel-mention-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ChannelMention {
     /// id of the channel
     pub id: Snowflake,
@@ -118,7 +118,7 @@ pub struct ChannelMention {
 }
 
 /// [Reaction Object](https://discord.com/developers/docs/resources/channel#reaction-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Reaction {
     /// times this emoji has been used to react
     pub count: i32,
@@ -131,7 +131,7 @@ pub struct Reaction {
 }
 
 /// [Message Types](https://discord.com/developers/docs/resources/channel#message-object-message-types)
-#[derive(Debug, Deserialize_repr)]
+#[derive(Debug, Clone, Deserialize_repr)]
 #[repr(u8)]
 pub enum MessageType {
     /// Deletable: true
@@ -229,7 +229,7 @@ pub enum MessageType {
 }
 
 /// [Message Activity Structure](https://discord.com/developers/docs/resources/channel#message-object-message-activity-structure)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct MessageActivity {
     /// [type of message activity](https://discord.com/developers/docs/resources/channel#message-object-message-activity-types)
     #[serde(rename = "type")]
@@ -240,7 +240,7 @@ pub struct MessageActivity {
 }
 
 /// [Message Activity Types](https://discord.com/developers/docs/resources/channel#message-object-message-activity-types)
-#[derive(Debug, Deserialize_repr)]
+#[derive(Debug, Clone, Deserialize_repr)]
 #[repr(u8)]
 pub enum MessageActivityType {
     Join = 1,
@@ -254,7 +254,7 @@ pub enum MessageActivityType {
 
 bitflags::bitflags! {
     /// [Message Flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags)
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct MessageFlags: u16 {
         /// this message has been published to subscribed channels (via Channel Following)
         const Crossposted = 1 << 0;
@@ -311,7 +311,7 @@ impl<'de> Deserialize<'de> for MessageFlags {
 }
 
 /// [Message Interaction Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#message-interaction-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct MessageInteraction {
     /// ID of the interaction
     pub id: Snowflake,
@@ -328,7 +328,7 @@ pub struct MessageInteraction {
 }
 
 /// [Message Reference Structure](https://discord.com/developers/docs/resources/channel#message-reference-object-message-reference-structure)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct MessageReference {
     /// id of the originating message
     pub message_id: Option<Snowflake>,

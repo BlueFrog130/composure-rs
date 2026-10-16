@@ -1,8 +1,8 @@
-use composure::models::{Permissions, Snowflake, TypeField};
+use crate::models::{Permissions, Snowflake, TypeField};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::command::*;
+use super::*;
 
 impl ApplicationCommand {
     pub fn new_chat_input_command(

@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// [Role Object](https://discord.com/developers/docs/topics/permissions#role-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Role {
     /// role id
     pub id: Snowflake,
@@ -49,7 +49,7 @@ impl Mentionable for Role {
 }
 
 /// [Role Subscription Data Object](https://discord.com/developers/docs/resources/channel#role-subscription-data-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RoleSubscriptionData {
     /// the id of the sku and listing that the user is subscribed to
     pub role_subscription_listing_id: Snowflake,
@@ -65,7 +65,7 @@ pub struct RoleSubscriptionData {
 }
 
 /// [Role Tags Structure](https://discord.com/developers/docs/topics/permissions#role-object-role-tags-structure)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RoleTags {
     /// the id of the bot this role belongs to
     pub bot_id: Option<Snowflake>,

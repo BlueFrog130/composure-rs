@@ -5,7 +5,7 @@ use crate::models::{
     deserialize::{Role, User},
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PartialEmoji {
     /// [emoji id](https://discord.com/developers/docs/reference#image-formatting)
     pub id: Option<Snowflake>,
@@ -18,7 +18,7 @@ pub struct PartialEmoji {
 }
 
 /// [Emoji Object](https://discord.com/developers/docs/resources/emoji#emoji-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Emoji {
     /// [emoji id](https://discord.com/developers/docs/reference#image-formatting)
     pub id: Option<Snowflake>,

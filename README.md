@@ -9,7 +9,29 @@ Composure is a lightweight interaction bot that aims to run on the edge. Everyth
 ## Features
 
 - Parse interactions
+- Define each command once with `#[command]`: options, description, and response are inferred from the function
+- Sync commands with Discord from the same definitions (`composure_api::sync_from_env`)
 - Flexible [adapter](#adapters) system
+
+```rust,ignore
+use composure::{Ctx, command, commands};
+
+/// Repeat some text
+#[command]
+fn echo(
+    _ctx: Ctx,
+    #[option(desc = "What to say", max_len = 200)] text: String,
+    #[option(desc = "How many times", min = 1, max = 5)] times: Option<u8>,
+) -> String {
+    text.repeat(times.unwrap_or(1).into())
+}
+
+commands! {
+    pub struct Bot = [echo];
+}
+```
+
+`Bot` is handed to an adapter to serve interactions, and to `composure_api::sync_from_env` in a host-only bin to sync the command definitions. See [the Cloudflare commands example](./adapters/cloudflare/commands-example).
 
 ### Adapters
 
@@ -22,7 +44,10 @@ Adapters are responsible for verifying the request, parsing the request body, th
 ## Todo
 
 - [ ] Explore more adapters
-- [ ] Create macro to simplify command tree
+- [x] Create macro to simplify command tree
+- [ ] Autocomplete, components, and modals through `#[command]`
+- [ ] Deferred responses and follow-ups
+- [ ] Command localizations
 - [ ] Handle message component interaction
 - [ ] Handle autocomplete interaction
 - [ ] Handle modal submit interaction

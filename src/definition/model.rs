@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use composure::models::{
+use crate::models::{
     ApplicationIntegrationType, ChannelType, InteractionContextType, Permissions, Snowflake,
     TypeField,
 };
 use serde::{Deserialize, Serialize};
 
 /// [Application Command Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommand {
     ChatInputCommand(ChatInputCommand<1>),
@@ -41,7 +41,7 @@ impl ApplicationCommand {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandDetails<const T: u8> {
     #[serde(rename = "type")]
     pub t: TypeField<T>,
@@ -96,7 +96,7 @@ pub struct CommandDetails<const T: u8> {
     pub version: Option<Snowflake>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatInputCommand<const T: u8> {
     #[serde(flatten)]
     pub details: CommandDetails<T>,
@@ -120,7 +120,7 @@ pub type MentionableOption = BaseOption<9>;
 pub type AttachmentOption = BaseOption<11>;
 
 /// [Application Command Option Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-structure)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommandOption {
     Subcommand(SubcommandOption),
@@ -137,7 +137,7 @@ pub enum ApplicationCommandOption {
 }
 
 /// Subcommand options
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum SubcommandCommandOption {
     String(StringOption),
@@ -151,7 +151,7 @@ pub enum SubcommandCommandOption {
     Attachment(AttachmentOption),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubcommandOption {
     #[serde(rename = "type")]
     pub t: TypeField<1>,
@@ -175,7 +175,7 @@ pub struct SubcommandOption {
     pub options: Option<Vec<SubcommandCommandOption>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubcommandGroupOption {
     #[serde(rename = "type")]
     pub t: TypeField<2>,
@@ -199,7 +199,7 @@ pub struct SubcommandGroupOption {
     pub options: Option<Vec<SubcommandOption>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StringOption {
     #[serde(rename = "type")]
     pub t: TypeField<3>,
@@ -239,7 +239,7 @@ pub struct StringOption {
     pub autocomplete: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntegerOption {
     #[serde(rename = "type")]
     pub t: TypeField<4>,
@@ -279,7 +279,7 @@ pub struct IntegerOption {
     pub autocomplete: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NumberOption {
     #[serde(rename = "type")]
     pub t: TypeField<10>,
@@ -319,7 +319,7 @@ pub struct NumberOption {
     pub autocomplete: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseOption<const T: u8> {
     #[serde(rename = "type")]
     pub t: TypeField<T>,
@@ -343,7 +343,7 @@ pub struct BaseOption<const T: u8> {
     pub required: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelOption {
     #[serde(rename = "type")]
     pub t: TypeField<7>,
@@ -372,7 +372,7 @@ pub struct ChannelOption {
 }
 
 /// [Application Command Option Choice Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationCommandOptionChoice<T> {
     /// 1-100 character choice name
     pub name: String,

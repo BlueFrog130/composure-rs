@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// [Embed Object](https://discord.com/developers/docs/resources/channel#embed-object)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type", rename = "rich")]
 pub struct Embed {
     /// title of embed
@@ -140,7 +140,7 @@ impl Embed {
 }
 
 /// [Embed Footer Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-footer-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbedFooter {
     /// footer text
     pub text: String,
@@ -163,7 +163,7 @@ impl EmbedFooter {
 }
 
 /// [Embed Image Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-image-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbedImage {
     /// source url of image (only supports http(s) and attachments)
     pub url: String,
@@ -195,7 +195,7 @@ impl EmbedImage {
 }
 
 /// [Embed Thumbnail Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-thumbnail-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbedThumbnail {
     /// source url of thumbnail (only supports http(s) and attachments)
     pub url: String,
@@ -227,7 +227,7 @@ impl EmbedThumbnail {
 }
 
 /// [Embed Video Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-video-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbedVideo {
     /// source url of video
     pub url: Option<String>,
@@ -259,7 +259,7 @@ impl EmbedVideo {
 }
 
 /// [Embed Provider Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-provider-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbedProvider {
     /// name of provider
     pub name: Option<String>,
@@ -275,7 +275,7 @@ impl EmbedProvider {
 }
 
 /// [Embed Author Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-author-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbedAuthor {
     /// name of author
     pub name: String,
@@ -307,7 +307,7 @@ impl EmbedAuthor {
 }
 
 /// [Embed Field Structure](https://discord.com/developers/docs/resources/channel#embed-object-embed-field-structure)
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmbedField {
     /// name of the field
     pub name: String,

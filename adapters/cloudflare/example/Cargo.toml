@@ -1,6 +1,6 @@
 [package]
 name = "composure_example_cloudflare"
-version = "0.0.2"
+version = "0.1.0"
 edition.workspace = true
 rust-version = "1.91"
 description = "Regression bot for the Composure Cloudflare adapter"
@@ -11,7 +11,6 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-async-trait = "0.1.92"
 composure = { path = "../../../" }
 composure_adapter_cloudflare = { path = "../" }
 worker = "0.8.7"

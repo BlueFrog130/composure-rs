@@ -8,7 +8,7 @@ const TYPE_KEY: &str = "type";
 const DATA_KEY: &str = "data";
 
 /// [Interaction Response Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-interaction-response-structure)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InteractionResponse {
     /// ACK to a `ping`
     Pong,
@@ -115,7 +115,7 @@ impl Serialize for InteractionResponse {
 }
 
 /// [Message Callback Data Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-messages)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MessageCallbackData {
     /// is the response TTS
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,14 +146,14 @@ pub struct MessageCallbackData {
     pub attachments: Option<Vec<PartialAttachment>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AutocompleteCallbackData {
     /// autocomplete choices (max of 25 choices)
     pub choices: Vec<ApplicationCommandOptionChoice>,
 }
 
 /// [Application Command Option Choice Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ApplicationCommandOptionChoice {
     /// 1-100 character choice name
     pub name: String,
@@ -166,7 +166,7 @@ pub struct ApplicationCommandOptionChoice {
     pub value: ApplicationCommandOptionChoiceValue,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommandOptionChoiceValue {
     String(String),
@@ -175,7 +175,7 @@ pub enum ApplicationCommandOptionChoiceValue {
 }
 
 /// [Modal](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-modal)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ModalCallbackData {
     /// a developer-defined identifier for the modal, max 100 characters
     pub custom_id: String,

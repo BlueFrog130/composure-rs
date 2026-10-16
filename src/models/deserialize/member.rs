@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// User object
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct User {
     /// User's [avatar hash](https://discord.com/developers/docs/reference#image-formatting)
     pub avatar: Option<String>,
@@ -42,7 +42,7 @@ impl Mentionable for User {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct PartialMember {
     /// Guild nickname
     pub nick: Option<String>,
@@ -67,7 +67,7 @@ pub struct PartialMember {
 }
 
 /// [Guild Member](https://discord.com/developers/docs/resources/guild#guild-member-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Member {
     /// User this member represents
     pub user: User,

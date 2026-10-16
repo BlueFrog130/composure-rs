@@ -19,7 +19,8 @@ fn signed_interactions() {
             signature.as_deref(),
             timestamp.as_deref(),
             &body,
-            Some(&RegressionBot),
+            &RegressionBot,
+            &(),
         ));
 
         if outcome.status() != case.status {

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypeField<const T: u8>;
 
 impl<const T: u8> Serialize for TypeField<T> {

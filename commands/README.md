@@ -1,3 +1,3 @@
 # Composure Commands
 
-Models for serializing and deserializing commands. Does not need to be included with main framework since these should just be used in command creation.
+Builder for command definitions. The definition models themselves live in `composure::definition` (re-exported here) so `#[command]` can generate them; prefer `#[command]` over building definitions by hand.

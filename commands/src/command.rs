@@ -1,9 +1,7 @@
 mod builder;
-mod implementation;
-mod model;
 
 pub use builder::*;
-pub use model::*;
+pub use composure::definition::*;
 
 #[cfg(test)]
 mod tests {

@@ -23,16 +23,19 @@ cargo fmt --all
 
 | Crate | Path | Role |
 |---|---|---|
-| `composure` | `/` | Core: Discord models (serde) + ed25519 request validation. Must stay WASM-friendly and small — no async runtime, no HTTP client. |
-| `composure_commands` | `commands/` | Application-command *definition* models + builder (`CommandsBuilder` → `CommandBuilder` → `SubcommandBuilder`/group). Used at publish time, not in the runtime bot. |
-| `composure_api` | `api/` | Blocking `reqwest` Discord REST client; `UpdateCommands` trait on `CommandsBuilder` overwrites global or guild commands (guild if `guild_id` set). Publish-time tool only. |
-| `composure_adapter_cloudflare` | `adapters/cloudflare/` | Cloudflare Workers adapter (`worker` crate). |
+| `composure` | `/` | Core: Discord models (serde), ed25519 request validation, `command` runtime (`InteractionHandler`, `Ctx`, Command Set traits), `definition` models. Must stay WASM-friendly and small — no async runtime, no HTTP client. `macros` feature re-exports `composure_macros`. |
+| `composure_macros` | `macros/` | Proc macros: `#[command]`, `#[group]`, `#[derive(Choice)]`. `commands!` is a `macro_rules!` in core. Runtime + trybuild UI tests in `macros/tests`. |
+| `composure_commands` | `commands/` | Definition builder (`CommandsBuilder` → `CommandBuilder` → `SubcommandBuilder`/group); re-exports `composure::definition`. |
+| `composure_api` | `api/` | Blocking `reqwest` Discord REST client + Sync (`sync_from_env`, `plan`, `apply`). Deploy-time only. |
+| `composure_adapter_cloudflare` | `adapters/cloudflare/` | Cloudflare Workers adapter (`worker` crate). `example/` = low-level regression bot, `commands-example/` = `#[command]` bot with `sync` bin. |
 
 Release profile is size-optimized (`opt-level = "z"`, LTO) because worker bundle size matters.
 
 ## Architecture
 
-**Request flow (adapter):** read body bytes → validate `X-Signature-Ed25519` / `X-Signature-Timestamp` against `DISCORD_PUBLIC_KEY` secret via `composure::auth::validate_request` → deserialize `Interaction` → dispatch to user's `CloudflareCommandHandler` (`command` / `component`, `async_trait`) → return `InteractionResponse` as JSON. Ping → Pong handled internally. Autocomplete and modal submit are still `todo!()`.
+**Request flow (adapter):** read body bytes → validate `X-Signature-Ed25519` / `X-Signature-Timestamp` against `DISCORD_PUBLIC_KEY` secret via `composure::auth::validate_request` → deserialize `Interaction` → `composure::command::dispatch` to an `InteractionHandler<S>` (S = adapter State, `worker::Env` on Cloudflare) → return `InteractionResponse` as JSON. Ping → Pong in core. Handler `Err(HandlerError)` is logged and answered with `HandlerError::response()` (ephemeral).
+
+**Commands:** `#[command] fn x(ctx: Ctx, opts...)` keeps the fn and adds a same-named empty braced struct (type namespace only) implementing `CommandDefinition` (+ `SubcommandDefinition` for chat input) and `Command<S>`. Option params go through `OptionType` (extract + definition); compile-time rules are `const _: () = assert!(...)` blocks. `#[group]` routes via `Invocation::route`. `commands! { pub struct Bot = [...]; }` implements `CommandSet<S>`, `InteractionHandler<S>`, `CommandSetDefinition`, and an inherent `with_fallback`. Async fns in traits are native (no `Send`, static dispatch) — keep it that way for Workers.
 
 Adapters are the integration layer; new platforms go under `adapters/<name>` and reuse core validation + models.
 
@@ -51,8 +54,9 @@ All submodules are glob re-exported, so everything is addressed as `composure::m
 
 ## Notes
 
-- `adapters/cloudflare/README.md` usage sample is stale (shows `with_command_handler` closure; real API is `with_handler` taking a `CloudflareCommandHandler` impl).
-- All crates share version `0.0.2`; bump together (path deps also pin `version`).
+- Glossary in `CONTEXT.md` (Command, Command Set, Option, Scope, Sync, ...); decisions in `docs/adr/`.
+- All crates share version `0.1.0`; bump together (path deps also pin `version`).
+- Regenerate trybuild expectations after changing macro errors: `TRYBUILD=overwrite cargo test -p composure_macros --test commands`, then review the `.stderr` diffs.
 
 ## Agent skills
 

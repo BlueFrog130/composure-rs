@@ -7,7 +7,7 @@ use crate::models::{
 };
 
 /// [Application Object](https://discord.com/developers/docs/resources/application#application-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Application {
     /// the id of the app
     pub id: Snowflake,
@@ -73,7 +73,7 @@ pub struct Application {
 }
 
 /// [Install Params Object](https://discord.com/developers/docs/resources/application#install-params-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct InstallParams {
     /// the [scopes](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes) to add the application to the server with
     pub scopes: Vec<String>,
@@ -84,7 +84,7 @@ pub struct InstallParams {
 
 bitflags! {
     /// [Application Flags](https://discord.com/developers/docs/resources/application#application-object-application-flags)
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct ApplicationFlags: u32 {
         /// Indicates if an app uses the [Auto Moderation API](https://discord.com/developers/docs/resources/auto-moderation)
         const ApplicationAutoModerationRuleCreateBadge = 1 << 6;

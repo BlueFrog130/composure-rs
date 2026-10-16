@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4.151.0/config-schema.json",
+  "name": "composure-commands-example",
+  "main": "build/worker/shim.mjs",
+  "compatibility_date": "2026-10-01",
+
+  // worker-build compiles the crate to wasm and writes the JS shim to build/worker
+  "build": {
+    "command": "worker-build --release"
+  },
+
+  // Read by the /greet command through Ctx<Env>
+  "vars": {
+    "GREETING": "Hello"
+  }
+
+  // DISCORD_PUBLIC_KEY is a secret: `npx wrangler secret put DISCORD_PUBLIC_KEY`,
+  // or `.dev.vars` for `wrangler dev`
+}

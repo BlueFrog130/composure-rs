@@ -1,6 +1,27 @@
 # Composure API
 
-Basic interactions with Discord API. Should be used to update commands for bot at publish time.
+Basic interactions with Discord API, used at deploy time, never in the bot itself.
+
+## Sync
+
+`sync_from_env(&Bot)` makes Discord's commands match a Command Set: it prints a Sync Plan (creates, updates, deletes per target) and applies it after confirmation. Call it from a host-only bin:
+
+```rust,ignore
+// src/bin/sync.rs
+fn main() -> std::process::ExitCode {
+    composure_api::sync_from_env(&my_bot::Bot)
+}
+```
+
+| Env var | |
+|---|---|
+| `DISCORD_TOKEN` | Bot token |
+| `DISCORD_APPLICATION_ID` | Application id |
+| `COMPOSURE_SCOPE_<NAME>` | Comma-separated guild ids for `#[command(scope = "name")]` (uppercased, `-` as `_`) |
+
+Flags: `--dry-run` prints the plan only, `--yes` applies without asking (CI), `--guild <id>` sends every command to one guild and leaves global commands alone (testing).
+
+Commands without a scope are global. Every guild listed in a `COMPOSURE_SCOPE_*` var is synced, so a guild whose commands were all removed gets cleared; guilds not listed are never touched. Targets without changes are skipped; changed ones are overwritten with one bulk request. `SyncConfig`, `plan`, and `apply` are available for other config sources.
 
 ## Live tests
 

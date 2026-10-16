@@ -1,56 +1,36 @@
 # Cloudflare Adapter
 
-Runs a Composure bot on Cloudflare Workers. The adapter verifies the request signature against the `DISCORD_PUBLIC_KEY` secret, answers Discord's Ping, and dispatches commands and components to your handler.
+Runs a Composure bot on Cloudflare Workers. The adapter verifies the request signature against the `DISCORD_PUBLIC_KEY` secret, answers Discord's Ping, and dispatches everything else to your handler, passing the worker's `Env` as State.
 
 ## Usage
 
-Based on the `worker-rust` template (`npm create cloudflare@latest -- --template=cloudflare/workers-sdk/templates/experimental/worker-rust`). Workers futures are not `Send`, so implement the handler with `#[async_trait(?Send)]`.
+Based on the `worker-rust` template (`npm create cloudflare@latest -- --template=cloudflare/workers-sdk/templates/experimental/worker-rust`). Enable `composure`'s `macros` feature, define commands with `#[command]`, and hand the Command Set to the bot:
 
 ```rust,no_run
-use async_trait::async_trait;
-use composure::models::{
-    ApplicationCommandInteraction, Embed, InteractionResponse, MessageComponentInteraction,
-};
-use composure_adapter_cloudflare::{CloudflareCommandHandler, CloudflareInteractionBot};
+use composure::{Ctx, command, commands};
+use composure_adapter_cloudflare::CloudflareInteractionBot;
 use worker::*;
 
-struct Bot;
+/// Say hello
+#[command]
+fn hello(ctx: Ctx) -> String {
+    // Server nickname in guilds; display name or username in DMs
+    let name = match (ctx.member(), ctx.user()) {
+        (Some(member), _) => member.display_name(),
+        (None, Some(user)) => user.display_name(),
+        (None, None) => "unknown user",
+    };
+    format!("Hello, {name}!")
+}
 
-#[async_trait(?Send)]
-impl CloudflareCommandHandler for Bot {
-    async fn command(
-        &self,
-        command: ApplicationCommandInteraction,
-    ) -> Result<InteractionResponse> {
-        match command.data.name.as_str() {
-            "hello" => {
-                // Server nickname in guilds; display name or username in DMs
-                let name = match (&command.common.member, command.common.invoking_user()) {
-                    (Some(member), _) => member.display_name(),
-                    (None, Some(user)) => user.display_name(),
-                    (None, None) => "unknown user",
-                };
-                Ok(InteractionResponse::respond_with_message(format!(
-                    "Hello, {name}!"
-                )))
-            }
-            _ => Ok(InteractionResponse::respond_with_embed(
-                Embed::new()
-                    .with_description("Unknown command!")
-                    .with_color(0xf04747),
-            )),
-        }
-    }
+/// Read a var from wrangler.toml
+#[command]
+async fn greeting(ctx: Ctx<Env>) -> Result<String> {
+    Ok(ctx.state().var("GREETING")?.to_string())
+}
 
-    async fn component(
-        &self,
-        component: MessageComponentInteraction,
-    ) -> Result<InteractionResponse> {
-        Ok(InteractionResponse::respond_with_message(format!(
-            "Clicked {}",
-            component.data.custom_id
-        )))
-    }
+commands! {
+    pub struct Bot = [hello, greeting];
 }
 
 #[event(fetch)]
@@ -63,9 +43,15 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 # fn main() {}
 ```
 
+`Bot.with_fallback(handler)` sends components, modals, autocomplete, and commands not in the set to any `InteractionHandler`. Implement `InteractionHandler<Env>` directly instead of using a Command Set for full control.
+
+Workers futures are not `Send`; handlers are dispatched statically, so no `Send` bounds or `async_trait` are needed.
+
+Sync the Command Set with Discord from a host-only bin; see `commands-example/` for a complete bot with a `sync` bin.
+
 ## Testing a handler
 
-`handle_interaction(public_key, signature, timestamp, body, Some(&handler))` runs the same verify, parse, and dispatch steps as `process` without the Workers runtime. It returns an `InteractionOutcome` with the HTTP status and response, so a handler can be tested with signed payloads in plain `cargo test`. See `example/` for a regression bot with fixtures, offline tests, and a `wrangler dev` end-to-end test.
+`handle_interaction(public_key, signature, timestamp, body, &handler, &state)` runs the same verify, parse, and dispatch steps as `process` without the Workers runtime. It returns an `InteractionOutcome` with the HTTP status and response, so a handler can be tested with signed payloads in plain `cargo test`. Commands generic over State (`ctx: Ctx`) can be tested with `&()` as the state. See `example/` for a regression bot with fixtures, offline tests, and a `wrangler dev` end-to-end test.
 
 ## Todo
 

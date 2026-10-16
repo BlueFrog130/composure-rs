@@ -9,6 +9,9 @@ use reqwest::{
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod application_commands;
+pub mod sync;
+
+pub use sync::{SyncConfig, SyncError, SyncPlan, sync_from_env};
 
 pub const DISCORD_API: &str = "https://discord.com/api/v10";
 
@@ -18,6 +21,17 @@ pub enum Error {
     HeaderError(header::InvalidHeaderValue),
     Unauthorized,
     UnknownResponse(String),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::RequestError(e) => write!(f, "request failed: {e}"),
+            Error::HeaderError(e) => write!(f, "invalid token: {e}"),
+            Error::Unauthorized => f.write_str("unauthorized: check DISCORD_TOKEN"),
+            Error::UnknownResponse(body) => write!(f, "unexpected response from Discord: {body}"),
+        }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

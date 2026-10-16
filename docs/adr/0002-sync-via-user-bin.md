@@ -1,0 +1,3 @@
+# Sync runs from a user-owned bin, not a standalone CLI
+
+Sync is a library call (`composure_api::sync_from_env(&command_set())`) invoked from a `src/bin/sync.rs` in the bot crate, instead of a `cargo composure` CLI that builds the user's crate and extracts Command Definitions. Definitions only exist after the user's code is compiled with real types, so any external CLI would have to build and run the crate anyway; a plain bin does that with `cargo run --bin sync` and no extra tooling or build-time magic. `composure_api`/`reqwest` are target-gated to non-wasm so they never reach the worker bundle. A thin CLI wrapper can still be added later on top of the same library call.

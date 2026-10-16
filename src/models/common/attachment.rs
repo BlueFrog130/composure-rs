@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::Snowflake;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PartialAttachment {
     /// name of file attached
     pub filename: String,
@@ -12,7 +12,7 @@ pub struct PartialAttachment {
 }
 
 /// [Attachment Object](https://discord.com/developers/docs/resources/channel#attachment-object)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Attachment {
     /// attachment id
     pub id: Snowflake,

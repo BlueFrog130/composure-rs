@@ -5,28 +5,27 @@
 //! signed payloads and assert on exactly what the models produced. The same bot runs offline via
 //! [`composure_adapter_cloudflare::handle_interaction`] and on `wrangler dev`.
 
-use async_trait::async_trait;
 use composure::models::{
     ApplicationCommandInteraction, ApplicationCommandInteractionData,
     ApplicationCommandInteractionDataOption, ApplicationCommandOptionChoice,
     ApplicationCommandOptionChoiceValue, ApplicationCommandType, InteractionResponse,
     MessageComponentInteraction, ModalSubmitInteraction, OptionList,
 };
-use composure_adapter_cloudflare::{CloudflareCommandHandler, CloudflareInteractionBot};
+use composure_adapter_cloudflare::{CloudflareInteractionBot, HandlerError, InteractionHandler};
 use worker::{Context, Env, Request, Response, event};
 
 pub struct RegressionBot;
 
-#[async_trait(?Send)]
-impl CloudflareCommandHandler for RegressionBot {
+impl<S> InteractionHandler<S> for RegressionBot {
     async fn command(
         &self,
         command: ApplicationCommandInteraction,
-    ) -> worker::Result<InteractionResponse> {
+        _state: &S,
+    ) -> Result<InteractionResponse, HandlerError> {
         let data = &command.data;
         let content = match data.t {
             ApplicationCommandType::ChatInput if data.name == "regress-fail" => {
-                return Err(worker::Error::RustError("regress-fail always fails".into()));
+                return Err(HandlerError::new("regress-fail always fails"));
             }
             ApplicationCommandType::ChatInput if data.name == "regress-contexts" => {
                 let user = command
@@ -70,7 +69,8 @@ impl CloudflareCommandHandler for RegressionBot {
     async fn component(
         &self,
         component: MessageComponentInteraction,
-    ) -> worker::Result<InteractionResponse> {
+        _state: &S,
+    ) -> Result<InteractionResponse, HandlerError> {
         let data = &component.data;
         let mut content = format!("component {}", data.custom_id);
         if let Some(values) = &data.values {
@@ -88,7 +88,8 @@ impl CloudflareCommandHandler for RegressionBot {
     async fn autocomplete(
         &self,
         autocomplete: ApplicationCommandInteraction,
-    ) -> worker::Result<InteractionResponse> {
+        _state: &S,
+    ) -> Result<InteractionResponse, HandlerError> {
         let Some(focused) = autocomplete.data.focused_option() else {
             return Ok(InteractionResponse::respond_with_autocomplete_choices(
                 Vec::new(),
@@ -128,7 +129,8 @@ impl CloudflareCommandHandler for RegressionBot {
     async fn modal_submit(
         &self,
         modal: ModalSubmitInteraction,
-    ) -> worker::Result<InteractionResponse> {
+        _state: &S,
+    ) -> Result<InteractionResponse, HandlerError> {
         let data = &modal.data;
         let title = data.value("title").unwrap_or("-");
         let body = data.value("body").unwrap_or("-");
