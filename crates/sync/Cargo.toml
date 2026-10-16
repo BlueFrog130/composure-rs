@@ -10,8 +10,8 @@ keywords = ["discord", "bot", "edge", "serverless", "wasm"]
 license = "Apache-2.0"
 
 [dependencies]
-composure = { path = "../composure", version = "0.1.0" }
-composure_api = { path = "../api", version = "0.1.0" }
+composure = { path = "../composure", version = "0.1.0", features = ["rest-commands", "reqwest"] }
+pollster = "0.4.0"
 serde_json = "1.0.154"
 clap = { version = "4.6.7", features = ["derive"], optional = true }
 cliclack = { version = "0.5.6", optional = true }
@@ -21,3 +21,7 @@ console = { version = "0.16.6", optional = true }
 default = ["cli"]
 ## `sync_from_env`: the interactive / CI Sync command line (clap + cliclack)
 cli = ["dep:clap", "dep:cliclack", "dep:console"]
+
+[dev-dependencies]
+composure_commands = { path = "../commands", version = "0.1.0" }
+dotenvy = "0.15.7"

@@ -5,7 +5,7 @@ use crate::{
         ApplicationCommandOption, ApplicationCommandOptionChoice, BaseOption, ChannelOption,
         IntegerOption, NumberOption, StringOption,
     },
-    models::{
+    types::{
         ApplicationCommandInteractionData, ApplicationCommandInteractionDataOption as DataOption,
         ApplicationCommandType, Attachment, ChannelType, Message, PartialChannel, PartialMember,
         Role, TypeField, User,
@@ -422,7 +422,7 @@ impl ResolvedMember {
     }
 
     fn resolve(
-        id: &crate::models::Snowflake,
+        id: &crate::types::Snowflake,
         data: &ApplicationCommandInteractionData,
     ) -> Result<Self, OptionError> {
         match (data.resolved_user(id), data.resolved_member(id)) {
@@ -494,7 +494,7 @@ pub trait CommandTarget<'a>: Sized {
 
 fn target_id(
     data: &ApplicationCommandInteractionData,
-) -> Result<&crate::models::Snowflake, OptionError> {
+) -> Result<&crate::types::Snowflake, OptionError> {
     data.target_id.as_ref().ok_or(OptionError::Missing)
 }
 

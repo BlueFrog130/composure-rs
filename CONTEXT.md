@@ -25,6 +25,47 @@ _Avoid_: Env (outside the Cloudflare Adapter)
 **Response**:
 What a Command returns to Discord for an Interaction; plain text, embeds, and full interaction responses all count.
 
+**Deferred Response**:
+A Response that only acknowledges the Interaction (Discord shows a loading state) and is completed later by Background Work editing the original response.
+_Avoid_: Async response, delayed reply
+
+**Background Work**:
+Work an Adapter runs after it has answered the platform request (`wait_until` on Cloudflare), bounded by the platform's post-response time limit.
+_Avoid_: Task, job, spawn
+
+**Webhook Event**:
+A non-interaction notification Discord POSTs to the app's events URL (app authorized, entitlement created, ...); ACKed immediately and handled as Background Work.
+_Avoid_: Gateway event, Interaction
+
+**Event Handler**:
+What answers Webhook Events, registered on the Command Set alongside its Commands.
+
+### Discord types
+
+**Types**:
+Rust representations of Discord's data model (`composure::types`), shared by Interactions, Responses and REST; organized by resource, not by direction.
+_Avoid_: Models, DTOs
+
+**Snowflake**:
+Discord's 64-bit time-ordered id, serialized as a string.
+
+### REST
+
+**Transport**:
+The Adapter-provided way to send one HTTP request and to sleep; the REST client's only contact with the platform.
+_Avoid_: HTTP client, connector
+
+**Interaction Client**:
+REST client authorized by an Interaction's token (follow-ups, editing the original response); needs no bot token and is always available to a Command.
+
+**Bot Client**:
+REST client authorized by the bot token; available only when the Adapter has a `DISCORD_TOKEN` secret.
+_Avoid_: HTTP client, API client
+
+**Endpoint**:
+One Discord REST route (method + path) exposed as a client method.
+_Avoid_: Route (outside the spec check), call
+
 ### Commands
 
 **Command**:
@@ -45,6 +86,16 @@ One of a fixed set of values an Option is restricted to.
 **Group**:
 A Command that only contains subcommands (or nested Groups) and cannot be invoked itself.
 _Avoid_: Parent command, category
+
+**Component Handler**:
+Code answering clicks/selections on message components whose `custom_id` starts with its prefix; may carry typed state encoded in the rest of the `custom_id`.
+_Avoid_: Button handler, listener
+
+**Modal Handler**:
+Code answering a modal submit routed by `custom_id` prefix, receiving the submitted fields as a typed Modal.
+
+**Autocomplete Handler**:
+Code suggesting Choices for one Option while the user types.
 
 **Command Set**:
 The explicit list of Commands a bot serves; the single source both for dispatching Interactions and for Sync.

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::models::InteractionResponse;
+use crate::types::InteractionResponse;
 
 /// Why an Interaction could not be answered normally. Adapters log it and answer with
 /// [`HandlerError::response`] instead.

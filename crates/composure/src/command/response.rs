@@ -1,6 +1,6 @@
 use std::{any::Any, fmt::Display};
 
-use crate::models::{Embed, InteractionResponse, MessageFlags};
+use crate::types::{Embed, InteractionResponse, MessageFlags};
 
 use super::HandlerError;
 
@@ -40,10 +40,15 @@ pub struct Ephemeral<T>(pub T);
 impl<T: IntoResponse> IntoResponse for Ephemeral<T> {
     fn into_response(self) -> InteractionResponse {
         let mut response = self.0.into_response();
-        if let InteractionResponse::ChannelMessageWithSource(data)
-        | InteractionResponse::UpdateMessage(data) = &mut response
-        {
-            *data.flags.get_or_insert(MessageFlags::empty()) |= MessageFlags::Ephemeral;
+        match &mut response {
+            InteractionResponse::ChannelMessageWithSource(data)
+            | InteractionResponse::UpdateMessage(data) => {
+                *data.flags.get_or_insert(MessageFlags::empty()) |= MessageFlags::Ephemeral;
+            }
+            InteractionResponse::DeferredChannelMessageWithSource(flags) => {
+                *flags.get_or_insert(MessageFlags::empty()) |= MessageFlags::Ephemeral;
+            }
+            _ => {}
         }
         response
     }

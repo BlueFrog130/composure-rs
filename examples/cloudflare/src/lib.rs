@@ -5,7 +5,7 @@ use composure::{
     Choice, Ctx, command,
     command::{Ephemeral, HandlerError, InteractionHandler},
     commands, group,
-    models::{Embed, InteractionResponse, Message, MessageComponentInteraction, User},
+    types::{Embed, InteractionResponse, Message, MessageComponentInteraction, User},
 };
 use composure_adapter_cloudflare::CloudflareInteractionBot;
 use worker::{Context, Env, Request, Response, event};

@@ -1,0 +1,3 @@
+# Webhook Events share the Adapter entrypoint, routed by path
+
+Discord's Webhook Events (`APPLICATION_AUTHORIZED`, `ENTITLEMENT_CREATE`, ...) arrive at a separately configured URL with the same Ed25519 signing as Interactions. The Adapter serves both from one entrypoint and routes by path (default `/events`) to an `EventHandler<S>` registered on the Command Set; a lower-level function is exposed for custom routing. Events are ACKed with 204 immediately and handled as Background Work, since Discord expects the ACK within 3 seconds. Unknown event types decode to `Event::Unknown` instead of failing, so new Discord events never break a deployed bot.

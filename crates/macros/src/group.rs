@@ -121,8 +121,8 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
 
         impl ::composure::command::CommandDefinition for #ident {
             const NAME: &'static str = #name;
-            const KIND: ::composure::models::ApplicationCommandType =
-                ::composure::models::ApplicationCommandType::ChatInput;
+            const KIND: ::composure::types::ApplicationCommandType =
+                ::composure::types::ApplicationCommandType::ChatInput;
             const SCOPE: ::core::option::Option<&'static str> = #scope;
 
             fn definition() -> ::composure::definition::ApplicationCommand {
@@ -149,7 +149,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             async fn invoke(
                 invocation: ::composure::command::Invocation<'_, __S>,
             ) -> ::core::result::Result<
-                ::composure::models::InteractionResponse,
+                ::composure::types::InteractionResponse,
                 ::composure::command::HandlerError,
             > {
                 let ::core::option::Option::Some((name, invocation)) = invocation.route() else {

@@ -15,8 +15,6 @@ use cliclack::{confirm, intro, log, outro, outro_cancel, spinner};
 use composure::command::CommandSetDefinition;
 use console::{StyledObject, style};
 
-use composure_api::DiscordClient;
-
 use crate::{
     Change, ChangeCounts, SyncConfig, SyncError, SyncPlan, Target, apply_target, guild_id, plan,
 };
@@ -174,7 +172,7 @@ fn run<C: CommandSetDefinition>(args: &Args, ui: &Ui) -> Result<ExitCode, Abort>
         }
     }
 
-    let client = DiscordClient::new(&config.token, &config.application_id)?;
+    let client = crate::client(&config)?;
     for target in plan.targets.iter().filter(|t| !t.changes.is_empty()) {
         ui.task(
             format!("Updating {}", name(&target.target)),
@@ -345,8 +343,8 @@ impl From<SyncError> for Abort {
     }
 }
 
-impl From<composure_api::Error> for Abort {
-    fn from(error: composure_api::Error) -> Self {
+impl From<composure::rest::Error> for Abort {
+    fn from(error: composure::rest::Error) -> Self {
         Abort::Failed(error.into())
     }
 }

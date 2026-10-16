@@ -1,4 +1,4 @@
-use composure::models::User;
+use composure::types::User;
 
 #[composure::command(user, name = "Inspect")]
 fn inspect(target: User) -> String {

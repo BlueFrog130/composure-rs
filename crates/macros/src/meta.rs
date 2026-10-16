@@ -52,7 +52,7 @@ impl Settings {
             fields.push(quote! {
                 default_member_permissions: ::core::option::Option::Some({
                     #[allow(unused_imports)]
-                    use ::composure::models::Permissions;
+                    use ::composure::types::Permissions;
                     #permissions
                 }),
             });
@@ -60,14 +60,14 @@ impl Settings {
         if let Some(types) = &self.integration_types {
             fields.push(quote! {
                 integration_types: ::core::option::Option::Some(
-                    &[#(::composure::models::ApplicationIntegrationType::#types),*]
+                    &[#(::composure::types::ApplicationIntegrationType::#types),*]
                 ),
             });
         }
         if let Some(contexts) = &self.contexts {
             fields.push(quote! {
                 contexts: ::core::option::Option::Some(
-                    &[#(::composure::models::InteractionContextType::#contexts),*]
+                    &[#(::composure::types::InteractionContextType::#contexts),*]
                 ),
             });
         }

@@ -7,7 +7,7 @@ use composure::{
         ResolvedMember, UserOrRole, dispatch,
     },
     commands, group,
-    models::{Embed, Interaction, InteractionResponse, Message, PartialChannel, Role, User},
+    types::{Embed, Interaction, InteractionResponse, Message, PartialChannel, Role, User},
 };
 use futures::executor::block_on;
 use serde_json::{Value, json};
@@ -413,7 +413,7 @@ struct Components;
 impl<S> InteractionHandler<S> for Components {
     async fn component(
         &self,
-        component: composure::models::MessageComponentInteraction,
+        component: composure::types::MessageComponentInteraction,
         _state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         Ok(InteractionResponse::respond_with_message(format!(
@@ -424,7 +424,7 @@ impl<S> InteractionHandler<S> for Components {
 
     async fn command(
         &self,
-        command: composure::models::ApplicationCommandInteraction,
+        command: composure::types::ApplicationCommandInteraction,
         _state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         Ok(InteractionResponse::respond_with_message(format!(
@@ -466,7 +466,7 @@ fn functions_stay_callable() {
     assert_eq!(ping, 1);
 }
 
-fn dummy_command() -> composure::models::ApplicationCommandInteraction {
+fn dummy_command() -> composure::types::ApplicationCommandInteraction {
     let Interaction::ApplicationCommand(command) = chat("echo", json!([])) else {
         unreachable!()
     };

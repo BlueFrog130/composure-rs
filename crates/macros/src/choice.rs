@@ -207,8 +207,8 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
             }
 
             fn extract(
-                option: ::core::option::Option<&::composure::models::ApplicationCommandInteractionDataOption>,
-                _data: &::composure::models::ApplicationCommandInteractionData,
+                option: ::core::option::Option<&::composure::types::ApplicationCommandInteractionDataOption>,
+                _data: &::composure::types::ApplicationCommandInteractionData,
             ) -> ::core::result::Result<Self, ::composure::command::OptionError> {
                 #extract
             }

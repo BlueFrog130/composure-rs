@@ -74,10 +74,10 @@ macro_rules! commands {
         {
             async fn dispatch(
                 &self,
-                interaction: &$crate::models::ApplicationCommandInteraction,
+                interaction: &$crate::types::ApplicationCommandInteraction,
                 state: &S,
             ) -> ::core::option::Option<
-                ::core::result::Result<$crate::models::InteractionResponse, $crate::command::HandlerError>,
+                ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
             > {
                 let data = &interaction.data;
                 $(
@@ -102,9 +102,9 @@ macro_rules! commands {
         {
             async fn command(
                 &self,
-                command: $crate::models::ApplicationCommandInteraction,
+                command: $crate::types::ApplicationCommandInteraction,
                 state: &S,
-            ) -> ::core::result::Result<$crate::models::InteractionResponse, $crate::command::HandlerError> {
+            ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
                 match $crate::command::CommandSet::dispatch(self, &command, state).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => ::core::result::Result::Err(

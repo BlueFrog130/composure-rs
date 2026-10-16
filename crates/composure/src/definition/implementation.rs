@@ -1,4 +1,4 @@
-use crate::models::{Permissions, Snowflake, TypeField};
+use crate::types::{Permissions, Snowflake, TypeField};
 use serde::Deserialize;
 use serde_json::Value;
 

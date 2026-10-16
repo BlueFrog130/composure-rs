@@ -5,7 +5,7 @@ pub use composure::definition::*;
 
 #[cfg(test)]
 mod tests {
-    use composure::models::{ApplicationIntegrationType, InteractionContextType, TypeField};
+    use composure::types::{ApplicationIntegrationType, InteractionContextType, TypeField};
     use serde_json::json;
 
     use super::*;

@@ -1,4 +1,4 @@
-use crate::models::{
+use crate::types::{
     ApplicationCommandInteraction, Interaction, InteractionResponse, MessageComponentInteraction,
     ModalSubmitInteraction,
 };

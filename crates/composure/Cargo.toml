@@ -8,6 +8,7 @@ description = "Discord bot framework for running on the edge"
 repository = "https://github.com/BlueFrog130/composure-rs"
 keywords = ["discord", "bot", "edge", "serverless", "wasm"]
 license = "Apache-2.0"
+exclude = ["spec"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,6 +21,7 @@ serde_json = { version = "1.0.154", features = ["raw_value"] }
 serde_repr = "0.1.21"
 strum = { version = "0.28.0", features = ["derive"] }
 composure_macros = { path = "../macros", version = "0.1.0", optional = true }
+reqwest = { version = "0.13.5", optional = true, features = ["blocking"] }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 js-sys = { version = "0.3.106", optional = true }
@@ -32,6 +34,17 @@ macros = ["dep:composure_macros"]
 ## Validate requests with the host's Web Crypto (`crypto.subtle`, Ed25519) instead of
 ## ed25519-dalek. Only takes effect on `wasm32-unknown-unknown`; the host must support Ed25519.
 web-crypto = ["dep:js-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+
+## Async REST client over an Adapter-provided Transport, with the Interaction (token) Endpoints
+rest = []
+## Application Command Endpoints on `BotClient`
+rest-commands = ["rest"]
+## What most bots need
+tier1 = ["rest", "rest-commands"]
+## Every Endpoint
+full = ["tier1"]
+## Native blocking Transport for deploy-time tools (not for wasm)
+reqwest = ["rest", "dep:reqwest"]
 
 [dev-dependencies]
 futures = { version = "0.3.34", default-features = false, features = ["executor"] }

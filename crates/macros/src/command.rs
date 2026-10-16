@@ -285,8 +285,8 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
 
         impl ::composure::command::CommandDefinition for #ident {
             const NAME: &'static str = #name;
-            const KIND: ::composure::models::ApplicationCommandType =
-                ::composure::models::ApplicationCommandType::#kind_tokens;
+            const KIND: ::composure::types::ApplicationCommandType =
+                ::composure::types::ApplicationCommandType::#kind_tokens;
             const SCOPE: ::core::option::Option<&'static str> = #scope;
 
             fn definition() -> ::composure::definition::ApplicationCommand {
@@ -300,7 +300,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             async fn invoke(
                 invocation: ::composure::command::Invocation<'_, #state>,
             ) -> ::core::result::Result<
-                ::composure::models::InteractionResponse,
+                ::composure::types::InteractionResponse,
                 ::composure::command::HandlerError,
             > {
                 #(#extracts)*
@@ -468,7 +468,7 @@ fn option_definition(option: &OptionParam) -> TokenStream {
     if let Some(types) = &option.channel_types {
         fields.push(quote! {
             channel_types: ::core::option::Option::Some(
-                &[#(::composure::models::ChannelType::#types),*]
+                &[#(::composure::types::ChannelType::#types),*]
             ),
         });
     }
@@ -503,7 +503,7 @@ fn checks(options: &[OptionParam], kind: Kind) -> TokenStream {
             const _: () = ::core::assert!(
                 ::core::matches!(
                     <#ty as ::composure::command::CommandTarget>::KIND,
-                    ::composure::models::ApplicationCommandType::#expected
+                    ::composure::types::ApplicationCommandType::#expected
                 ),
                 #message
             );

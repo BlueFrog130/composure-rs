@@ -1,8 +1,8 @@
 //! Test-only handler that answers every interaction with a plain-text description of what it
 //! parsed (option values, resolved users/channels/roles/attachments, component values, modal
-//! inputs), so the fixtures can assert on exactly what the models produced.
+//! inputs), so the fixtures can assert on exactly what the types produced.
 
-use composure::models::{
+use composure::types::{
     ApplicationCommandInteraction, ApplicationCommandInteractionData,
     ApplicationCommandInteractionDataOption, ApplicationCommandOptionChoice,
     ApplicationCommandOptionChoiceValue, ApplicationCommandType, InteractionResponse,

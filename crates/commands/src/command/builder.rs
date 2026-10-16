@@ -1,4 +1,4 @@
-use composure::models::{
+use composure::types::{
     ApplicationIntegrationType, InteractionContextType, Permissions, Snowflake, TypeField,
 };
 

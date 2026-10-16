@@ -8,16 +8,17 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt,
     str::FromStr,
+    time::Duration,
 };
 
 use composure::{
     command::ScopedDefinition,
     definition::{ApplicationCommand, CommandDetails},
-    models::Snowflake,
+    rest::{self, BotClient, CommandScope, ReqwestTransport},
+    types::Snowflake,
 };
+use pollster::block_on;
 use serde_json::Value;
-
-use composure_api::DiscordClient;
 
 #[cfg(feature = "cli")]
 mod cli;
@@ -119,7 +120,7 @@ pub enum SyncError {
         target: Target,
         name: String,
     },
-    Api(composure_api::Error),
+    Api(rest::Error),
 }
 
 impl fmt::Display for SyncError {
@@ -142,8 +143,8 @@ impl fmt::Display for SyncError {
     }
 }
 
-impl From<composure_api::Error> for SyncError {
-    fn from(error: composure_api::Error) -> Self {
+impl From<rest::Error> for SyncError {
+    fn from(error: rest::Error) -> Self {
         SyncError::Api(error)
     }
 }
@@ -403,13 +404,10 @@ pub fn plan(
     definitions: Vec<ScopedDefinition>,
     config: &SyncConfig,
 ) -> Result<SyncPlan, SyncError> {
-    let client = DiscordClient::new(&config.token, &config.application_id)?;
+    let client = client(config)?;
     let mut plans = Vec::new();
     for (target, commands) in targets(definitions, config)? {
-        let current = match &target {
-            Target::Global => client.get_global_commands()?,
-            Target::Guild(guild) => client.get_guild_commands(guild)?,
-        };
+        let current = block_on(client.get_commands(target.scope()?))?.model()?;
         plans.push(plan_target(target, commands, &current));
     }
     Ok(SyncPlan { targets: plans })
@@ -417,20 +415,44 @@ pub fn plan(
 
 /// Overwrites every target in the plan that has changes
 pub fn apply(plan: &SyncPlan, config: &SyncConfig) -> Result<(), SyncError> {
-    let client = DiscordClient::new(&config.token, &config.application_id)?;
+    let client = client(config)?;
     for target in plan.targets.iter().filter(|t| !t.changes.is_empty()) {
         apply_target(&client, target)?;
     }
     Ok(())
 }
 
+/// Bot Client for `config`; waits out rate limits up to a minute, since Sync is not under a
+/// platform time limit
+pub fn client(config: &SyncConfig) -> Result<BotClient<ReqwestTransport>, SyncError> {
+    let application_id = parse_id("application id", &config.application_id)?;
+    Ok(
+        BotClient::new(ReqwestTransport::new(), &config.token, application_id)
+            .with_max_rate_limit_wait(Duration::from_secs(60)),
+    )
+}
+
+fn parse_id(what: &str, id: &str) -> Result<Snowflake, SyncError> {
+    id.parse()
+        .map_err(|_| SyncError::Config(format!("invalid {what} `{id}`")))
+}
+
+impl Target {
+    fn scope(&self) -> Result<CommandScope, SyncError> {
+        Ok(match self {
+            Target::Global => CommandScope::Global,
+            Target::Guild(guild) => CommandScope::Guild(parse_id("guild id", guild)?),
+        })
+    }
+}
+
 /// Overwrites one target with its planned Commands, changed or not
-pub fn apply_target(client: &DiscordClient, target: &TargetPlan) -> Result<(), SyncError> {
-    let commands = target.commands.iter().collect();
-    match &target.target {
-        Target::Global => client.overwrite_global_commands(&commands)?,
-        Target::Guild(guild) => client.overwrite_guild_commands(guild, &commands)?,
-    };
+pub fn apply_target(
+    client: &BotClient<ReqwestTransport>,
+    target: &TargetPlan,
+) -> Result<(), SyncError> {
+    let commands: Vec<_> = target.commands.iter().collect();
+    block_on(client.overwrite_commands(target.target.scope()?, &commands))?;
     Ok(())
 }
 
@@ -529,7 +551,7 @@ mod tests {
 
     #[test]
     fn guild_targets_drop_global_only_fields() {
-        use composure::models::{ApplicationIntegrationType, InteractionContextType};
+        use composure::types::{ApplicationIntegrationType, InteractionContextType};
         let mut meta = CommandMeta::new("ping", "Ping");
         meta.contexts = Some(&[InteractionContextType::Guild]);
         meta.integration_types = Some(&[ApplicationIntegrationType::GuildInstall]);

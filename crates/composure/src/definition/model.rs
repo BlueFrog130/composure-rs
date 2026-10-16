@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::models::{
+use crate::types::{
     ApplicationIntegrationType, ChannelType, InteractionContextType, Permissions, Snowflake,
     TypeField,
 };

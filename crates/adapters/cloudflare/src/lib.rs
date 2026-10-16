@@ -1,10 +1,13 @@
 #![doc = include_str!("../README.md")]
 
+mod transport;
+
 pub use composure::command::{HandlerError, InteractionHandler, NoHandler};
 use composure::{
     command::{ErrorKind, dispatch},
-    models::{Interaction, InteractionResponse},
+    types::{Interaction, InteractionResponse},
 };
+pub use transport::FetchTransport;
 use worker::{Env, Headers, Request, Response, console_debug, console_error, console_warn};
 
 #[derive(Debug)]
@@ -229,7 +232,7 @@ impl<H: InteractionHandler<Env>> CloudflareInteractionBot<H> {
 
 #[cfg(test)]
 mod tests {
-    use composure::models::{ApplicationCommandInteraction, MessageComponentInteraction};
+    use composure::types::{ApplicationCommandInteraction, MessageComponentInteraction};
     use futures::executor::block_on;
     use serde_json::{Value, json};
 

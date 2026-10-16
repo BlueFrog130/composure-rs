@@ -17,17 +17,18 @@ cargo clippy --workspace
 cargo fmt --all
 ```
 
-**`composure_api` tests hit the live Discord API** (create/overwrite real commands). They read `crates/api/.env.test` (gitignored) with `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, and panic without it. Exclude them for offline runs: `cargo test --workspace --exclude composure_api`.
+`cargo test --workspace` is offline. Live Discord API tests are `#[ignore]`d (`composure_sync --test api_regression`; they overwrite real commands and read `crates/sync/.env.test`, gitignored, with `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`).
+
+REST Endpoints are checked against Discord's OpenAPI spec vendored in `crates/composure/spec/` (pinned commit in `PINNED`; bump with `scripts/update-spec.sh`): `cargo test -p composure --features full --lib rest::spec -- --nocapture` also prints unimplemented routes.
 
 ## Workspace crates
 
 | Crate | Path | Role |
 |---|---|---|
-| `composure` | `crates/composure/` | Core: Discord models (serde), ed25519 request validation, `command` runtime (`InteractionHandler`, `Ctx`, Command Set traits), `definition` models. Must stay WASM-friendly and small — no async runtime, no HTTP client. `macros` feature re-exports `composure_macros`. |
+| `composure` | `crates/composure/` | Core: Discord types (serde), ed25519 request validation, `command` runtime (`InteractionHandler`, `Ctx`, Command Set traits), `definition` models, `rest` client. Must stay WASM-friendly and small — no async runtime, no HTTP implementation. `macros` feature re-exports `composure_macros`. |
 | `composure_macros` | `crates/macros/` | Proc macros: `#[command]`, `#[group]`, `#[derive(Choice)]`. `commands!` is a `macro_rules!` in core. Runtime + trybuild UI tests in `crates/macros/tests`. |
 | `composure_commands` | `crates/commands/` | Definition builder (`CommandsBuilder` → `CommandBuilder` → `SubcommandBuilder`/group); re-exports `composure::definition`. |
-| `composure_api` | `crates/api/` | Blocking `reqwest` Discord REST client (`DiscordClient`, `UpdateCommands`). Discord API interactions only. Deploy-time only. |
-| `composure_sync` | `crates/sync/` | Sync (`plan`, `apply`; `sync_from_env` CLI via clap + cliclack behind default `cli` feature) on top of `composure_api`. Deploy-time only. |
+| `composure_sync` | `crates/sync/` | Sync (`plan`, `apply`; `sync_from_env` CLI via clap + cliclack behind default `cli` feature) on core's `BotClient` + `reqwest` Transport via `pollster`. Deploy-time only. |
 | `composure_adapter_cloudflare` | `crates/adapters/cloudflare/` | Cloudflare Workers adapter (`worker` crate). `bench/` (own workspace member, `exclude`d from the adapter package) = `validate_request` dalek vs `web-crypto` benchmark on `wrangler dev` (`cargo test -p composure_bench_cloudflare --test wrangler --release -- --ignored --nocapture`). |
 | `composure_example_commands` | `examples/cloudflare/` | Example `#[command]` bot on Workers with a `sync` bin; `tests/regression.rs` runs signed fixtures for every interaction shape. |
 
@@ -39,14 +40,11 @@ Release profile is size-optimized (`opt-level = "z"`, LTO) because worker bundle
 
 **Commands:** `#[command] fn x(ctx: Ctx, opts...)` keeps the fn and adds a same-named empty braced struct (type namespace only) implementing `CommandDefinition` (+ `SubcommandDefinition` for chat input) and `Command<S>`. Option params go through `OptionType` (extract + definition); compile-time rules are `const _: () = assert!(...)` blocks. `#[group]` routes via `Invocation::route`. `commands! { pub struct Bot = [...]; }` implements `CommandSet<S>`, `InteractionHandler<S>`, `CommandSetDefinition`, and an inherent `with_fallback`. Async fns in traits are native (no `Send`, static dispatch) — keep it that way for Workers.
 
-Adapters are the integration layer; new platforms go under `crates/adapters/<name>` and reuse core validation + models.
+Adapters are the integration layer; new platforms go under `crates/adapters/<name>` and reuse core validation + types.
 
-**Models (`crates/composure/src/models/`)** are split by direction:
-- `deserialize/` — inbound Discord payloads (interaction, channel, member, message, role, ...)
-- `serialize/` — outbound (`InteractionResponse`)
-- `common/` — both directions (embed, component, permissions, snowflake, ...)
+**Types (`crates/composure/src/types/`)** are one file per resource (interaction, message, channel, member, role, embed, component, ...), shared by Interactions, Responses and REST. All are glob re-exported, so everything is addressed as `composure::types::X`.
 
-All submodules are glob re-exported, so everything is addressed as `composure::models::X`.
+**REST (`crates/composure/src/rest/`, `rest` / `rest-*` / `tier1` / `full` features):** async clients over an Adapter-provided `Transport` (`send` + `sleep`; own `Request`/`RawResponse` types, core encodes JSON/multipart). `InteractionClient` (interaction token, no auth) and `BotClient` (bot token; resource Endpoints added as `impl BotClient<T>` blocks in per-feature modules). Each module declares its routes with `routes! { NAME = Method "/spec/{path}"; }` — paths copied from the spec so the spec check matches. Endpoints take borrowed body structs and return lazily-decoded `Response<T>` (`()` for 204). 429s are waited out via `Transport::sleep` up to `with_max_rate_limit_wait` (2s default, Sync uses 60s). Tests use `rest::testing::MockTransport`.
 
 **Serde conventions:**
 - `Interaction` uses a manual `Deserialize` that reads the body once into a private `Envelope` (common fields typed, `data` kept as `Box<RawValue>`), then parses `data` by `type` into `DataInteraction<T>` variants (`ApplicationCommandInteraction`, `MessageComponentInteraction`, `ModalSubmitInteraction` are type aliases). Options do the same via `RawOption`. This is the hot path: don't go through `serde_json::Value` or `#[serde(flatten)]` for type-discriminated unions.

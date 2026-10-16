@@ -1,7 +1,9 @@
 pub mod auth;
 pub mod command;
 pub mod definition;
-pub mod models;
+#[cfg(feature = "rest")]
+pub mod rest;
+pub mod types;
 
 pub use command::Ctx;
 #[cfg(feature = "macros")]

@@ -1,4 +1,4 @@
-use crate::models::{ApplicationCommandInteraction, Member, Snowflake, User};
+use crate::types::{ApplicationCommandInteraction, Member, Snowflake, User};
 
 /// What a Command sees besides its Options: the Interaction it answers and the Adapter's State.
 pub struct Ctx<'a, S = ()> {

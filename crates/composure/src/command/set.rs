@@ -3,7 +3,7 @@ use crate::{
         ApplicationCommand, ApplicationCommandOption, ChatInputCommand, CommandDetails,
         SubcommandCommandOption, SubcommandGroupOption, SubcommandOption,
     },
-    models::{
+    types::{
         ApplicationCommandInteraction, ApplicationCommandInteractionData,
         ApplicationCommandInteractionDataOption as DataOption, ApplicationCommandType,
         ApplicationIntegrationType, InteractionContextType, InteractionResponse, OptionList,

@@ -4,7 +4,6 @@ members = [
     "crates/composure",
     "crates/macros",
     "crates/commands",
-    "crates/api",
     "crates/sync",
     "crates/adapters/cloudflare",
     "crates/adapters/cloudflare/bench",
