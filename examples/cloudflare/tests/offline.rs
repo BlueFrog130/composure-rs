@@ -511,6 +511,45 @@ fn modals_show_and_submit_typed_forms() {
     assert_eq!(response["data"]["flags"], 64);
 }
 
+fn autocomplete(name: &str, option: &str, typed: &str) -> Value {
+    let mut payload = command(json!({ "id": "1", "name": name, "type": 1, "options": [
+        { "name": option, "type": 3, "value": typed, "focused": true },
+    ] }));
+    payload["type"] = json!(4);
+    payload
+}
+
+#[test]
+fn autocomplete_suggests_while_typing() {
+    let (_, response) = send(&Bot, autocomplete("fruit", "name", "Bl"));
+    assert_eq!(
+        response,
+        json!({ "type": 8, "data": { "choices": [{ "name": "blueberry", "value": "blueberry" }] } })
+    );
+
+    // Suggestions from REST, with the bot token
+    let env = TestEnv::default();
+    let (_, response, _) = send_with(&Bot, &env, autocomplete("command-info", "name", "h"));
+    assert_eq!(
+        response["data"]["choices"],
+        json!([{ "name": "hello", "value": "hello" }])
+    );
+    assert_eq!(
+        env.sent()[0].1,
+        "/applications/1052322265397739523/commands?with_localizations=true"
+    );
+
+    let (_, response) = send(
+        &Bot,
+        command(
+            json!({ "id": "1", "name": "command-info", "type": 1, "options": [
+            { "name": "name", "type": 3, "value": "hello" },
+        ] }),
+        ),
+    );
+    assert_eq!(response["data"]["content"], "`/hello`: Say hello");
+}
+
 #[test]
 fn definitions_for_sync() {
     let definitions = Bot::definitions();
@@ -527,6 +566,7 @@ fn definitions_for_sync() {
             (None, json!("hello"), json!(1)),
             (None, json!("echo"), json!(1)),
             (None, json!("ice-cream"), json!(1)),
+            (None, json!("fruit"), json!(1)),
             (None, json!("greet"), json!(1)),
             (Some("dev"), json!("mod"), json!(1)),
             (None, json!("Avatar"), json!(2)),
@@ -538,6 +578,7 @@ fn definitions_for_sync() {
             (None, json!("Thumbs up"), json!(3)),
             (None, json!("dm-me"), json!(1)),
             (None, json!("report"), json!(1)),
+            (None, json!("command-info"), json!(1)),
             (None, json!("export"), json!(1)),
             (None, json!("counter"), json!(1)),
             (None, json!("roll"), json!(1)),

@@ -198,6 +198,7 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
 
         impl ::composure::command::OptionType<'_> for #ident {
             const OPTION_TYPE: u8 = #option_type;
+            const HAS_CHOICES: bool = true;
 
             fn definition(
                 meta: &::composure::command::OptionMeta,

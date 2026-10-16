@@ -96,7 +96,7 @@ impl<T: IntoResponse, E: Display + 'static> CommandOutput for Result<T, E> {
 
 /// A [`HandlerError`] as is, keeping its kind; anything else as a generic Handler error.
 /// The type check is resolved at compile time.
-fn into_handler_error<E: Display + 'static>(error: E) -> HandlerError {
+pub(crate) fn into_handler_error<E: Display + 'static>(error: E) -> HandlerError {
     let mut error = Some(error);
     match (&mut error as &mut dyn Any).downcast_mut::<Option<HandlerError>>() {
         Some(handler_error) => handler_error.take().expect("taken once"),

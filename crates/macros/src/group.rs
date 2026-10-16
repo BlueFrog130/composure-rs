@@ -89,6 +89,13 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             }
         }
     });
+    let autocomplete_routes = subcommands.iter().map(|sub| {
+        quote! {
+            if name == <#sub as ::composure::command::CommandDefinition>::NAME {
+                return <#sub as ::composure::command::Command<__S>>::autocomplete(invocation).await;
+            }
+        }
+    });
 
     Ok(quote! {
         #item
@@ -161,6 +168,17 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 };
                 #(#routes)*
                 ::core::result::Result::Err(::composure::command::HandlerError::unknown_command(name))
+            }
+
+            async fn autocomplete(
+                invocation: ::composure::command::Invocation<'_, __S>,
+            ) -> ::core::option::Option<::core::result::Result<
+                ::composure::types::InteractionResponse,
+                ::composure::command::HandlerError,
+            >> {
+                let (name, invocation) = invocation.route()?;
+                #(#autocomplete_routes)*
+                ::core::option::Option::None
             }
         }
     })

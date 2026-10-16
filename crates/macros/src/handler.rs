@@ -112,63 +112,9 @@ pub fn expand(kind: Kind, args: TokenStream, item: TokenStream) -> syn::Result<T
         (_, form) => form,
     };
 
-    // The State: a concrete type or the function's type parameter; `ComponentCtx` and
-    // `ComponentCtx<impl Bound>` add one named `__S`
     let has_ctx = ctx.is_some();
-    let state: Type = match ctx {
-        Some(None) => {
-            if let Some(param) = &state_param {
-                return Err(syn::Error::new(
-                    param.span(),
-                    format!(
-                        "use the type parameter as the State: `ctx: {}<S>`",
-                        kind.ctx_name()
-                    ),
-                ));
-            }
-            function.sig.generics.params.push(parse_quote!(__S));
-            parse_quote!(__S)
-        }
-        Some(Some(Type::ImplTrait(bounds))) => {
-            let bounds = bounds.bounds;
-            function
-                .sig
-                .generics
-                .params
-                .push(parse_quote!(__S: #bounds));
-            parse_quote!(__S)
-        }
-        Some(Some(ty)) => ty,
-        None => {
-            if let Some(param) = &state_param {
-                return Err(syn::Error::new(
-                    param.span(),
-                    format!(
-                        "handlers can only be generic over their State: add `ctx: {}<{param}>`",
-                        kind.ctx_name()
-                    ),
-                ));
-            }
-            parse_quote!(__S)
-        }
-    };
-    if has_ctx
-        && let Some(FnArg::Typed(param)) = function.sig.inputs.first_mut()
-        && let Type::Path(path) = &mut *param.ty
-        && let Some(segment) = path.path.segments.last_mut()
-    {
-        // Spell out the lifetime: async fns reject an elided one
-        segment.arguments = PathArguments::AngleBracketed(parse_quote!(<'_, #state>));
-    }
-    let generic = has_ctx && function.sig.generics.type_params().next().is_some();
-    let (impl_generics, where_clause) = if generic {
-        let (impl_generics, _, where_clause) = function.sig.generics.split_for_impl();
-        (quote!(#impl_generics), quote!(#where_clause))
-    } else if has_ctx {
-        (quote!(), quote!())
-    } else {
-        (quote!(<__S>), quote!())
-    };
+    let (state, impl_generics, where_clause) =
+        resolve_state(&mut function, ctx, state_param, kind.ctx_name())?;
 
     let vis = &function.vis;
     let names: Vec<_> = state_args.iter().map(|(name, _)| name).collect();
@@ -268,6 +214,76 @@ pub fn expand(kind: Kind, args: TokenStream, item: TokenStream) -> syn::Result<T
     })
 }
 
+/// The State a handler runs with, given its context parameter (`ctx`: `None` without one,
+/// `Some(None)` without a State argument): a concrete type or the function's type parameter.
+/// Adds `__S` for `Ctx` / `Ctx<impl Bound>` and spells out the context's lifetime. Returns the
+/// State and the generics and where clause for the handler trait impl.
+pub(crate) fn resolve_state(
+    function: &mut ItemFn,
+    ctx: Option<Option<Type>>,
+    state_param: Option<Ident>,
+    ctx_name: &str,
+) -> syn::Result<(Type, TokenStream, TokenStream)> {
+    // The State: a concrete type or the function's type parameter; `Ctx` and
+    // `Ctx<impl Bound>` add one named `__S`
+    let has_ctx = ctx.is_some();
+    let state: Type = match ctx {
+        Some(None) => {
+            if let Some(param) = &state_param {
+                return Err(syn::Error::new(
+                    param.span(),
+                    format!(
+                        "use the type parameter as the State: `ctx: {}<S>`",
+                        ctx_name
+                    ),
+                ));
+            }
+            function.sig.generics.params.push(parse_quote!(__S));
+            parse_quote!(__S)
+        }
+        Some(Some(Type::ImplTrait(bounds))) => {
+            let bounds = bounds.bounds;
+            function
+                .sig
+                .generics
+                .params
+                .push(parse_quote!(__S: #bounds));
+            parse_quote!(__S)
+        }
+        Some(Some(ty)) => ty,
+        None => {
+            if let Some(param) = &state_param {
+                return Err(syn::Error::new(
+                    param.span(),
+                    format!(
+                        "handlers can only be generic over their State: add `ctx: {}<{param}>`",
+                        ctx_name
+                    ),
+                ));
+            }
+            parse_quote!(__S)
+        }
+    };
+    if has_ctx
+        && let Some(FnArg::Typed(param)) = function.sig.inputs.first_mut()
+        && let Type::Path(path) = &mut *param.ty
+        && let Some(segment) = path.path.segments.last_mut()
+    {
+        // Spell out the lifetime: async fns reject an elided one
+        segment.arguments = PathArguments::AngleBracketed(parse_quote!(<'_, #state>));
+    }
+    let generic = has_ctx && function.sig.generics.type_params().next().is_some();
+    let (impl_generics, where_clause) = if generic {
+        let (impl_generics, _, where_clause) = function.sig.generics.split_for_impl();
+        (quote!(#impl_generics), quote!(#where_clause))
+    } else if has_ctx {
+        (quote!(), quote!())
+    } else {
+        (quote!(<__S>), quote!())
+    };
+    Ok((state, impl_generics, where_clause))
+}
+
 fn validate_prefix(prefix: &LitStr) -> syn::Result<()> {
     let value = prefix.value();
     if value.is_empty() || value.chars().count() > MAX_PREFIX_LEN {
@@ -286,7 +302,7 @@ fn validate_prefix(prefix: &LitStr) -> syn::Result<()> {
 }
 
 /// The function's one type parameter, which must be its State
-fn state_param(function: &ItemFn) -> syn::Result<Option<Ident>> {
+pub(crate) fn state_param(function: &ItemFn) -> syn::Result<Option<Ident>> {
     let mut param = None;
     for generic in &function.sig.generics.params {
         match generic {
@@ -302,12 +318,12 @@ fn state_param(function: &ItemFn) -> syn::Result<Option<Ident>> {
     Ok(param)
 }
 
-fn is_ctx(ty: &Type, name: &str) -> bool {
+pub(crate) fn is_ctx(ty: &Type, name: &str) -> bool {
     matches!(ty, Type::Path(path) if path.path.segments.last().is_some_and(|s| s.ident == name))
 }
 
 /// `Some(state)` if `ty` is the `name` context: `Some(None)` without a State argument
-fn ctx_state(ty: &Type, name: &str) -> Option<Option<Type>> {
+pub(crate) fn ctx_state(ty: &Type, name: &str) -> Option<Option<Type>> {
     if !is_ctx(ty, name) {
         return None;
     }

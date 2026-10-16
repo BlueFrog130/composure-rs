@@ -3,6 +3,7 @@
 
 use proc_macro::TokenStream;
 
+mod autocomplete;
 mod choice;
 mod command;
 mod group;
@@ -31,7 +32,7 @@ mod modal;
 ///   `integration_types(...)`, `nsfw`, and `user` / `message` for context-menu commands, which
 ///   take one target parameter (`User`, `ResolvedMember`, or `Message`, owned or borrowed)
 /// - `#[option("Description", ...)]` then `name`, `min`, `max`, `min_len`, `max_len`,
-///   `channel_types(...)`
+///   `channel_types(...)`, `autocomplete = handler` (an `#[autocomplete]` function)
 ///
 /// The function stays callable as written; a same-named empty struct is added for
 /// `commands!` and Groups to refer to.
@@ -114,6 +115,30 @@ pub fn modal(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Modal, attributes(modal, input))]
 pub fn derive_modal(item: TokenStream) -> TokenStream {
     modal::expand(item.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// Defines an Autocomplete Handler from a function taking an optional leading `ctx: Ctx` and
+/// what the user has typed so far as `input: &str`. Attach it to a string, integer, or number
+/// Option with `#[option("...", autocomplete = name)]`.
+///
+/// ```ignore
+/// #[autocomplete]
+/// fn fruits(input: &str) -> Vec<&'static str> {
+///     FRUITS.iter().copied().filter(|f| f.starts_with(input)).collect()
+/// }
+///
+/// /// Pick a fruit
+/// #[command]
+/// fn fruit(#[option("Fruit", autocomplete = fruits)] name: &str) -> String { ... }
+/// ```
+///
+/// Return a `Vec` of strings, numbers, `(name, value)` pairs, or
+/// `ApplicationCommandOptionChoice`s (at most 25 are sent), or a `Result` of one.
+#[proc_macro_attribute]
+pub fn autocomplete(args: TokenStream, item: TokenStream) -> TokenStream {
+    autocomplete::expand(args.into(), item.into())
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

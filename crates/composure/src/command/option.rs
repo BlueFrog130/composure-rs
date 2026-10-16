@@ -22,6 +22,8 @@ pub struct OptionMeta {
     pub min_length: Option<i32>,
     pub max_length: Option<i32>,
     pub channel_types: Option<&'static [ChannelType]>,
+    /// Suggestions come from an Autocomplete Handler while the user types
+    pub autocomplete: bool,
 }
 
 impl OptionMeta {
@@ -34,6 +36,7 @@ impl OptionMeta {
             min_length: None,
             max_length: None,
             channel_types: None,
+            autocomplete: false,
         }
     }
 }
@@ -83,6 +86,9 @@ pub trait OptionType<'a>: Sized {
     /// Upper bound implied by the type (e.g. `255` for `u8`); explicit bounds must stay inside it
     const MAX_VALUE: Option<f64> = None;
 
+    /// Restricted to fixed Choices (`#[derive(Choice)]`), which rules out autocomplete
+    const HAS_CHOICES: bool = false;
+
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption;
 
     fn extract(
@@ -96,6 +102,7 @@ impl<'a, T: OptionType<'a>> OptionType<'a> for Option<T> {
     const REQUIRED: bool = false;
     const MIN_VALUE: Option<f64> = T::MIN_VALUE;
     const MAX_VALUE: Option<f64> = T::MAX_VALUE;
+    const HAS_CHOICES: bool = T::HAS_CHOICES;
 
     fn definition(meta: &OptionMeta, _required: bool) -> ApplicationCommandOption {
         T::definition(meta, false)
@@ -138,7 +145,7 @@ fn string_definition(
         choices,
         min_length: meta.min_length,
         max_length: meta.max_length,
-        autocomplete: None,
+        autocomplete: meta.autocomplete.then_some(true),
     })
 }
 
@@ -159,7 +166,7 @@ fn integer_definition(
         choices,
         min_value: meta.min_value.or(type_min).map(|v| v as i64),
         max_value: meta.max_value.or(type_max).map(|v| v as i64),
-        autocomplete: None,
+        autocomplete: meta.autocomplete.then_some(true),
     })
 }
 
@@ -299,7 +306,7 @@ impl OptionType<'_> for f64 {
             choices: None,
             min_value: meta.min_value,
             max_value: meta.max_value,
-            autocomplete: None,
+            autocomplete: meta.autocomplete.then_some(true),
         })
     }
 

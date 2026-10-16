@@ -27,6 +27,7 @@ struct OptionParam {
     min_len: Option<i32>,
     max_len: Option<i32>,
     channel_types: Option<Vec<Ident>>,
+    autocomplete: Option<syn::Path>,
     span: Span,
 }
 
@@ -214,14 +215,63 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     };
     let checks = checks(&options, kind);
 
-    let (impl_generics, where_clause) = if generic {
-        let (impl_generics, _, where_clause) = function.sig.generics.split_for_impl();
-        (quote!(#impl_generics), quote!(#where_clause))
-    } else if has_ctx {
-        (quote!(), quote!())
+    // Autocomplete Handlers must accept the Command's State
+    let autocompletes: Vec<_> = options
+        .iter()
+        .filter_map(|o| Some((&o.name, o.autocomplete.as_ref()?)))
+        .collect();
+    let mut predicates: Vec<TokenStream> = function
+        .sig
+        .generics
+        .where_clause
+        .iter()
+        .flat_map(|clause| clause.predicates.iter().map(|p| quote!(#p)))
+        .collect();
+    predicates.extend(
+        autocompletes
+            .iter()
+            .map(|(_, handler)| quote!(#handler: ::composure::command::Autocomplete<#state>)),
+    );
+    let where_clause = if predicates.is_empty() {
+        quote!()
     } else {
-        (quote!(<__S>), quote!())
+        quote!(where #(#predicates),*)
     };
+    let impl_generics = if generic {
+        let (impl_generics, _, _) = function.sig.generics.split_for_impl();
+        quote!(#impl_generics)
+    } else if has_ctx {
+        quote!()
+    } else {
+        quote!(<__S>)
+    };
+    let autocomplete = (!autocompletes.is_empty()).then(|| {
+        let routes = autocompletes.iter().map(|(name, handler)| {
+            quote! {
+                if focused.name == #name {
+                    return ::core::option::Option::Some(
+                        <#handler as ::composure::command::Autocomplete<#state>>::complete(
+                            invocation.ctx(),
+                            &focused.value,
+                        )
+                        .await,
+                    );
+                }
+            }
+        });
+        quote! {
+            async fn autocomplete(
+                invocation: ::composure::command::Invocation<'_, #state>,
+            ) -> ::core::option::Option<::core::result::Result<
+                ::composure::types::InteractionResponse,
+                ::composure::command::HandlerError,
+            >> {
+                let focused = invocation.focused()?;
+                #(#routes)*
+                ::core::option::Option::None
+            }
+        }
+    });
 
     let extracts = options.iter().map(|option| {
         let OptionParam { ident, ty, name, .. } = option;
@@ -306,6 +356,8 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 #(#extracts)*
                 ::composure::command::CommandOutput::into_result(#call)
             }
+
+            #autocomplete
         }
     })
 }
@@ -362,6 +414,7 @@ fn parse_option(
         min_len: None,
         max_len: None,
         channel_types: None,
+        autocomplete: None,
         span,
     };
     let mut desc: Option<LitStr> = None;
@@ -399,9 +452,11 @@ fn parse_option(
                     option.max_len = Some(length(&meta.value()?.parse()?, 1)?);
                 } else if meta.path.is_ident("channel_types") {
                     option.channel_types = Some(meta::ident_list(&meta)?);
+                } else if meta.path.is_ident("autocomplete") {
+                    option.autocomplete = Some(meta.value()?.parse()?);
                 } else {
                     return Err(meta.error(
-                        "unknown option setting; expected a description first, then name, min, max, min_len, max_len, channel_types",
+                        "unknown option setting; expected a description first, then name, min, max, min_len, max_len, channel_types, autocomplete",
                     ));
                 }
                 Ok(())
@@ -464,6 +519,9 @@ fn option_definition(option: &OptionParam) -> TokenStream {
     }
     if let Some(max_len) = option.max_len {
         fields.push(quote!(max_length: ::core::option::Option::Some(#max_len),));
+    }
+    if option.autocomplete.is_some() {
+        fields.push(quote!(autocomplete: true,));
     }
     if let Some(types) = &option.channel_types {
         fields.push(quote! {
@@ -572,6 +630,17 @@ fn checks(options: &[OptionParam], kind: Kind) -> TokenStream {
             check(
                 format!("option `{name}`: `channel_types` only applies to channel options"),
                 quote!(#option_type == 7),
+            );
+        }
+        if option.autocomplete.is_some() {
+            check(
+                format!(
+                    "option `{name}`: `autocomplete` only applies to string, integer, and number options without fixed choices"
+                ),
+                quote! {
+                    (#option_type == 3 || #option_type == 4 || #option_type == 10)
+                        && !<#ty as ::composure::command::OptionType>::HAS_CHOICES
+                },
             );
         }
     }

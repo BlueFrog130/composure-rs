@@ -76,7 +76,8 @@ pub async fn dispatch<S, H: InteractionHandler<S>>(
 }
 
 /// A Command Set plus a handler for everything it does not handle: components and modals
-/// without a matching handler, autocomplete, and commands not in the set. Built with the set's `with_fallback`.
+/// without a matching handler, autocomplete without an Autocomplete Handler, and commands not
+/// in the set. Built with the set's `with_fallback`.
 #[derive(Debug, Clone, Copy)]
 pub struct WithFallback<C, F> {
     commands: C,
@@ -117,7 +118,14 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         autocomplete: ApplicationCommandInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
-        self.fallback.autocomplete(autocomplete, state).await
+        match self
+            .commands
+            .dispatch_autocomplete(&autocomplete, state)
+            .await
+        {
+            Some(result) => result,
+            None => self.fallback.autocomplete(autocomplete, state).await,
+        }
     }
 
     async fn modal_submit(

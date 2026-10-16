@@ -9,6 +9,7 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 | `/hello` | `Ctx` (invoking user/member), user-install contexts |
 | `/echo` | Options with constraints, optional Option, borrowed `&str` |
 | `/ice-cream` | `#[derive(Choice)]` and its `name()`, `name` override, `Embed` response |
+| `/fruit` | `#[autocomplete]` handler attached with `#[option(.., autocomplete = fruit_names)]` |
 | `/greet` | `Ctx<impl Vars>`: a bounded State, `Worker` on Workers and a stand-in in tests |
 | `/mod ban`, `/mod kick` | `#[group]` with `scope = "dev"` and permissions, `Ephemeral` replies, `HandlerError::user` |
 | Avatar (user), Word count (message) | Context-menu commands |
@@ -24,6 +25,7 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 | Thumbs up (message) | Create Reaction on the target message |
 | `/dm-me` | Create DM + Create Message; a REST failure turned into a `HandlerError::user` |
 | `/report` | Bot Client in Background Work (Get Commands), a CSV file uploaded with the edit (multipart) |
+| `/command-info` | Async autocomplete with `Ctx<impl Platform>`: suggestions fetched with the bot token |
 | `/export` | A file in the initial response (the Adapter answers through the callback endpoint) |
 
 [`src/interactive.rs`](src/interactive.rs): `#[component]` / `#[modal]` handlers, listed in `commands!` under `components` / `modals`

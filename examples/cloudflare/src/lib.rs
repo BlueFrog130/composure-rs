@@ -19,8 +19,8 @@ use worker::{Context, Env, Request, Response, event};
 commands! {
     /// Every command this bot serves
     pub struct Bot = [
-        hello, echo, ice_cream, greet, Mod, avatar, word_count,
-        whoami, remind, countdown, announce, thumbs_up, dm_me, report, export,
+        hello, echo, ice_cream, fruit, greet, Mod, avatar, word_count,
+        whoami, remind, countdown, announce, thumbs_up, dm_me, report, command_info, export,
         counter, roll, colors, feedback,
     ];
     components = [counter_click, reroll, pick_colors];

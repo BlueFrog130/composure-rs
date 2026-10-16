@@ -6,7 +6,7 @@ use crate::{
     types::{
         ApplicationCommandInteraction, ApplicationCommandInteractionData,
         ApplicationCommandInteractionDataOption as DataOption, ApplicationCommandType,
-        ApplicationIntegrationType, InteractionContextType, InteractionResponse,
+        ApplicationIntegrationType, FocusedOption, InteractionContextType, InteractionResponse,
         MessageComponentInteraction, ModalSubmitInteraction, OptionList, Permissions, Subcommand,
         TypeField,
     },
@@ -39,6 +39,13 @@ pub trait SubcommandDefinition: CommandDefinition {
 #[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
 pub trait Command<S>: CommandDefinition {
     async fn invoke(invocation: Invocation<'_, S>) -> Result<InteractionResponse, HandlerError>;
+
+    /// Suggestions for the Option being typed, or `None` if it has no Autocomplete Handler
+    async fn autocomplete(
+        _invocation: Invocation<'_, S>,
+    ) -> Option<Result<InteractionResponse, HandlerError>> {
+        None
+    }
 }
 
 static NO_OPTIONS: OptionList = OptionList::empty();
@@ -74,6 +81,14 @@ impl<'a, S> Invocation<'a, S> {
     /// The Option named `name` at this level
     pub fn option(&self, name: &str) -> Option<&'a DataOption> {
         self.options.get_option(name)
+    }
+
+    /// The Option being typed at this level, in an autocomplete Interaction
+    pub fn focused(&self) -> Option<&'a FocusedOption> {
+        self.options.iter().find_map(|option| match option {
+            DataOption::Focused(focused) => Some(focused),
+            _ => None,
+        })
     }
 
     /// The subcommand or subcommand group invoked below this Group, and the Invocation for it
@@ -224,6 +239,15 @@ pub trait CommandSet<S> {
         interaction: &ApplicationCommandInteraction,
         state: &S,
     ) -> Option<Result<InteractionResponse, HandlerError>>;
+
+    /// Runs the matching Command's Autocomplete Handler for the focused Option, or `None`
+    async fn dispatch_autocomplete(
+        &self,
+        _interaction: &ApplicationCommandInteraction,
+        _state: &S,
+    ) -> Option<Result<InteractionResponse, HandlerError>> {
+        None
+    }
 
     /// Runs the Component Handler whose prefix the `custom_id` starts with, or `None`
     async fn dispatch_component(

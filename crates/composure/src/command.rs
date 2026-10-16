@@ -18,6 +18,7 @@
 //! }
 //! ```
 
+mod autocomplete;
 mod component;
 mod ctx;
 pub mod custom_id;
@@ -29,6 +30,7 @@ mod platform;
 mod response;
 mod set;
 
+pub use autocomplete::*;
 pub use component::*;
 pub use ctx::*;
 pub use error::*;
@@ -53,6 +55,7 @@ pub use set::*;
 ///
 /// The struct implements [`InteractionHandler`] for every State its Commands accept; an
 /// Interaction for a Command not in the set is answered with an "Unknown command" message.
+/// Autocomplete goes to the invoked Command's Autocomplete Handler for the focused Option.
 /// Components and modals are routed by the `custom_id` prefix; unmatched ones get a "not
 /// handled" message. Two Commands with the same name and type, two handlers with the same
 /// prefix, or more Commands than Discord allows in one Scope fail to compile.
@@ -118,6 +121,27 @@ macro_rules! commands {
                 ::core::option::Option::None
             }
 
+            async fn dispatch_autocomplete(
+                &self,
+                interaction: &$crate::types::ApplicationCommandInteraction,
+                state: &S,
+            ) -> ::core::option::Option<
+                ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
+            > {
+                let data = &interaction.data;
+                $(
+                    if data.name == <$command as $crate::command::CommandDefinition>::NAME
+                        && data.t == <$command as $crate::command::CommandDefinition>::KIND
+                    {
+                        return <$command as $crate::command::Command<S>>::autocomplete(
+                            $crate::command::Invocation::new(interaction, state),
+                        )
+                        .await;
+                    }
+                )*
+                ::core::option::Option::None
+            }
+
             #[allow(unused_variables)]
             async fn dispatch_component(
                 &self,
@@ -177,6 +201,22 @@ macro_rules! commands {
                     ::core::option::Option::None => ::core::result::Result::Err(
                         $crate::command::HandlerError::unknown_command(&command.data.name),
                     ),
+                }
+            }
+
+            async fn autocomplete(
+                &self,
+                autocomplete: $crate::types::ApplicationCommandInteraction,
+                state: &S,
+            ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
+                match $crate::command::CommandSet::dispatch_autocomplete(self, &autocomplete, state).await {
+                    ::core::option::Option::Some(result) => result,
+                    ::core::option::Option::None => {
+                        $crate::command::InteractionHandler::<S>::autocomplete(
+                            &$crate::command::NoHandler, autocomplete, state,
+                        )
+                        .await
+                    }
                 }
             }
 

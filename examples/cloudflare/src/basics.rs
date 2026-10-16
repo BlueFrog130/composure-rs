@@ -1,7 +1,7 @@
 //! Commands that only answer: Options, Choices, State, Groups, context menus, errors.
 
 use composure::{
-    Choice, Ctx, command,
+    Choice, Ctx, autocomplete, command,
     command::{Ephemeral, HandlerError},
     group,
     types::{Embed, Message, User},
@@ -49,6 +49,33 @@ pub fn ice_cream(
     Embed::new()
         .with_title(&format!("{} x {}", scoops.unwrap_or(1), flavor.name()))
         .with_color(0xf5c2e7)
+}
+
+const FRUITS: [&str; 8] = [
+    "apple",
+    "apricot",
+    "banana",
+    "blueberry",
+    "cherry",
+    "grape",
+    "mango",
+    "melon",
+];
+
+/// Suggests fruits starting with what the user typed
+#[autocomplete]
+pub fn fruit_names(input: &str) -> Vec<&'static str> {
+    let input = input.to_lowercase();
+    FRUITS
+        .into_iter()
+        .filter(|fruit| fruit.starts_with(&input))
+        .collect()
+}
+
+/// Pick a fruit, with suggestions while you type
+#[command]
+pub fn fruit(#[option("Fruit", autocomplete = fruit_names)] name: &str) -> String {
+    format!("You picked {name}")
 }
 
 /// What `/greet` needs from the State: [`Worker`] on Workers, a stand-in in tests

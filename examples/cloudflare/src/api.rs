@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use composure::{
-    Ctx, Mentionable, command,
+    Ctx, Mentionable, autocomplete, command,
     command::{Deferred, Ephemeral, HandlerError, Platform},
     definition::ApplicationCommand,
     rest::{CommandScope, EditMessage},
@@ -131,6 +131,55 @@ pub fn report(ctx: Ctx<impl Platform>) -> Ephemeral<Deferred> {
             .with_file(File::new("commands.csv", csv).content_type("text/csv")),
         )
     }))
+}
+
+/// Suggests this bot's global command names, fetched with the bot token while the user types
+#[autocomplete]
+pub async fn command_names(
+    ctx: Ctx<impl Platform>,
+    input: &str,
+) -> Result<Vec<String>, HandlerError> {
+    let commands = ctx
+        .bot()?
+        .get_commands(CommandScope::Global)
+        .await?
+        .model()?;
+    Ok(commands
+        .iter()
+        .map(command_name)
+        .filter(|name| name.starts_with(input))
+        .map(str::to_string)
+        .collect())
+}
+
+/// Describe one of this bot's commands
+#[command(name = "command-info")]
+pub async fn command_info(
+    ctx: Ctx<impl Platform>,
+    #[option("Command", autocomplete = command_names)] name: &str,
+) -> Result<Ephemeral<String>, HandlerError> {
+    let commands = ctx
+        .bot()?
+        .get_commands(CommandScope::Global)
+        .await?
+        .model()?;
+    let command = commands
+        .iter()
+        .find(|command| command_name(command) == name)
+        .ok_or_else(|| HandlerError::user(format!("No command named `{name}`.")))?;
+    Ok(Ephemeral(match command {
+        ApplicationCommand::ChatInputCommand(c) => format!("`/{name}`: {}", c.description),
+        ApplicationCommand::UserCommand(_) => format!("`{name}` is a user command"),
+        ApplicationCommand::MessageCommand(_) => format!("`{name}` is a message command"),
+    }))
+}
+
+fn command_name(command: &ApplicationCommand) -> &str {
+    match command {
+        ApplicationCommand::ChatInputCommand(c) => &c.details.name,
+        ApplicationCommand::UserCommand(c) => &c.name,
+        ApplicationCommand::MessageCommand(c) => &c.name,
+    }
 }
 
 /// Get your text back as a file
