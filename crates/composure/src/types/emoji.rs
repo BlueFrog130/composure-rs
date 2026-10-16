@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Role, Snowflake, User};
+use crate::types::{Snowflake, User};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PartialEmoji {
@@ -23,8 +23,8 @@ pub struct Emoji {
     /// emoji name
     pub name: Option<String>,
 
-    /// roles allowed to use this emoji
-    pub roles: Option<Vec<Role>>,
+    /// ids of the roles allowed to use this emoji
+    pub roles: Option<Vec<Snowflake>>,
 
     /// user that created this emoji
     pub user: Option<User>,

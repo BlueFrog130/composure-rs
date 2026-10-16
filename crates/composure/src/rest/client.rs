@@ -40,6 +40,8 @@ pub(crate) enum Body<'a, B: Serialize> {
     None,
     Json(&'a B),
     WithFiles(&'a B, &'a [File]),
+    /// Text fields and one file, without `payload_json`
+    Form(&'a [(&'a str, &'a str)], &'a File),
 }
 
 impl Body<'_, ()> {
@@ -100,6 +102,11 @@ impl<T: Transport> Rest<T> {
             }
             Body::WithFiles(body, files) => {
                 let (bytes, content_type) = multipart::encode(body, files)?;
+                headers.push(("Content-Type", content_type));
+                Some(bytes)
+            }
+            Body::Form(fields, file) => {
+                let (bytes, content_type) = multipart::encode_form(fields, file);
                 headers.push(("Content-Type", content_type));
                 Some(bytes)
             }

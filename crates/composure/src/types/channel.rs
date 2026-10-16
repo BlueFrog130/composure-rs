@@ -320,6 +320,21 @@ pub struct ThreadMetadata {
     pub create_timestamp: Option<String>,
 }
 
+/// Threads plus the bot's thread members, from the
+/// [list threads](https://discord.com/developers/docs/resources/channel#list-public-archived-threads)
+/// Endpoints
+#[derive(Debug, Clone, Deserialize)]
+pub struct ThreadList {
+    pub threads: Vec<Channel>,
+
+    /// The bot's membership in each thread it joined
+    pub members: Vec<ThreadMember>,
+
+    /// More archived threads are available (paging); absent for active threads
+    #[serde(default)]
+    pub has_more: bool,
+}
+
 /// [Thread Member Object](https://discord.com/developers/docs/resources/channel#thread-member-object)
 #[derive(Debug, Clone, Deserialize)]
 pub struct ThreadMember {

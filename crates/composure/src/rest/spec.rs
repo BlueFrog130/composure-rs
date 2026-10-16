@@ -22,6 +22,16 @@ fn implemented() -> Vec<Route> {
     routes.extend_from_slice(super::members::ROUTES);
     #[cfg(feature = "rest-roles")]
     routes.extend_from_slice(super::roles::ROUTES);
+    #[cfg(feature = "rest-bans")]
+    routes.extend_from_slice(super::bans::ROUTES);
+    #[cfg(feature = "rest-threads")]
+    routes.extend_from_slice(super::threads::ROUTES);
+    #[cfg(feature = "rest-invites")]
+    routes.extend_from_slice(super::invites::ROUTES);
+    #[cfg(feature = "rest-emojis")]
+    routes.extend_from_slice(super::emojis::ROUTES);
+    #[cfg(feature = "rest-stickers")]
+    routes.extend_from_slice(super::stickers::ROUTES);
     routes
 }
 

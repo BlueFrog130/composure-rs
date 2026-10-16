@@ -67,6 +67,32 @@ pub(crate) fn encode(payload: &impl Serialize, files: &[File]) -> Result<(Vec<u8
     Ok((body, format!("multipart/form-data; boundary={boundary}")))
 }
 
+/// A plain form: text fields plus one `file` part (sticker uploads)
+pub(crate) fn encode_form(fields: &[(&str, &str)], file: &File) -> (Vec<u8>, String) {
+    let text: Vec<u8> = fields.iter().flat_map(|(_, value)| value.bytes()).collect();
+    let boundary = boundary(&text, std::slice::from_ref(file));
+    let mut body = Vec::with_capacity(text.len() + file.bytes.len() + 200 * (fields.len() + 2));
+    for (name, value) in fields {
+        part_header(&mut body, &boundary, name, None, None);
+        body.extend_from_slice(value.as_bytes());
+        body.extend_from_slice(b"\r\n");
+    }
+    part_header(
+        &mut body,
+        &boundary,
+        "file",
+        Some(&file.name),
+        Some(
+            file.content_type
+                .as_deref()
+                .unwrap_or("application/octet-stream"),
+        ),
+    );
+    body.extend_from_slice(&file.bytes);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    (body, format!("multipart/form-data; boundary={boundary}"))
+}
+
 fn part_header(
     body: &mut Vec<u8>,
     boundary: &str,
@@ -132,6 +158,22 @@ mod tests {
                  {{\"attachments\":[{{\"description\":\"alt\",\"filename\":\"a.txt\",\"id\":0}}],\"content\":\"hi\"}}\r\n\
                  --{boundary}\r\nContent-Disposition: form-data; name=\"files[0]\"; filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\n\
                  hello\r\n--{boundary}--\r\n"
+            )
+        );
+    }
+
+    #[test]
+    fn encodes_forms() {
+        let file = File::new("s.png", b"PNG".to_vec()).content_type("image/png");
+        let (body, content_type) = encode_form(&[("name", "wave"), ("tags", "hi")], &file);
+        let boundary = content_type.rsplit('=').next().unwrap();
+        assert_eq!(
+            String::from_utf8(body).unwrap(),
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nwave\r\n\
+                 --{boundary}\r\nContent-Disposition: form-data; name=\"tags\"\r\n\r\nhi\r\n\
+                 --{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"s.png\"\r\nContent-Type: image/png\r\n\r\n\
+                 PNG\r\n--{boundary}--\r\n"
             )
         );
     }

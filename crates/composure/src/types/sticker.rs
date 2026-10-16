@@ -29,7 +29,7 @@ pub struct Sticker {
     pub t: StickerType,
 
     /// [type of sticker format](https://discord.com/developers/docs/resources/sticker#sticker-object-sticker-format-types)
-    pub format_type: i32,
+    pub format_type: Option<i32>,
 
     /// whether this guild sticker can be used, may be false due to loss of Server Boosts
     pub available: Option<bool>,

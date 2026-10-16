@@ -51,10 +51,20 @@ rest-guilds = ["rest"]
 rest-members = ["rest"]
 ## Roles on `BotClient`
 rest-roles = ["rest"]
+## Bans and bulk bans on `BotClient`
+rest-bans = ["rest"]
+## Threads: starting, membership, listing on `BotClient`
+rest-threads = ["rest", "rest-messages"]
+## Invites on `BotClient`
+rest-invites = ["rest"]
+## Guild and application emojis on `BotClient`
+rest-emojis = ["rest"]
+## Stickers on `BotClient`
+rest-stickers = ["rest"]
 ## What most bots need
 tier1 = ["rest", "rest-commands", "rest-messages", "rest-users", "rest-channels", "rest-guilds", "rest-members", "rest-roles"]
 ## Every Endpoint
-full = ["tier1"]
+full = ["tier1", "rest-bans", "rest-threads", "rest-invites", "rest-emojis", "rest-stickers"]
 ## Native blocking Transport for deploy-time tools (not for wasm)
 reqwest = ["rest", "dep:reqwest"]
 
