@@ -3,6 +3,10 @@
 //! [`InteractionClient`] needs only an Interaction's token; [`BotClient`] needs the bot token and
 //! gains Endpoints per `rest-*` feature.
 
+#[cfg(feature = "rest-audit-log")]
+mod audit_log;
+#[cfg(feature = "rest-automod")]
+mod automod;
 #[cfg(feature = "rest-bans")]
 mod bans;
 mod bot;
@@ -30,6 +34,8 @@ mod response;
 #[cfg(feature = "rest-roles")]
 mod roles;
 mod route;
+#[cfg(feature = "rest-scheduled-events")]
+mod scheduled_events;
 #[cfg(test)]
 mod spec;
 #[cfg(feature = "rest-stickers")]
@@ -41,7 +47,13 @@ mod threads;
 mod transport;
 #[cfg(feature = "rest-users")]
 mod users;
+#[cfg(feature = "rest-webhooks")]
+mod webhooks;
 
+#[cfg(feature = "rest-audit-log")]
+pub use audit_log::GetAuditLog;
+#[cfg(feature = "rest-automod")]
+pub use automod::AutoModerationRuleFields;
 #[cfg(feature = "rest-bans")]
 pub use bans::GetBans;
 pub use bot::BotClient;
@@ -69,8 +81,12 @@ pub use response::Response;
 #[cfg(feature = "rest-roles")]
 pub use roles::{RoleFields, RolePosition};
 pub use route::Route;
+#[cfg(feature = "rest-scheduled-events")]
+pub use scheduled_events::{GetScheduledEventUsers, ScheduledEventFields};
 #[cfg(feature = "rest-stickers")]
 pub use stickers::{CreateSticker, ModifySticker, StickerPack, StickerPacks};
 #[cfg(feature = "rest-threads")]
 pub use threads::{ArchivedThreads, StartForumThread, StartThread};
 pub use transport::{Method, RawResponse, Request, Transport, TransportError};
+#[cfg(feature = "rest-webhooks")]
+pub use webhooks::{ExecuteWebhook, WebhookClient, WebhookFields};

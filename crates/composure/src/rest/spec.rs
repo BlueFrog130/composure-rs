@@ -5,34 +5,44 @@ use std::collections::BTreeSet;
 
 use super::Route;
 
-fn implemented() -> Vec<Route> {
-    let mut routes = Vec::new();
-    routes.extend_from_slice(super::interaction::ROUTES);
+/// Route tables per module; a route may appear in two modules (webhook execution and
+/// interaction follow-ups share paths)
+fn modules() -> Vec<&'static [Route]> {
+    let mut modules = Vec::new();
+    modules.push(super::interaction::ROUTES);
     #[cfg(feature = "rest-commands")]
-    routes.extend_from_slice(super::commands::ROUTES);
+    modules.push(super::commands::ROUTES);
     #[cfg(feature = "rest-messages")]
-    routes.extend_from_slice(super::messages::ROUTES);
+    modules.push(super::messages::ROUTES);
     #[cfg(feature = "rest-users")]
-    routes.extend_from_slice(super::users::ROUTES);
+    modules.push(super::users::ROUTES);
     #[cfg(feature = "rest-channels")]
-    routes.extend_from_slice(super::channels::ROUTES);
+    modules.push(super::channels::ROUTES);
     #[cfg(feature = "rest-guilds")]
-    routes.extend_from_slice(super::guilds::ROUTES);
+    modules.push(super::guilds::ROUTES);
     #[cfg(feature = "rest-members")]
-    routes.extend_from_slice(super::members::ROUTES);
+    modules.push(super::members::ROUTES);
     #[cfg(feature = "rest-roles")]
-    routes.extend_from_slice(super::roles::ROUTES);
+    modules.push(super::roles::ROUTES);
     #[cfg(feature = "rest-bans")]
-    routes.extend_from_slice(super::bans::ROUTES);
+    modules.push(super::bans::ROUTES);
     #[cfg(feature = "rest-threads")]
-    routes.extend_from_slice(super::threads::ROUTES);
+    modules.push(super::threads::ROUTES);
     #[cfg(feature = "rest-invites")]
-    routes.extend_from_slice(super::invites::ROUTES);
+    modules.push(super::invites::ROUTES);
     #[cfg(feature = "rest-emojis")]
-    routes.extend_from_slice(super::emojis::ROUTES);
+    modules.push(super::emojis::ROUTES);
     #[cfg(feature = "rest-stickers")]
-    routes.extend_from_slice(super::stickers::ROUTES);
-    routes
+    modules.push(super::stickers::ROUTES);
+    #[cfg(feature = "rest-scheduled-events")]
+    modules.push(super::scheduled_events::ROUTES);
+    #[cfg(feature = "rest-automod")]
+    modules.push(super::automod::ROUTES);
+    #[cfg(feature = "rest-audit-log")]
+    modules.push(super::audit_log::ROUTES);
+    #[cfg(feature = "rest-webhooks")]
+    modules.push(super::webhooks::ROUTES);
+    modules
 }
 
 /// Parameter names differ between Endpoints sharing a path (`webhook_id` vs `application_id`),
@@ -69,6 +79,10 @@ fn spec_routes() -> BTreeSet<(String, String)> {
     routes
 }
 
+fn implemented() -> Vec<Route> {
+    modules().into_iter().flatten().copied().collect()
+}
+
 fn key(route: &Route) -> (String, String) {
     (route.method.as_str().to_string(), normalize(route.path))
 }
@@ -85,10 +99,15 @@ fn implemented_routes_exist_in_spec() {
 }
 
 #[test]
-fn implemented_routes_are_unique() {
-    let routes = implemented();
-    let unique: BTreeSet<_> = routes.iter().map(key).collect();
-    assert_eq!(unique.len(), routes.len(), "an Endpoint is declared twice");
+fn implemented_routes_are_unique_per_module() {
+    for routes in modules() {
+        let unique: BTreeSet<_> = routes.iter().map(key).collect();
+        assert_eq!(
+            unique.len(),
+            routes.len(),
+            "an Endpoint is declared twice in {routes:?}"
+        );
+    }
 }
 
 /// Not a check: `cargo test -p composure --all-features unimplemented -- --nocapture`
