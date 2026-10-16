@@ -3,7 +3,7 @@
 
 use composure::{
     Choice, Ctx, command,
-    command::{HandlerError, InteractionHandler},
+    command::{Ephemeral, HandlerError, InteractionHandler},
     commands, group,
     models::{Embed, InteractionResponse, Message, MessageComponentInteraction, User},
 };
@@ -28,13 +28,13 @@ pub fn hello(ctx: Ctx) -> String {
 /// Repeat some text
 #[command]
 pub fn echo(
-    #[option(desc = "What to say", max_len = 200)] text: String,
-    #[option(desc = "How many times", min = 1, max = 5)] times: Option<u8>,
+    #[option("What to say", max_len = 200)] text: &str,
+    #[option("How many times", min = 1, max = 5)] times: Option<u8>,
 ) -> String {
     vec![text; times.unwrap_or(1).into()].join(" ")
 }
 
-#[derive(Choice, Debug)]
+#[derive(Choice)]
 pub enum Flavor {
     Vanilla,
     Chocolate,
@@ -45,41 +45,56 @@ pub enum Flavor {
 /// Order ice cream
 #[command(name = "ice-cream")]
 pub fn ice_cream(
-    #[option(desc = "Flavor")] flavor: Flavor,
-    #[option(desc = "Scoops")] scoops: Option<u8>,
+    #[option("Flavor")] flavor: Flavor,
+    #[option("Scoops")] scoops: Option<u8>,
 ) -> Embed {
     Embed::new()
-        .with_title(&format!("{} x {flavor:?}", scoops.unwrap_or(1)))
+        .with_title(&format!("{} x {}", scoops.unwrap_or(1), flavor.name()))
         .with_color(0xf5c2e7)
 }
 
-/// Greet with the GREETING var from wrangler.toml
+/// What `/greet` needs from the State: `worker::Env` on Workers, a stand-in in tests
+pub trait Vars {
+    fn var(&self, name: &str) -> Option<String>;
+}
+
+impl Vars for Env {
+    fn var(&self, name: &str) -> Option<String> {
+        Env::var(self, name).ok().map(|var| var.to_string())
+    }
+}
+
+/// Greet with the GREETING var from wrangler.jsonc
 #[command]
-pub async fn greet(ctx: Ctx<Env>) -> Result<String, worker::Error> {
-    let greeting = ctx.state().var("GREETING")?.to_string();
+pub fn greet(ctx: Ctx<impl Vars>) -> Result<String, HandlerError> {
+    let greeting = ctx
+        .state()
+        .var("GREETING")
+        .ok_or_else(|| HandlerError::new("GREETING is not set"))?;
     Ok(format!("{greeting} from the worker!"))
 }
 
 /// Ban a member
 #[command]
 pub fn ban(
-    #[option(desc = "Who to ban")] user: User,
-    #[option(desc = "Why")] reason: Option<String>,
-) -> InteractionResponse {
-    InteractionResponse::respond_with_ephemeral_message(format!(
+    ctx: Ctx,
+    #[option("Who to ban")] user: &User,
+    #[option("Why")] reason: Option<&str>,
+) -> Result<Ephemeral<String>, HandlerError> {
+    if ctx.user().is_some_and(|me| me.id == user.id) {
+        return Err(HandlerError::user("You can't ban yourself."));
+    }
+    Ok(Ephemeral(format!(
         "Would ban {} ({})",
         user.display_name(),
-        reason.as_deref().unwrap_or("no reason")
-    ))
+        reason.unwrap_or("no reason")
+    )))
 }
 
 /// Kick a member
 #[command]
-pub fn kick(#[option(desc = "Who to kick")] user: User) -> InteractionResponse {
-    InteractionResponse::respond_with_ephemeral_message(format!(
-        "Would kick {}",
-        user.display_name()
-    ))
+pub fn kick(#[option("Who to kick")] user: &User) -> Ephemeral<String> {
+    Ephemeral(format!("Would kick {}", user.display_name()))
 }
 
 /// Moderation tools (dev guild only)
@@ -88,7 +103,7 @@ pub struct Mod;
 
 /// Shows a user's avatar
 #[command(user, name = "Avatar")]
-pub fn avatar(target: User) -> String {
+pub fn avatar(target: &User) -> String {
     match &target.avatar {
         Some(hash) => format!(
             "https://cdn.discordapp.com/avatars/{}/{hash}.png",
@@ -100,7 +115,7 @@ pub fn avatar(target: User) -> String {
 
 /// Counts the words in a message
 #[command(message, name = "Word count")]
-pub fn word_count(target: Message) -> String {
+pub fn word_count(target: &Message) -> String {
     format!("{} words", target.content.split_whitespace().count())
 }
 

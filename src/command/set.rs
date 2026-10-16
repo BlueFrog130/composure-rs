@@ -229,3 +229,61 @@ pub trait CommandSet<S> {
 pub trait CommandSetDefinition {
     fn definitions() -> Vec<ScopedDefinition>;
 }
+
+/// Compile-time checks for the Commands of a Command Set or Group, as `(name, kind, scope)`: no
+/// two share a name and kind, and no Scope exceeds Discord's per-kind limit. Used by
+/// [`commands!`](crate::commands) and `#[group]`.
+#[doc(hidden)]
+pub const fn check_commands(commands: &[(&str, ApplicationCommandType, Option<&str>)]) {
+    let mut i = 0;
+    while i < commands.len() {
+        let (name, kind, scope) = commands[i];
+        let limit = match kind {
+            ApplicationCommandType::ChatInput => 100,
+            ApplicationCommandType::User | ApplicationCommandType::Message => 15,
+        };
+        let mut same_scope = 0;
+        let mut j = 0;
+        while j < commands.len() {
+            let (other_name, other_kind, other_scope) = commands[j];
+            if kind as u8 == other_kind as u8 {
+                if j != i && str_eq(name, other_name) {
+                    panic!("two commands have the same name and type");
+                }
+                if scope_eq(scope, other_scope) {
+                    same_scope += 1;
+                }
+            }
+            j += 1;
+        }
+        if same_scope > limit {
+            panic!(
+                "too many commands of one type in one scope: Discord allows 100 chat-input, 15 user, and 15 message commands"
+            );
+        }
+        i += 1;
+    }
+}
+
+const fn str_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+const fn scope_eq(a: Option<&str>, b: Option<&str>) -> bool {
+    match (a, b) {
+        (Some(a), Some(b)) => str_eq(a, b),
+        (None, None) => true,
+        _ => false,
+    }
+}

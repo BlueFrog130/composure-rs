@@ -5,10 +5,10 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 | Command | Shows |
 |---|---|
 | `/hello` | `Ctx` (invoking user/member), user-install contexts |
-| `/echo` | Options with constraints, optional Option |
-| `/ice-cream` | `#[derive(Choice)]`, `name` override, `Embed` response |
-| `/greet` | `Ctx<Env>` State, `Result` response |
-| `/mod ban`, `/mod kick` | `#[group]` with `scope = "dev"` and permissions |
+| `/echo` | Options with constraints, optional Option, borrowed `&str` |
+| `/ice-cream` | `#[derive(Choice)]` and its `name()`, `name` override, `Embed` response |
+| `/greet` | `Ctx<impl Vars>`: a bounded State, `worker::Env` on Workers and a stand-in in tests |
+| `/mod ban`, `/mod kick` | `#[group]` with `scope = "dev"` and permissions, `Ephemeral` replies, `HandlerError::user` |
 | Avatar (user), Word count (message) | Context-menu commands |
 
 Components go to `Components` via `Bot.with_fallback(Components)`.
@@ -54,4 +54,4 @@ Set the Interactions Endpoint URL to `https://composure-commands-example.<subdom
 
 ## Test
 
-`cargo test -p composure_example_commands` sends signed interactions through `handle_interaction` on the host (everything except `/greet`, which needs the Workers `Env`).
+`cargo test -p composure_example_commands` sends signed interactions through `handle_interaction` on the host, with a stand-in for `worker::Env` as State.

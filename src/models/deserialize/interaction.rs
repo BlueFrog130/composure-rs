@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Deserializer};
-use serde_json::Value;
+use serde::{Deserialize, Deserializer, de, de::DeserializeOwned};
+use serde_json::{Value, value::RawValue};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::models::{
@@ -28,41 +28,60 @@ impl<'de> Deserialize<'de> for Interaction {
     where
         D: Deserializer<'de>,
     {
-        let value = Value::deserialize(deserializer)?;
+        let envelope = Envelope::deserialize(deserializer)?;
+        let common = InteractionCommon {
+            id: envelope.id,
+            application_id: envelope.application_id,
+            guild_id: envelope.guild_id,
+            channel: envelope.channel,
+            channel_id: envelope.channel_id,
+            member: envelope.member,
+            user: envelope.user,
+            token: envelope.token,
+            version: envelope.version,
+            app_permissions: envelope.app_permissions,
+            guild_locale: envelope.guild_locale,
+            authorizing_integration_owners: envelope.authorizing_integration_owners,
+            context: envelope.context,
+        };
+        let (locale, data) = (envelope.locale, envelope.data);
 
-        let t = value
-            .get("type")
-            .and_then(Value::as_u64)
-            .ok_or(serde::de::Error::missing_field("type"))?;
-
-        match t {
-            // Ping
-            1 => Ok(Interaction::Ping(
-                PingInteraction::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            // Application Command
-            2 => Ok(Interaction::ApplicationCommand(
-                DataInteraction::<ApplicationCommandInteractionData>::deserialize(value)
-                    .map_err(serde::de::Error::custom)?,
-            )),
-            // Message Component
-            3 => Ok(Interaction::MessageComponent(
-                DataInteraction::<MessageComponentData>::deserialize(value)
-                    .map_err(serde::de::Error::custom)?,
-            )),
-            // Autocomplete
-            4 => Ok(Interaction::ApplicationCommandAutocomplete(
-                DataInteraction::<ApplicationCommandInteractionData>::deserialize(value)
-                    .map_err(serde::de::Error::custom)?,
-            )),
-            // Modal Submit
-            5 => Ok(Interaction::ModalSubmit(
-                DataInteraction::<ModalSubmitData>::deserialize(value)
-                    .map_err(serde::de::Error::custom)?,
-            )),
-            _ => Err(serde::de::Error::custom("Unknown interaction")),
-        }
+        Ok(match envelope.t {
+            1 => Interaction::Ping(PingInteraction { common }),
+            2 => Interaction::ApplicationCommand(DataInteraction::new(common, locale, data)?),
+            3 => Interaction::MessageComponent(DataInteraction::new(common, locale, data)?),
+            4 => Interaction::ApplicationCommandAutocomplete(DataInteraction::new(
+                common, locale, data,
+            )?),
+            5 => Interaction::ModalSubmit(DataInteraction::new(common, locale, data)?),
+            _ => return Err(de::Error::custom("unknown interaction type")),
+        })
     }
+}
+
+/// An Interaction read in one pass: the common fields typed, and `data` kept as raw JSON until
+/// `type` says what it is (Discord does not send `type` first)
+#[derive(Deserialize)]
+struct Envelope {
+    #[serde(rename = "type")]
+    t: u8,
+    locale: Option<String>,
+    data: Option<Box<RawValue>>,
+
+    id: Snowflake,
+    application_id: Snowflake,
+    guild_id: Option<Snowflake>,
+    channel: Option<Channel>,
+    channel_id: Option<Snowflake>,
+    member: Option<Member>,
+    user: Option<User>,
+    token: String,
+    version: u8,
+    app_permissions: Option<Permissions>,
+    guild_locale: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_integration_owners")]
+    authorizing_integration_owners: HashMap<ApplicationIntegrationType, Snowflake>,
+    context: Option<InteractionContextType>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -143,18 +162,31 @@ impl InteractionCommon {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct PingInteraction {
-    #[serde(flatten)]
     pub common: InteractionCommon,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct DataInteraction<D> {
-    #[serde(flatten)]
     pub common: InteractionCommon,
     pub locale: Option<String>,
     pub data: D,
+}
+
+impl<D: DeserializeOwned> DataInteraction<D> {
+    fn new<E: de::Error>(
+        common: InteractionCommon,
+        locale: Option<String>,
+        data: Option<Box<RawValue>>,
+    ) -> Result<Self, E> {
+        let data = data.ok_or_else(|| E::missing_field("data"))?;
+        Ok(Self {
+            common,
+            locale,
+            data: serde_json::from_str(data.get()).map_err(E::custom)?,
+        })
+    }
 }
 
 /// [Interaction Data](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-data)
@@ -411,68 +443,131 @@ impl<'de> Deserialize<'de> for ApplicationCommandInteractionDataOption {
     where
         D: Deserializer<'de>,
     {
-        let value = Value::deserialize(deserializer)?;
+        use ApplicationCommandInteractionDataOption as O;
+        use RawOptionValue as V;
 
-        let t = value
-            .get("type")
-            .and_then(Value::as_u64)
-            .ok_or(serde::de::Error::missing_field("type"))?;
+        let RawOption {
+            name,
+            t,
+            value,
+            options,
+            focused,
+        } = RawOption::deserialize(deserializer)?;
 
-        if value.get("focused").and_then(Value::as_bool) == Some(true) && t > 2 {
-            let name = value
-                .get("name")
-                .and_then(Value::as_str)
-                .ok_or(serde::de::Error::missing_field("name"))?;
-            let typed = match value.get("value") {
-                Some(Value::String(s)) => s.clone(),
-                Some(Value::Null) | None => String::new(),
-                Some(other) => other.to_string(),
+        if focused == Some(true) && t > 2 {
+            let value = match value {
+                Some(V::String(s)) => s,
+                Some(V::Integer(i)) => i.to_string(),
+                Some(V::Number(n)) => n.to_string(),
+                Some(V::Boolean(b)) => b.to_string(),
+                None => String::new(),
             };
-            return Ok(ApplicationCommandInteractionDataOption::Focused(
-                FocusedOption {
-                    name: name.to_string(),
-                    t: t as u8,
-                    value: typed,
-                },
-            ));
+            return Ok(O::Focused(FocusedOption { name, t, value }));
         }
 
-        match t {
-            1 => Ok(ApplicationCommandInteractionDataOption::Subcommand(
-                Subcommand::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            2 => Ok(ApplicationCommandInteractionDataOption::SubcommandGroup(
-                SubcommandGroup::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            3 => Ok(ApplicationCommandInteractionDataOption::String(
-                ValueOption::<String>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            4 => Ok(ApplicationCommandInteractionDataOption::Integer(
-                ValueOption::<i64>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            5 => Ok(ApplicationCommandInteractionDataOption::Boolean(
-                ValueOption::<bool>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            6 => Ok(ApplicationCommandInteractionDataOption::User(
-                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            7 => Ok(ApplicationCommandInteractionDataOption::Channel(
-                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            8 => Ok(ApplicationCommandInteractionDataOption::Role(
-                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            9 => Ok(ApplicationCommandInteractionDataOption::Mentionable(
-                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            10 => Ok(ApplicationCommandInteractionDataOption::Number(
-                ValueOption::<f64>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            11 => Ok(ApplicationCommandInteractionDataOption::Attachment(
-                ValueOption::<Snowflake>::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            _ => Err(serde::de::Error::custom("Unknown option")),
+        Ok(match (t, value) {
+            (1, _) => O::Subcommand(Subcommand {
+                name,
+                options: OptionList(options.unwrap_or_default()),
+                focused,
+            }),
+            (2, _) => match options.and_then(|o| o.into_iter().next()) {
+                Some(O::Subcommand(subcommand)) => O::SubcommandGroup(SubcommandGroup {
+                    name,
+                    subcommand,
+                    focused,
+                }),
+                _ => return Err(de::Error::custom("subcommand group without a subcommand")),
+            },
+            (3, Some(V::String(s))) => O::String(ValueOption::new(name, s, focused)),
+            (4, Some(V::Integer(i))) => O::Integer(ValueOption::new(name, i, focused)),
+            (5, Some(V::Boolean(b))) => O::Boolean(ValueOption::new(name, b, focused)),
+            (10, Some(V::Number(n))) => O::Number(ValueOption::new(name, n, focused)),
+            // Discord sends whole numbers without a fraction
+            (10, Some(V::Integer(i))) => O::Number(ValueOption::new(name, i as f64, focused)),
+            (6..=9 | 11, Some(V::String(s))) => {
+                let Ok(id) = s.parse() else {
+                    return Err(de::Error::custom(format_args!(
+                        "option `{name}`: invalid id"
+                    )));
+                };
+                let option = ValueOption::new(name, id, focused);
+                match t {
+                    6 => O::User(option),
+                    7 => O::Channel(option),
+                    8 => O::Role(option),
+                    9 => O::Mentionable(option),
+                    _ => O::Attachment(option),
+                }
+            }
+            (3..=11, _) => {
+                return Err(de::Error::custom(format_args!(
+                    "option `{name}`: value does not match type {t}"
+                )));
+            }
+            _ => return Err(de::Error::custom("unknown option type")),
+        })
+    }
+}
+
+/// An option read in one pass; turned into the variant its `type` names
+#[derive(Deserialize)]
+struct RawOption {
+    name: String,
+    #[serde(rename = "type")]
+    t: u8,
+    value: Option<RawOptionValue>,
+    options: Option<Vec<ApplicationCommandInteractionDataOption>>,
+    focused: Option<bool>,
+}
+
+/// An option `value` as JSON sent it
+enum RawOptionValue {
+    String(String),
+    Integer(i64),
+    Number(f64),
+    Boolean(bool),
+}
+
+impl<'de> Deserialize<'de> for RawOptionValue {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+
+        impl de::Visitor<'_> for Visitor {
+            type Value = RawOptionValue;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a string, number, or boolean")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(RawOptionValue::String(v.to_string()))
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(RawOptionValue::String(v))
+            }
+
+            fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
+                Ok(RawOptionValue::Integer(v))
+            }
+
+            fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
+                i64::try_from(v)
+                    .map(RawOptionValue::Integer)
+                    .map_err(|_| E::invalid_value(de::Unexpected::Unsigned(v), &self))
+            }
+
+            fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
+                Ok(RawOptionValue::Number(v))
+            }
+
+            fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
+                Ok(RawOptionValue::Boolean(v))
+            }
         }
+
+        deserializer.deserialize_any(Visitor)
     }
 }
 
@@ -663,6 +758,16 @@ pub struct ValueOption<T> {
 
     /// true if this option is the currently focused option for autocomplete
     pub focused: Option<bool>,
+}
+
+impl<T> ValueOption<T> {
+    fn new(name: String, value: T, focused: Option<bool>) -> Self {
+        Self {
+            name,
+            value,
+            focused,
+        }
+    }
 }
 
 /// [Application Command Types](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-types)

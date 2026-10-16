@@ -21,7 +21,7 @@ impl Settings {
     pub fn parse(&mut self, meta: &ParseNestedMeta) -> syn::Result<bool> {
         if meta.path.is_ident("name") {
             self.name = Some(meta.value()?.parse()?);
-        } else if meta.path.is_ident("desc") || meta.path.is_ident("description") {
+        } else if meta.path.is_ident("desc") {
             self.desc = Some(meta.value()?.parse()?);
         } else if meta.path.is_ident("scope") {
             let scope: LitStr = meta.value()?.parse()?;
@@ -199,20 +199,44 @@ fn validate_scope(scope: &LitStr) -> syn::Result<()> {
     Ok(())
 }
 
-/// `RoleTools` -> `role_tools`
+/// `RoleTools` -> `role_tools`, `HTTPTools` -> `http_tools`
 pub fn snake_case(ident: &Ident) -> String {
+    let chars: Vec<char> = ident.to_string().chars().collect();
     let mut out = String::new();
-    for (i, c) in ident.to_string().chars().enumerate() {
-        if c.is_uppercase() {
-            if i > 0 {
+    for (i, &c) in chars.iter().enumerate() {
+        if c.is_uppercase() && i > 0 {
+            let previous = chars[i - 1];
+            let next_is_lower = chars.get(i + 1).is_some_and(|n| n.is_lowercase());
+            // A new word starts after a lowercase letter or digit, or at the last capital of
+            // an acronym followed by lowercase
+            if previous.is_lowercase()
+                || previous.is_ascii_digit()
+                || (previous.is_uppercase() && next_is_lower)
+            {
                 out.push('_');
             }
-            out.extend(c.to_lowercase());
-        } else {
-            out.push(c);
         }
+        out.extend(c.to_lowercase());
     }
     out
+}
+
+/// An integer literal, optionally negated
+pub fn integer(expr: &Expr) -> syn::Result<i64> {
+    match expr {
+        Expr::Lit(ExprLit {
+            lit: Lit::Int(i), ..
+        }) => i.base10_parse(),
+        Expr::Unary(syn::ExprUnary {
+            op: syn::UnOp::Neg(_),
+            expr,
+            ..
+        }) => integer(expr).map(|v| -v),
+        _ => Err(syn::Error::new_spanned(
+            expr.to_token_stream(),
+            "expected an integer literal",
+        )),
+    }
 }
 
 /// A numeric literal, optionally negated, as `f64`
@@ -233,5 +257,20 @@ pub fn number(expr: &Expr) -> syn::Result<f64> {
             expr.to_token_stream(),
             "expected a number literal",
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snake_case_keeps_acronyms_together() {
+        let case = |name| snake_case(&Ident::new(name, Span::call_site()));
+        assert_eq!(case("Mod"), "mod");
+        assert_eq!(case("RoleTools"), "role_tools");
+        assert_eq!(case("HTTPTools"), "http_tools");
+        assert_eq!(case("ToolsV2"), "tools_v2");
+        assert_eq!(case("IOError"), "io_error");
     }
 }

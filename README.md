@@ -14,14 +14,13 @@ Composure is a lightweight interaction bot that aims to run on the edge. Everyth
 - Flexible [adapter](#adapters) system
 
 ```rust,ignore
-use composure::{Ctx, command, commands};
+use composure::{command, commands};
 
 /// Repeat some text
 #[command]
 fn echo(
-    _ctx: Ctx,
-    #[option(desc = "What to say", max_len = 200)] text: String,
-    #[option(desc = "How many times", min = 1, max = 5)] times: Option<u8>,
+    #[option("What to say", max_len = 200)] text: &str,
+    #[option("How many times", min = 1, max = 5)] times: Option<u8>,
 ) -> String {
     text.repeat(times.unwrap_or(1).into())
 }

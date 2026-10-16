@@ -1,21 +1,19 @@
 //! Signed interactions through `handle_interaction` on the host, and the Definitions Sync would
-//! publish. `greet` needs the Workers `Env`, so it is only checked for its Definition.
+//! publish. `TestEnv` stands in for `worker::Env` as State.
 
-use composure::{
-    command::{CommandSetDefinition, InteractionHandler},
-    commands,
-};
+use composure::command::{CommandSetDefinition, InteractionHandler};
 use composure_adapter_cloudflare::handle_interaction;
-use composure_example_commands::{
-    Bot, Components, Mod, avatar, echo, hello, ice_cream, word_count,
-};
+use composure_example_commands::{Bot, Components, Vars};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
 use serde_json::{Value, json};
 
-// The same commands minus `greet`, which needs `worker::Env` as State
-commands! {
-    struct HostBot = [hello, echo, ice_cream, Mod, avatar, word_count];
+struct TestEnv;
+
+impl Vars for TestEnv {
+    fn var(&self, name: &str) -> Option<String> {
+        (name == "GREETING").then(|| "Howdy".to_string())
+    }
 }
 
 const KEY: [u8; 32] = [7; 32];
@@ -26,7 +24,7 @@ fn alice() -> Value {
     json!({ "id": ALICE, "username": "alice", "discriminator": "0", "global_name": "Alice", "avatar": "abc" })
 }
 
-fn send(handler: &impl InteractionHandler<()>, payload: Value) -> (u16, Value) {
+fn send(handler: &impl InteractionHandler<TestEnv>, payload: Value) -> (u16, Value) {
     let body = payload.to_string().into_bytes();
     let key = SigningKey::from_bytes(&KEY);
     let signature = hex::encode(key.sign(&[TIMESTAMP.as_bytes(), &body].concat()).to_bytes());
@@ -36,7 +34,7 @@ fn send(handler: &impl InteractionHandler<()>, payload: Value) -> (u16, Value) {
         Some(TIMESTAMP),
         &body,
         handler,
-        &(),
+        &TestEnv,
     ));
     let response = outcome
         .response()
@@ -58,7 +56,7 @@ fn command(data: Value) -> Value {
 }
 
 fn content(payload: Value) -> String {
-    let (status, response) = send(&HostBot, payload);
+    let (status, response) = send(&Bot, payload);
     assert_eq!(status, 200, "{response}");
     response["data"]["content"]
         .as_str()
@@ -83,14 +81,19 @@ fn chat_input_commands() {
     );
 
     let (_, response) = send(
-        &HostBot,
+        &Bot,
         command(
             json!({ "id": "1", "name": "ice-cream", "type": 1, "options": [
             { "name": "flavor", "type": 3, "value": "mint" },
         ] }),
         ),
     );
-    assert_eq!(response["data"]["embeds"][0]["title"], "1 x MintChip");
+    assert_eq!(response["data"]["embeds"][0]["title"], "1 x Mint chip");
+
+    assert_eq!(
+        content(command(json!({ "id": "1", "name": "greet", "type": 1 }))),
+        "Howdy from the worker!"
+    );
 }
 
 #[test]
@@ -100,7 +103,22 @@ fn group_and_context_menu_commands() {
         "options": [{ "name": "ban", "type": 1, "options": [{ "name": "user", "type": 6, "value": ALICE }] }],
         "resolved": { "users": { ALICE: alice() } },
     }));
-    assert_eq!(content(ban), "Would ban Alice (no reason)");
+    let (_, response) = send(&Bot, ban);
+    assert_eq!(response["data"]["content"], "You can't ban yourself.");
+    assert_eq!(response["data"]["flags"], 64);
+
+    let bob = json!({ "id": "100000000000000002", "username": "bob", "discriminator": "0", "global_name": "Bob" });
+    let ban = command(json!({
+        "id": "1", "name": "mod", "type": 1,
+        "options": [{ "name": "ban", "type": 1, "options": [
+            { "name": "user", "type": 6, "value": "100000000000000002" },
+            { "name": "reason", "type": 3, "value": "spam" },
+        ] }],
+        "resolved": { "users": { "100000000000000002": bob } },
+    }));
+    let (_, response) = send(&Bot, ban);
+    assert_eq!(response["data"]["content"], "Would ban Bob (spam)");
+    assert_eq!(response["data"]["flags"], 64);
 
     let avatar = command(json!({
         "id": "1", "name": "Avatar", "type": 2, "target_id": ALICE,
@@ -115,7 +133,7 @@ fn group_and_context_menu_commands() {
 #[test]
 fn errors_become_ephemeral_messages() {
     let (status, response) = send(
-        &HostBot,
+        &Bot,
         command(json!({ "id": "1", "name": "nope", "type": 1 })),
     );
     assert_eq!(status, 200);
@@ -124,7 +142,7 @@ fn errors_become_ephemeral_messages() {
 
     // `text` is required
     let (_, response) = send(
-        &HostBot,
+        &Bot,
         command(json!({ "id": "1", "name": "echo", "type": 1 })),
     );
     assert_eq!(response["data"]["flags"], 64);
@@ -136,7 +154,7 @@ fn fallback_handles_components() {
         "id": "1", "application_id": "1", "type": 3, "token": "t", "version": 1,
         "data": { "custom_id": "button", "component_type": 2 },
     });
-    let (_, response) = send(&HostBot.with_fallback(Components), click);
+    let (_, response) = send(&Bot.with_fallback(Components), click);
     assert_eq!(response["data"]["content"], "Clicked button");
 }
 

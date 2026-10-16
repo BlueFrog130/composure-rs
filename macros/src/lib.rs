@@ -16,17 +16,19 @@ mod meta;
 /// #[command(scope = "dev", permissions = Permissions::BanMembers)]
 /// async fn ban(
 ///     ctx: Ctx<Env>,
-///     #[option(desc = "Who to ban")] user: User,
-///     #[option(desc = "Days of messages to delete", min = 0, max = 7)] days: Option<u8>,
-/// ) -> Result<String, worker::Error> { ... }
+///     #[option("Who to ban")] user: &User,
+///     #[option("Days of messages to delete", min = 0, max = 7)] days: Option<u8>,
+/// ) -> Result<Ephemeral<String>, HandlerError> { ... }
 /// ```
 ///
-/// - `ctx: Ctx` works with any State; `ctx: Ctx<T>` only with State `T`
-/// - `Option<T>` parameters are not required
+/// - `ctx: Ctx` works with any State, `ctx: Ctx<T>` only with State `T`, and `ctx: Ctx<impl
+///   Bound>` (or `fn f<S: Bound>(ctx: Ctx<S>)`) with any State meeting the bound
+/// - `Option<T>` parameters are not required; `&str`, `&User`, `&Role`, `&PartialChannel`,
+///   `&Attachment`, and `&Message` borrow from the Interaction instead of copying
 /// - Settings: `name`, `desc`, `scope`, `permissions`, `contexts(...)`,
 ///   `integration_types(...)`, `nsfw`, and `user` / `message` for context-menu commands, which
-///   take one target parameter (`User`, `ResolvedMember`, or `Message`)
-/// - `#[option(...)]`: `desc` (required), `name`, `min`, `max`, `min_len`, `max_len`,
+///   take one target parameter (`User`, `ResolvedMember`, or `Message`, owned or borrowed)
+/// - `#[option("Description", ...)]` then `name`, `min`, `max`, `min_len`, `max_len`,
 ///   `channel_types(...)`
 ///
 /// The function stays callable as written; a same-named empty struct is added for
@@ -58,7 +60,7 @@ pub fn group(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Makes a fieldless enum usable as an Option restricted to its variants. Values are the
 /// variant names unless every variant sets an integer `#[choice(value = N)]`; `#[choice(name =
-/// "...")]` sets the name shown to users.
+/// "...")]` sets the name shown to users. Adds `name()` and `value()` for the chosen variant.
 #[proc_macro_derive(Choice, attributes(choice))]
 pub fn derive_choice(item: TokenStream) -> TokenStream {
     choice::expand(item.into())

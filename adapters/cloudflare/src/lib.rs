@@ -2,7 +2,7 @@
 
 pub use composure::command::{HandlerError, InteractionHandler, NoHandler};
 use composure::{
-    command::dispatch,
+    command::{ErrorKind, dispatch},
     models::{Interaction, InteractionResponse},
 };
 use worker::{Env, Headers, Request, Response, console_debug, console_error, console_warn};
@@ -210,7 +210,12 @@ impl<H: InteractionHandler<Env>> CloudflareInteractionBot<H> {
             }
             InteractionOutcome::Respond(response) => Response::from_json(&response),
             InteractionOutcome::HandlerFailed { error, response } => {
-                console_error!("Handler error: {}", error);
+                // User errors are expected outcomes the user already sees
+                if error.kind() == ErrorKind::User {
+                    console_debug!("User error: {}", error);
+                } else {
+                    console_error!("Handler error: {}", error);
+                }
                 Response::from_json(&response)
             }
         }

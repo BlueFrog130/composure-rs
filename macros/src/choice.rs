@@ -67,7 +67,7 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                         Value::String(lit.value())
                     } else {
                         let expr: syn::Expr = input.parse()?;
-                        Value::Integer(crate::meta::number(&expr)? as i64)
+                        Value::Integer(crate::meta::integer(&expr)?)
                     };
                 } else {
                     return Err(meta.error("unknown choice setting; expected `name` or `value`"));
@@ -92,20 +92,45 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
         ));
     }
 
-    let (option_type, definition, extract) = if integer {
+    for (i, (variant, name, _)) in variants.iter().enumerate() {
+        if variants[..i].iter().any(|(_, other, _)| other == name) {
+            return Err(syn::Error::new(
+                variant.span(),
+                format!("duplicate choice name `{name}`"),
+            ));
+        }
+    }
+
+    let names = variants
+        .iter()
+        .map(|(variant, name, _)| quote!(Self::#variant => #name,));
+    let (option_type, definition, extract, value_type, value_arms) = if integer {
         let pairs = variants.iter().map(|(_, name, value)| {
             let Value::Integer(value) = value else {
                 unreachable!()
             };
             quote!((#name, #value))
         });
-        let arms = variants.iter().map(|(variant, _, value)| {
-            let Value::Integer(value) = value else {
-                unreachable!()
-            };
-            let value = LitInt::new(&value.to_string(), variant.span());
-            quote!(#value => ::core::result::Result::Ok(Self::#variant),)
-        });
+        let values: Vec<i64> = variants
+            .iter()
+            .map(|(_, _, value)| match value {
+                Value::Integer(value) => *value,
+                _ => unreachable!(),
+            })
+            .collect();
+        duplicate_value(&variants, &values)?;
+        let arms = variants
+            .iter()
+            .zip(&values)
+            .map(|((variant, _, _), value)| {
+                let value = LitInt::new(&value.to_string(), variant.span());
+                quote!(#value => ::core::result::Result::Ok(Self::#variant),)
+            });
+        let value_arms: Vec<_> = variants
+            .iter()
+            .zip(&values)
+            .map(|((variant, _, _), value)| quote!(Self::#variant => #value,))
+            .collect();
         (
             4u8,
             quote! { ::composure::command::integer_choices(meta, required, &[#(#pairs),*]) },
@@ -115,6 +140,8 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                     _ => ::core::result::Result::Err(::composure::command::OptionError::UnknownChoice),
                 }
             },
+            quote!(i64),
+            value_arms,
         )
     } else {
         let values: Vec<String> = variants
@@ -123,6 +150,12 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                 Value::String(value) => value.clone(),
                 _ => variant.to_string(),
             })
+            .collect();
+        duplicate_value(&variants, &values)?;
+        let value_arms: Vec<_> = variants
+            .iter()
+            .zip(&values)
+            .map(|((variant, _, _), value)| quote!(Self::#variant => #value,))
             .collect();
         let pairs = variants
             .iter()
@@ -141,11 +174,29 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                     _ => ::core::result::Result::Err(::composure::command::OptionError::UnknownChoice),
                 }
             },
+            quote!(&'static str),
+            value_arms,
         )
     };
 
     Ok(quote! {
-        impl ::composure::command::OptionType for #ident {
+        impl #ident {
+            /// The name users see for this choice
+            pub const fn name(&self) -> &'static str {
+                match self {
+                    #(#names)*
+                }
+            }
+
+            /// The value Discord sends for this choice
+            pub const fn value(&self) -> #value_type {
+                match self {
+                    #(#value_arms)*
+                }
+            }
+        }
+
+        impl ::composure::command::OptionType<'_> for #ident {
             const OPTION_TYPE: u8 = #option_type;
 
             fn definition(
@@ -163,4 +214,19 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
             }
         }
     })
+}
+
+fn duplicate_value<T: PartialEq + std::fmt::Display>(
+    variants: &[(syn::Ident, String, Value)],
+    values: &[T],
+) -> syn::Result<()> {
+    for (i, value) in values.iter().enumerate() {
+        if values[..i].contains(value) {
+            return Err(syn::Error::new(
+                variants[i].0.span(),
+                format!("duplicate choice value `{value}`"),
+            ));
+        }
+    }
+    Ok(())
 }

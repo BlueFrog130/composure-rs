@@ -67,7 +67,10 @@ impl fmt::Display for OptionError {
 
 /// A Rust type usable as a Command parameter: knows its Option Definition and how to read its
 /// value from an Interaction. `Option<T>` makes any `T` not required.
-pub trait OptionType: Sized {
+///
+/// `'a` is the Interaction's lifetime, so borrowed parameters (`&str`, `&User`, ...) read their
+/// value without copying it.
+pub trait OptionType<'a>: Sized {
     /// [Option type](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type)
     /// number, e.g. 3 for string
     const OPTION_TYPE: u8;
@@ -83,12 +86,12 @@ pub trait OptionType: Sized {
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption;
 
     fn extract(
-        option: Option<&DataOption>,
-        data: &ApplicationCommandInteractionData,
+        option: Option<&'a DataOption>,
+        data: &'a ApplicationCommandInteractionData,
     ) -> Result<Self, OptionError>;
 }
 
-impl<T: OptionType> OptionType for Option<T> {
+impl<'a, T: OptionType<'a>> OptionType<'a> for Option<T> {
     const OPTION_TYPE: u8 = T::OPTION_TYPE;
     const REQUIRED: bool = false;
     const MIN_VALUE: Option<f64> = T::MIN_VALUE;
@@ -99,8 +102,8 @@ impl<T: OptionType> OptionType for Option<T> {
     }
 
     fn extract(
-        option: Option<&DataOption>,
-        data: &ApplicationCommandInteractionData,
+        option: Option<&'a DataOption>,
+        data: &'a ApplicationCommandInteractionData,
     ) -> Result<Self, OptionError> {
         match option {
             None => Ok(None),
@@ -198,7 +201,22 @@ fn present(option: Option<&DataOption>) -> Result<&DataOption, OptionError> {
     option.ok_or(OptionError::Missing)
 }
 
-impl OptionType for String {
+impl<'a> OptionType<'a> for &'a str {
+    const OPTION_TYPE: u8 = 3;
+
+    fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
+        string_definition(meta, required, None)
+    }
+
+    fn extract(
+        option: Option<&'a DataOption>,
+        _data: &'a ApplicationCommandInteractionData,
+    ) -> Result<Self, OptionError> {
+        string_value(option)
+    }
+}
+
+impl OptionType<'_> for String {
     const OPTION_TYPE: u8 = 3;
 
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
@@ -209,10 +227,7 @@ impl OptionType for String {
         option: Option<&DataOption>,
         _data: &ApplicationCommandInteractionData,
     ) -> Result<Self, OptionError> {
-        match present(option)? {
-            DataOption::String(o) => Ok(o.value.clone()),
-            _ => Err(OptionError::WrongType),
-        }
+        string_value(option).map(str::to_string)
     }
 }
 
@@ -232,7 +247,7 @@ pub fn string_value(option: Option<&DataOption>) -> Result<&str, OptionError> {
     }
 }
 
-impl OptionType for i64 {
+impl OptionType<'_> for i64 {
     const OPTION_TYPE: u8 = 4;
 
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
@@ -249,7 +264,7 @@ impl OptionType for i64 {
 
 macro_rules! bounded_integer {
     ($($t:ty),*) => {$(
-        impl OptionType for $t {
+        impl OptionType<'_> for $t {
             const OPTION_TYPE: u8 = 4;
             const MIN_VALUE: Option<f64> = Some(<$t>::MIN as f64);
             const MAX_VALUE: Option<f64> = Some(<$t>::MAX as f64);
@@ -270,7 +285,7 @@ macro_rules! bounded_integer {
 
 bounded_integer!(i8, i16, i32, u8, u16, u32);
 
-impl OptionType for f64 {
+impl OptionType<'_> for f64 {
     const OPTION_TYPE: u8 = 10;
 
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
@@ -301,7 +316,7 @@ impl OptionType for f64 {
     }
 }
 
-impl OptionType for bool {
+impl OptionType<'_> for bool {
     const OPTION_TYPE: u8 = 5;
 
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
@@ -319,25 +334,74 @@ impl OptionType for bool {
     }
 }
 
-impl OptionType for User {
-    const OPTION_TYPE: u8 = 6;
+/// A resolved Option (user, channel, role, attachment) as a reference into the Interaction's
+/// resolved data, and as an owned clone of it
+macro_rules! resolved {
+    ($($ty:ty => $variant:ident, $code:literal, $resolve:ident, $definition:path;)*) => {$(
+        impl<'a> OptionType<'a> for &'a $ty {
+            const OPTION_TYPE: u8 = $code;
 
-    fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
-        ApplicationCommandOption::User(base(meta, required))
-    }
+            fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
+                $definition(meta, required)
+            }
 
-    fn extract(
-        option: Option<&DataOption>,
-        data: &ApplicationCommandInteractionData,
-    ) -> Result<Self, OptionError> {
-        match present(option)? {
-            DataOption::User(o) => data
-                .resolved_user(&o.value)
-                .cloned()
-                .ok_or(OptionError::Unresolved),
-            _ => Err(OptionError::WrongType),
+            fn extract(
+                option: Option<&'a DataOption>,
+                data: &'a ApplicationCommandInteractionData,
+            ) -> Result<Self, OptionError> {
+                match present(option)? {
+                    DataOption::$variant(o) => data.$resolve(&o.value).ok_or(OptionError::Unresolved),
+                    _ => Err(OptionError::WrongType),
+                }
+            }
         }
-    }
+
+        impl OptionType<'_> for $ty {
+            const OPTION_TYPE: u8 = $code;
+
+            fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
+                $definition(meta, required)
+            }
+
+            fn extract(
+                option: Option<&DataOption>,
+                data: &ApplicationCommandInteractionData,
+            ) -> Result<Self, OptionError> {
+                <&$ty as OptionType>::extract(option, data).cloned()
+            }
+        }
+    )*};
+}
+
+resolved! {
+    User => User, 6, resolved_user, user_definition;
+    PartialChannel => Channel, 7, resolved_channel, channel_definition;
+    Role => Role, 8, resolved_role, role_definition;
+    Attachment => Attachment, 11, resolved_attachment, attachment_definition;
+}
+
+fn user_definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
+    ApplicationCommandOption::User(base(meta, required))
+}
+
+fn channel_definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
+    ApplicationCommandOption::Channel(ChannelOption {
+        t: TypeField,
+        name: meta.name.to_string(),
+        name_localizations: None,
+        description: meta.description.to_string(),
+        description_localizations: None,
+        required: Some(required),
+        channel_types: meta.channel_types.map(<[ChannelType]>::to_vec),
+    })
+}
+
+fn role_definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
+    ApplicationCommandOption::Role(base(meta, required))
+}
+
+fn attachment_definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
+    ApplicationCommandOption::Attachment(base(meta, required))
 }
 
 /// A user together with their membership in the guild the Command was invoked in. As an Option it
@@ -371,7 +435,7 @@ impl ResolvedMember {
     }
 }
 
-impl OptionType for ResolvedMember {
+impl OptionType<'_> for ResolvedMember {
     const OPTION_TYPE: u8 = 6;
 
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
@@ -389,77 +453,6 @@ impl OptionType for ResolvedMember {
     }
 }
 
-impl OptionType for PartialChannel {
-    const OPTION_TYPE: u8 = 7;
-
-    fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
-        ApplicationCommandOption::Channel(ChannelOption {
-            t: TypeField,
-            name: meta.name.to_string(),
-            name_localizations: None,
-            description: meta.description.to_string(),
-            description_localizations: None,
-            required: Some(required),
-            channel_types: meta.channel_types.map(<[ChannelType]>::to_vec),
-        })
-    }
-
-    fn extract(
-        option: Option<&DataOption>,
-        data: &ApplicationCommandInteractionData,
-    ) -> Result<Self, OptionError> {
-        match present(option)? {
-            DataOption::Channel(o) => data
-                .resolved_channel(&o.value)
-                .cloned()
-                .ok_or(OptionError::Unresolved),
-            _ => Err(OptionError::WrongType),
-        }
-    }
-}
-
-impl OptionType for Role {
-    const OPTION_TYPE: u8 = 8;
-
-    fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
-        ApplicationCommandOption::Role(base(meta, required))
-    }
-
-    fn extract(
-        option: Option<&DataOption>,
-        data: &ApplicationCommandInteractionData,
-    ) -> Result<Self, OptionError> {
-        match present(option)? {
-            DataOption::Role(o) => data
-                .resolved_role(&o.value)
-                .cloned()
-                .ok_or(OptionError::Unresolved),
-            _ => Err(OptionError::WrongType),
-        }
-    }
-}
-
-impl OptionType for Attachment {
-    const OPTION_TYPE: u8 = 11;
-
-    fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
-        ApplicationCommandOption::Attachment(base(meta, required))
-    }
-
-    fn extract(
-        option: Option<&DataOption>,
-        data: &ApplicationCommandInteractionData,
-    ) -> Result<Self, OptionError> {
-        match present(option)? {
-            DataOption::Attachment(o) => data
-                .resolved_attachment(&o.value)
-                .cloned()
-                .ok_or(OptionError::Unresolved),
-            _ => Err(OptionError::WrongType),
-        }
-    }
-}
-
 /// Value of a mentionable Option
 #[derive(Debug, Clone)]
 pub enum UserOrRole {
@@ -467,7 +460,7 @@ pub enum UserOrRole {
     Role(Role),
 }
 
-impl OptionType for UserOrRole {
+impl OptionType<'_> for UserOrRole {
     const OPTION_TYPE: u8 = 9;
 
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption {
@@ -490,12 +483,13 @@ impl OptionType for UserOrRole {
     }
 }
 
-/// The target parameter of a user or message Command
-pub trait CommandTarget: Sized {
+/// The target parameter of a user or message Command. `'a` is the Interaction's lifetime, so
+/// `&User` and `&Message` targets read it without copying.
+pub trait CommandTarget<'a>: Sized {
     /// User or message: the kind of Command this target belongs to
     const KIND: ApplicationCommandType;
 
-    fn extract(data: &ApplicationCommandInteractionData) -> Result<Self, OptionError>;
+    fn extract(data: &'a ApplicationCommandInteractionData) -> Result<Self, OptionError>;
 }
 
 fn target_id(
@@ -504,17 +498,24 @@ fn target_id(
     data.target_id.as_ref().ok_or(OptionError::Missing)
 }
 
-impl CommandTarget for User {
+impl<'a> CommandTarget<'a> for &'a User {
     const KIND: ApplicationCommandType = ApplicationCommandType::User;
 
-    fn extract(data: &ApplicationCommandInteractionData) -> Result<Self, OptionError> {
+    fn extract(data: &'a ApplicationCommandInteractionData) -> Result<Self, OptionError> {
         data.resolved_user(target_id(data)?)
-            .cloned()
             .ok_or(OptionError::Unresolved)
     }
 }
 
-impl CommandTarget for ResolvedMember {
+impl CommandTarget<'_> for User {
+    const KIND: ApplicationCommandType = ApplicationCommandType::User;
+
+    fn extract(data: &ApplicationCommandInteractionData) -> Result<Self, OptionError> {
+        <&User as CommandTarget>::extract(data).cloned()
+    }
+}
+
+impl CommandTarget<'_> for ResolvedMember {
     const KIND: ApplicationCommandType = ApplicationCommandType::User;
 
     fn extract(data: &ApplicationCommandInteractionData) -> Result<Self, OptionError> {
@@ -522,12 +523,19 @@ impl CommandTarget for ResolvedMember {
     }
 }
 
-impl CommandTarget for Message {
+impl<'a> CommandTarget<'a> for &'a Message {
+    const KIND: ApplicationCommandType = ApplicationCommandType::Message;
+
+    fn extract(data: &'a ApplicationCommandInteractionData) -> Result<Self, OptionError> {
+        data.resolved_message(target_id(data)?)
+            .ok_or(OptionError::Unresolved)
+    }
+}
+
+impl CommandTarget<'_> for Message {
     const KIND: ApplicationCommandType = ApplicationCommandType::Message;
 
     fn extract(data: &ApplicationCommandInteractionData) -> Result<Self, OptionError> {
-        data.resolved_message(target_id(data)?)
-            .cloned()
-            .ok_or(OptionError::Unresolved)
+        <&Message as CommandTarget>::extract(data).cloned()
     }
 }

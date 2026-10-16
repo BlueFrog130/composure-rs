@@ -1,7 +1,8 @@
 //! `#[group(subcommands(...))]`: makes a unit struct a Command that routes to its subcommands.
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, quote_spanned};
+use syn::spanned::Spanned;
 use syn::{Fields, ItemStruct, Path};
 
 use crate::meta::{self, Settings};
@@ -63,7 +64,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     let scope = settings.scope_tokens();
 
     let checks = subcommands.iter().map(|sub| {
-        quote! {
+        quote_spanned! {sub.span()=>
             ::core::assert!(
                 <#sub as ::composure::command::SubcommandDefinition>::DEPTH <= 1,
                 "groups nest at most one level: command > group > subcommand",
@@ -92,8 +93,16 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     Ok(quote! {
         #item
 
+        // DEPTH is often 0, which clippy flags as an absurd comparison once the check is
+        // spanned to user code
+        #[allow(clippy::absurd_extreme_comparisons)]
         const _: () = {
             #(#checks)*
+            ::composure::command::check_commands(&[#((
+                <#subcommands as ::composure::command::CommandDefinition>::NAME,
+                <#subcommands as ::composure::command::CommandDefinition>::KIND,
+                <#subcommands as ::composure::command::CommandDefinition>::SCOPE,
+            )),*]);
         };
 
         impl #ident {

@@ -3,8 +3,8 @@
 use composure::{
     Choice, Ctx,
     command::{
-        CommandSetDefinition, ErrorKind, HandlerError, InteractionHandler, ResolvedMember,
-        UserOrRole, dispatch,
+        CommandSetDefinition, Ephemeral, ErrorKind, HandlerError, InteractionHandler,
+        ResolvedMember, UserOrRole, dispatch,
     },
     commands, group,
     models::{Embed, Interaction, InteractionResponse, Message, PartialChannel, Role, User},
@@ -16,8 +16,8 @@ use serde_json::{Value, json};
 #[composure::command]
 async fn echo(
     _ctx: Ctx,
-    #[option(desc = "What to say", min_len = 1, max_len = 200)] text: String,
-    #[option(desc = "How many times", min = 1, max = 5)] times: Option<u8>,
+    #[option("What to say", min_len = 1, max_len = 200)] text: &str,
+    #[option("How many times", min = 1, max = 5)] times: Option<u8>,
 ) -> String {
     text.repeat(times.unwrap_or(1).into())
 }
@@ -51,10 +51,7 @@ enum Size {
 
 /// Pick a color and size
 #[composure::command]
-fn paint(
-    #[option(desc = "Color")] color: Color,
-    #[option(desc = "Size")] size: Option<Size>,
-) -> String {
+fn paint(#[option("Color")] color: Color, #[option("Size")] size: Option<Size>) -> String {
     format!("{color:?} {size:?}")
 }
 
@@ -67,11 +64,11 @@ async fn fail() -> Result<String, String> {
 /// Describe resolved options
 #[composure::command]
 fn resolve(
-    #[option(desc = "A user")] user: User,
-    #[option(desc = "A member")] member: Option<ResolvedMember>,
-    #[option(desc = "A channel", channel_types(GuildText))] channel: Option<PartialChannel>,
-    #[option(desc = "A role")] role: Option<Role>,
-    #[option(desc = "A user or role")] who: Option<UserOrRole>,
+    #[option("A user")] user: User,
+    #[option("A member")] member: Option<ResolvedMember>,
+    #[option("A channel", channel_types(GuildText))] channel: Option<PartialChannel>,
+    #[option("A role")] role: Option<Role>,
+    #[option("A user or role")] who: Option<UserOrRole>,
 ) -> String {
     let who = match who {
         Some(UserOrRole::User(user)) => user.username,
@@ -89,7 +86,7 @@ fn resolve(
 
 /// Ban someone
 #[composure::command]
-fn ban(#[option(desc = "Who")] user: User) -> Embed {
+fn ban(#[option("Who")] user: &User) -> Embed {
     Embed::new().with_title(&format!("banned {}", user.username))
 }
 
@@ -114,18 +111,52 @@ struct Roles;
 struct Admin;
 
 #[composure::command(user, name = "Inspect")]
-fn inspect(target: User) -> String {
+fn inspect(target: &User) -> String {
     format!("inspect {}", target.username)
 }
 
 #[composure::command(message, name = "Quote")]
-fn quote(target: Message) -> InteractionResponse {
-    InteractionResponse::respond_with_ephemeral_message(format!("> {}", target.content))
+fn quote(target: &Message) -> Ephemeral<String> {
+    Ephemeral(format!("> {}", target.content))
+}
+
+/// Refuses with a message for the user
+#[composure::command]
+fn refuse() -> Result<String, HandlerError> {
+    Err(HandlerError::user("Not allowed here"))
+}
+
+/// What a bounded-State Command needs from the State
+trait Counter {
+    fn count(&self) -> u32;
+}
+
+impl Counter for u32 {
+    fn count(&self) -> u32 {
+        *self
+    }
+}
+
+/// Count with `impl Bound`
+#[composure::command]
+async fn count(ctx: Ctx<impl Counter>) -> String {
+    format!("count {}", ctx.state().count())
+}
+
+/// Count with a named type parameter
+#[composure::command]
+fn tally<S: Counter>(ctx: Ctx<S>, #[option("Add")] add: Option<u32>) -> String {
+    format!("tally {}", ctx.state().count() + add.unwrap_or(0))
 }
 
 commands! {
     /// Everything under test
-    pub struct Bot = [echo, ping, show_state, paint, fail, resolve, Admin, inspect, quote];
+    pub struct Bot = [echo, ping, show_state, paint, fail, resolve, Admin, inspect, quote, refuse, count, tally];
+}
+
+commands! {
+    /// Bounded-State Commands only, so any `Counter` State works
+    struct Counting = [count, tally];
 }
 
 commands! {
@@ -205,6 +236,11 @@ fn choices_are_extracted() {
         { "name": "size", "type": 4, "value": 10 },
     ]);
     assert_eq!(content(chat("paint", options)), "DarkBlue Some(Big)");
+    assert_eq!(
+        (Color::DarkBlue.name(), Color::DarkBlue.value()),
+        ("Dark blue", "dark-blue")
+    );
+    assert_eq!((Size::Big.name(), Size::Big.value()), ("Large", 10));
 
     let unknown = run(chat(
         "paint",
@@ -235,6 +271,30 @@ fn command_errors_are_handler_errors() {
         serde_json::to_value(error.response()).unwrap()["data"]["flags"],
         64
     );
+}
+
+#[test]
+fn user_errors_are_shown_to_the_user() {
+    let error = run(chat("refuse", json!([]))).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::User);
+    let response = serde_json::to_value(error.response()).unwrap();
+    assert_eq!(response["data"]["content"], "Not allowed here");
+    assert_eq!(response["data"]["flags"], 64);
+}
+
+#[test]
+fn bounded_state() {
+    assert_eq!(content(chat("count", json!([]))), "count 7");
+
+    struct Fake;
+    impl Counter for Fake {
+        fn count(&self) -> u32 {
+            40
+        }
+    }
+    let options = json!([{ "name": "add", "type": 4, "value": 2 }]);
+    let response = run_with(&Counting, &Fake, chat("tally", options)).unwrap();
+    assert_eq!(response["data"]["content"], "tally 42");
 }
 
 #[test]
@@ -398,7 +458,7 @@ fn fallback_handles_the_rest() {
 fn functions_stay_callable() {
     assert_eq!(ping(), "pong");
     assert_eq!(
-        block_on(echo(Ctx::new(&dummy_command(), &()), "a".into(), Some(2))),
+        block_on(echo(Ctx::new(&dummy_command(), &()), "a", Some(2))),
         "aa"
     );
     // A local binding can share a command's name
@@ -464,7 +524,7 @@ fn chat_input_definitions() {
 fn bounded_integers_get_type_range() {
     /// Bounded
     #[composure::command]
-    fn bounded(#[option(desc = "Small")] small: i8, #[option(desc = "Big")] big: i64) -> String {
+    fn bounded(#[option("Small")] small: i8, #[option("Big")] big: i64) -> String {
         format!("{small}{big}")
     }
     use composure::command::CommandDefinition;

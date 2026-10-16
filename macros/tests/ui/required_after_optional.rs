@@ -1,8 +1,8 @@
 /// Greet
 #[composure::command]
 fn greet(
-    #[option(desc = "Greeting")] greeting: Option<String>,
-    #[option(desc = "Name")] name: String,
+    #[option("Greeting")] greeting: Option<String>,
+    #[option("Name")] name: String,
 ) -> String {
     format!("{greeting:?} {name}")
 }

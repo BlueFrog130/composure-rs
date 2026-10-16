@@ -2,10 +2,10 @@
 //! `CommandDefinition` and `Command`.
 
 use proc_macro2::{Literal, Span, TokenStream};
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::{
-    FnArg, GenericArgument, Ident, ItemFn, LitInt, LitStr, Pat, PathArguments, ReturnType, Type,
-    parse_quote, spanned::Spanned,
+    FnArg, GenericArgument, GenericParam, Ident, ItemFn, LitInt, LitStr, Pat, PathArguments,
+    ReturnType, Token, Type, parse::Parser, parse_quote, spanned::Spanned,
 };
 
 use crate::meta::{self, Settings};
@@ -15,14 +15,6 @@ enum Kind {
     ChatInput,
     User,
     Message,
-}
-
-/// How the Command reaches the Adapter's State
-enum State {
-    /// No `Ctx` param, or `Ctx` without a State type: works with any State
-    Generic,
-    /// `Ctx<T>`: only with State `T`
-    Concrete(Box<Type>),
 }
 
 struct OptionParam {
@@ -56,18 +48,13 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             ))
         }
     });
-    syn::parse::Parser::parse2(parser, args)?;
+    parser.parse2(args)?;
 
     let mut function: ItemFn = syn::parse2(item)?;
     let ident = function.sig.ident.clone();
     let span = ident.span();
 
-    if !function.sig.generics.params.is_empty() {
-        return Err(syn::Error::new(
-            function.sig.generics.span(),
-            "commands cannot be generic; use `ctx: Ctx` to accept any State",
-        ));
-    }
+    let state_param = state_param(&function)?;
     if matches!(function.sig.output, ReturnType::Default) {
         return Err(syn::Error::new(
             function.sig.span(),
@@ -92,7 +79,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     };
 
     // Split params into ctx and options/target, stripping `#[option]` attributes
-    let mut state = State::Generic;
+    let mut ctx_state_ty: Option<Type> = None;
     let mut has_ctx = false;
     let mut options = Vec::new();
     for (index, input) in function.sig.inputs.iter_mut().enumerate() {
@@ -100,23 +87,15 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             return Err(syn::Error::new(input.span(), "commands cannot take `self`"));
         };
 
-        if index == 0
-            && let Some(ctx_state) = ctx_state(&param.ty)
-        {
+        if let Some(state) = ctx_state(&param.ty) {
+            if index != 0 {
+                return Err(syn::Error::new(
+                    param.ty.span(),
+                    "`ctx` must be the first parameter",
+                ));
+            }
             has_ctx = true;
-            // Spell out the lifetime: async fns reject an elided one in `Ctx<T>`
-            let args: syn::AngleBracketedGenericArguments = match &ctx_state {
-                Some(ty) => parse_quote!(<'_, #ty>),
-                None => parse_quote!(<'_, __S>),
-            };
-            if let Type::Path(path) = &mut *param.ty
-                && let Some(segment) = path.path.segments.last_mut()
-            {
-                segment.arguments = PathArguments::AngleBracketed(args);
-            }
-            if let Some(ty) = ctx_state {
-                state = State::Concrete(Box::new(ty));
-            }
+            ctx_state_ty = state;
             continue;
         }
 
@@ -130,6 +109,61 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
         param.attrs.retain(|attr| !attr.path().is_ident("option"));
         options.push(option);
     }
+
+    // The State the Command runs with: a concrete type, or a type parameter of the function
+    // (`Ctx` and `Ctx<impl Bound>` add one named `__S`)
+    let state: Type = match ctx_state_ty {
+        None if has_ctx => {
+            if let Some(param) = &state_param {
+                return Err(syn::Error::new(
+                    param.span(),
+                    "use the type parameter as the State: `ctx: Ctx<S>`",
+                ));
+            }
+            function.sig.generics.params.push(parse_quote!(__S));
+            parse_quote!(__S)
+        }
+        Some(Type::ImplTrait(bounds)) => {
+            let bounds = bounds.bounds;
+            function
+                .sig
+                .generics
+                .params
+                .push(parse_quote!(__S: #bounds));
+            parse_quote!(__S)
+        }
+        Some(ty) => {
+            if let Some(param) = &state_param
+                && !matches!(&ty, Type::Path(path) if path.path.is_ident(param))
+            {
+                return Err(syn::Error::new(
+                    ty.span(),
+                    format!("commands can only be generic over their State: `ctx: Ctx<{param}>`"),
+                ));
+            }
+            ty
+        }
+        None => {
+            if let Some(param) = &state_param {
+                return Err(syn::Error::new(
+                    param.span(),
+                    format!(
+                        "commands can only be generic over their State: add `ctx: Ctx<{param}>`"
+                    ),
+                ));
+            }
+            parse_quote!(__S)
+        }
+    };
+    if has_ctx
+        && let Some(FnArg::Typed(param)) = function.sig.inputs.first_mut()
+        && let Type::Path(path) = &mut *param.ty
+        && let Some(segment) = path.path.segments.last_mut()
+    {
+        // Spell out the lifetime: async fns reject an elided one in `Ctx<T>`
+        segment.arguments = PathArguments::AngleBracketed(parse_quote!(<'_, #state>));
+    }
+    let generic = has_ctx && function.sig.generics.type_params().next().is_some();
 
     match kind {
         Kind::ChatInput if options.len() > 25 => {
@@ -161,9 +195,6 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
         .iter()
         .filter(|attr| attr.path().is_ident("doc"))
         .collect();
-    if matches!(state, State::Generic) && has_ctx {
-        function.sig.generics = parse_quote!(<__S>);
-    }
 
     let settings_meta = settings.meta_tokens(&name, &description);
     let scope = settings.scope_tokens();
@@ -183,9 +214,13 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     };
     let checks = checks(&options, kind);
 
-    let (impl_generics, state_ty) = match &state {
-        State::Generic => (quote!(<__S>), quote!(__S)),
-        State::Concrete(ty) => (quote!(), quote!(#ty)),
+    let (impl_generics, where_clause) = if generic {
+        let (impl_generics, _, where_clause) = function.sig.generics.split_for_impl();
+        (quote!(#impl_generics), quote!(#where_clause))
+    } else if has_ctx {
+        (quote!(), quote!())
+    } else {
+        (quote!(<__S>), quote!())
     };
 
     let extracts = options.iter().map(|option| {
@@ -261,9 +296,9 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
 
         #subcommand
 
-        impl #impl_generics ::composure::command::Command<#state_ty> for #ident {
+        impl #impl_generics ::composure::command::Command<#state> for #ident #where_clause {
             async fn invoke(
-                invocation: ::composure::command::Invocation<'_, #state_ty>,
+                invocation: ::composure::command::Invocation<'_, #state>,
             ) -> ::core::result::Result<
                 ::composure::models::InteractionResponse,
                 ::composure::command::HandlerError,
@@ -273,6 +308,24 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             }
         }
     })
+}
+
+/// The function's one type parameter, which must be its State; lifetimes and consts are rejected
+fn state_param(function: &ItemFn) -> syn::Result<Option<Ident>> {
+    let generics = &function.sig.generics;
+    let mut param = None;
+    for generic in &generics.params {
+        match generic {
+            GenericParam::Type(ty) if param.is_none() => param = Some(ty.ident.clone()),
+            _ => {
+                return Err(syn::Error::new(
+                    generic.span(),
+                    "commands can only be generic over their State: `fn f<S: Bound>(ctx: Ctx<S>)`",
+                ));
+            }
+        }
+    }
+    Ok(param)
 }
 
 /// `Some(state)` if `ty` is `Ctx`: `Some(None)` for `Ctx`/`Ctx<'_>`, `Some(Some(T))` for `Ctx<T>`
@@ -291,6 +344,7 @@ fn ctx_state(ty: &Type) -> Option<Option<Type>> {
     }))
 }
 
+/// `#[option("Description", setting = value, ...)]`
 fn parse_option(
     ident: Ident,
     ty: Type,
@@ -311,53 +365,55 @@ fn parse_option(
         span,
     };
     let mut desc: Option<LitStr> = None;
-    let mut has_attr = false;
 
     for attr in attrs.iter().filter(|attr| attr.path().is_ident("option")) {
-        has_attr = true;
         if kind != Kind::ChatInput {
             return Err(syn::Error::new(
                 attr.span(),
                 "`#[option]` is only for chat-input commands; user and message targets have no settings",
             ));
         }
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("desc") || meta.path.is_ident("description") {
-                desc = Some(meta.value()?.parse()?);
-            } else if meta.path.is_ident("name") || meta.path.is_ident("rename") {
-                let name: LitStr = meta.value()?.parse()?;
-                option.name = name.value();
-                option.span = name.span();
-            } else if meta.path.is_ident("min") {
-                option.min = Some(meta::number(&meta.value()?.parse()?)?);
-            } else if meta.path.is_ident("max") {
-                option.max = Some(meta::number(&meta.value()?.parse()?)?);
-            } else if meta.path.is_ident("min_len") {
-                option.min_len = Some(length(&meta.value()?.parse()?, 0)?);
-            } else if meta.path.is_ident("max_len") {
-                option.max_len = Some(length(&meta.value()?.parse()?, 1)?);
-            } else if meta.path.is_ident("channel_types") {
-                option.channel_types = Some(meta::ident_list(&meta)?);
-            } else {
-                return Err(meta.error(
-                    "unknown option setting; expected one of desc, name, min, max, min_len, max_len, channel_types",
-                ));
+        if matches!(attr.meta, syn::Meta::Path(_)) {
+            continue;
+        }
+        attr.parse_args_with(|input: syn::parse::ParseStream| {
+            if input.peek(LitStr) {
+                desc = Some(input.parse()?);
+                if input.is_empty() {
+                    return Ok(());
+                }
+                input.parse::<Token![,]>()?;
             }
-            Ok(())
+            let settings = syn::meta::parser(|meta| {
+                if meta.path.is_ident("name") {
+                    let name: LitStr = meta.value()?.parse()?;
+                    option.name = name.value();
+                    option.span = name.span();
+                } else if meta.path.is_ident("min") {
+                    option.min = Some(meta::number(&meta.value()?.parse()?)?);
+                } else if meta.path.is_ident("max") {
+                    option.max = Some(meta::number(&meta.value()?.parse()?)?);
+                } else if meta.path.is_ident("min_len") {
+                    option.min_len = Some(length(&meta.value()?.parse()?, 0)?);
+                } else if meta.path.is_ident("max_len") {
+                    option.max_len = Some(length(&meta.value()?.parse()?, 1)?);
+                } else if meta.path.is_ident("channel_types") {
+                    option.channel_types = Some(meta::ident_list(&meta)?);
+                } else {
+                    return Err(meta.error(
+                        "unknown option setting; expected a description first, then name, min, max, min_len, max_len, channel_types",
+                    ));
+                }
+                Ok(())
+            });
+            settings.parse2(input.parse()?)
         })?;
     }
 
     if kind == Kind::ChatInput {
         meta::validate_chat_name(&option.name, option.span)?;
         let desc = desc.ok_or_else(|| {
-            syn::Error::new(
-                span,
-                if has_attr {
-                    "missing option description: add `desc = \"...\"`"
-                } else {
-                    "missing option description: add `#[option(desc = \"...\")]`"
-                },
-            )
+            syn::Error::new(span, "missing option description: add `#[option(\"...\")]`")
         })?;
         meta::validate_description(&desc.value(), desc.span())?;
         option.description = desc.value();
@@ -428,21 +484,22 @@ fn option_definition(option: &OptionParam) -> TokenStream {
 }
 
 /// Compile-time checks that need the option types: settings that fit the type, bounds inside
-/// the type's range, required before optional, and targets matching the command kind
+/// the type's range, required before optional, and targets matching the command kind. Each is
+/// spanned to its parameter's type, so the error points there.
 fn checks(options: &[OptionParam], kind: Kind) -> TokenStream {
     if kind != Kind::ChatInput {
         let ty = &options[0].ty;
         let (expected, message) = match kind {
             Kind::User => (
                 quote!(User),
-                "a user command's target must be `User` or `ResolvedMember`",
+                "a user command's target must be `User`, `&User`, or `ResolvedMember`",
             ),
             _ => (
                 quote!(Message),
-                "a message command's target must be `Message`",
+                "a message command's target must be `Message` or `&Message`",
             ),
         };
-        return quote! {
+        return quote_spanned! {ty.span()=>
             const _: () = ::core::assert!(
                 ::core::matches!(
                     <#ty as ::composure::command::CommandTarget>::KIND,
@@ -458,59 +515,80 @@ fn checks(options: &[OptionParam], kind: Kind) -> TokenStream {
         let ty = &option.ty;
         let name = &option.name;
         let option_type = quote!(<#ty as ::composure::command::OptionType>::OPTION_TYPE);
-        if option.min.is_some() || option.max.is_some() {
-            let message =
-                format!("option `{name}`: `min`/`max` only apply to integer and number options");
-            checks.push(quote! {
-                ::core::assert!(#option_type == 4 || #option_type == 10, #message);
+        let mut check = |message: String, condition: TokenStream| {
+            checks.push(quote_spanned! {ty.span()=>
+                ::core::assert!(#condition, #message);
             });
+        };
+        if option.min.is_some() || option.max.is_some() {
+            check(
+                format!("option `{name}`: `min`/`max` only apply to integer and number options"),
+                quote!(#option_type == 4 || #option_type == 10),
+            );
+        }
+        if [option.min, option.max]
+            .into_iter()
+            .flatten()
+            .any(|bound| bound.fract() != 0.0)
+        {
+            check(
+                format!(
+                    "option `{name}`: fractional `min`/`max` only apply to number (`f64`) options"
+                ),
+                quote!(#option_type == 10),
+            );
         }
         if let Some(min) = option.min {
             let min = Literal::f64_suffixed(min);
-            let message = format!("option `{name}`: `min` is below the range of its type");
-            checks.push(quote! {
-                if let ::core::option::Option::Some(type_min) =
-                    <#ty as ::composure::command::OptionType>::MIN_VALUE
-                {
-                    ::core::assert!(#min >= type_min, #message);
-                }
-            });
+            check(
+                format!("option `{name}`: `min` is below the range of its type"),
+                quote! {
+                    match <#ty as ::composure::command::OptionType>::MIN_VALUE {
+                        ::core::option::Option::Some(type_min) => #min >= type_min,
+                        ::core::option::Option::None => true,
+                    }
+                },
+            );
         }
         if let Some(max) = option.max {
             let max = Literal::f64_suffixed(max);
-            let message = format!("option `{name}`: `max` is above the range of its type");
-            checks.push(quote! {
-                if let ::core::option::Option::Some(type_max) =
-                    <#ty as ::composure::command::OptionType>::MAX_VALUE
-                {
-                    ::core::assert!(#max <= type_max, #message);
-                }
-            });
+            check(
+                format!("option `{name}`: `max` is above the range of its type"),
+                quote! {
+                    match <#ty as ::composure::command::OptionType>::MAX_VALUE {
+                        ::core::option::Option::Some(type_max) => #max <= type_max,
+                        ::core::option::Option::None => true,
+                    }
+                },
+            );
         }
         if option.min_len.is_some() || option.max_len.is_some() {
-            let message =
-                format!("option `{name}`: `min_len`/`max_len` only apply to string options");
-            checks.push(quote! { ::core::assert!(#option_type == 3, #message); });
+            check(
+                format!("option `{name}`: `min_len`/`max_len` only apply to string options"),
+                quote!(#option_type == 3),
+            );
         }
         if option.channel_types.is_some() {
-            let message =
-                format!("option `{name}`: `channel_types` only applies to channel options");
-            checks.push(quote! { ::core::assert!(#option_type == 7, #message); });
+            check(
+                format!("option `{name}`: `channel_types` only applies to channel options"),
+                quote!(#option_type == 7),
+            );
         }
     }
 
-    if options.len() > 1 {
-        let types = options.iter().map(|option| &option.ty);
-        checks.push(quote! {
-            let required = [#(<#types as ::composure::command::OptionType>::REQUIRED),*];
-            let mut i = 1;
-            while i < required.len() {
-                ::core::assert!(
-                    required[i - 1] || !required[i],
-                    "required options must come before optional ones",
-                );
-                i += 1;
-            }
+    // Each required option must not follow an optional one
+    for pair in options.windows(2) {
+        let (previous, ty) = (&pair[0].ty, &pair[1].ty);
+        let message = format!(
+            "required option `{}` must come before optional ones",
+            pair[1].name
+        );
+        checks.push(quote_spanned! {ty.span()=>
+            ::core::assert!(
+                <#previous as ::composure::command::OptionType>::REQUIRED
+                    || !<#ty as ::composure::command::OptionType>::REQUIRED,
+                #message,
+            );
         });
     }
 

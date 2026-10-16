@@ -45,6 +45,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
 `Bot.with_fallback(handler)` sends components, modals, autocomplete, and commands not in the set to any `InteractionHandler`. Implement `InteractionHandler<Env>` directly instead of using a Command Set for full control.
 
+`Ctx<Env>` ties a Command (and its Command Set) to Workers. To run it in host tests, take `Ctx<impl YourTrait>` and implement the trait for `Env` and a stand-in; see `/greet` in `commands-example/`.
+
 Workers futures are not `Send`; handlers are dispatched statically, so no `Send` bounds or `async_trait` are needed.
 
 Sync the Command Set with Discord from a host-only bin; see `commands-example/` for a complete bot with a `sync` bin.

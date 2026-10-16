@@ -1,6 +1,6 @@
 /// Count
 #[composure::command]
-fn count(#[option(desc = "How many", max_len = 3)] n: i64) -> String {
+fn count(#[option("How many", max_len = 3)] n: i64) -> String {
     n.to_string()
 }
 

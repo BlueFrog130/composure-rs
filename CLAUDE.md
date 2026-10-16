@@ -47,7 +47,8 @@ Adapters are the integration layer; new platforms go under `adapters/<name>` and
 All submodules are glob re-exported, so everything is addressed as `composure::models::X`.
 
 **Serde conventions:**
-- `Interaction` uses a manual `Deserialize` that peeks the `type` field and dispatches to `DataInteraction<T>` variants (`ApplicationCommandInteraction`, `MessageComponentInteraction`, `ModalSubmitInteraction` are type aliases). Follow this pattern for type-discriminated unions.
+- `Interaction` uses a manual `Deserialize` that reads the body once into a private `Envelope` (common fields typed, `data` kept as `Box<RawValue>`), then parses `data` by `type` into `DataInteraction<T>` variants (`ApplicationCommandInteraction`, `MessageComponentInteraction`, `ModalSubmitInteraction` are type aliases). Options do the same via `RawOption`. This is the hot path: don't go through `serde_json::Value` or `#[serde(flatten)]` for type-discriminated unions.
+- `OptionType<'a>` / `CommandTarget<'a>` carry the Interaction's lifetime so `&str`, `&User`, `&Message`, ... parameters borrow instead of clone.
 - `TypeField<const T: u8>` is a zero-sized marker that serializes as the constant and fails deserialization on mismatch — used as a `t` field to tag struct variants inside `#[serde(untagged)]`-style enums (see `commands/src/command/model.rs`).
 - Integer enums use `serde_repr`; flags use `bitflags`.
 - `Snowflake` is a custom struct (decomposed timestamp/worker/process/increment) serialized as a string.

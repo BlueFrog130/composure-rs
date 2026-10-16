@@ -2,14 +2,13 @@
 //! Definition derive, collected into a Command Set with [`commands!`](crate::commands).
 //!
 //! ```ignore
-//! use composure::{Ctx, command, commands};
+//! use composure::{command, commands};
 //!
 //! /// Repeat some text
 //! #[command]
-//! async fn echo(
-//!     _ctx: Ctx,
-//!     #[option(desc = "What to say", max_len = 200)] text: String,
-//!     #[option(desc = "How many times", min = 1, max = 5)] times: Option<u8>,
+//! fn echo(
+//!     #[option("What to say", max_len = 200)] text: &str,
+//!     #[option("How many times", min = 1, max = 5)] times: Option<u8>,
 //! ) -> String {
 //!     text.repeat(times.unwrap_or(1).into())
 //! }
@@ -45,6 +44,8 @@ pub use set::*;
 ///
 /// The struct implements [`InteractionHandler`] for every State its Commands accept; an
 /// Interaction for a Command not in the set is answered with an "Unknown command" message.
+/// Two Commands with the same name and type, or more than Discord allows in one Scope, fail to
+/// compile.
 /// `Bot.with_fallback(handler)` sends components, modals, autocomplete, and unknown commands to
 /// `handler` instead.
 #[macro_export]
@@ -53,6 +54,12 @@ macro_rules! commands {
         $(#[$attr])*
         #[derive(Debug, Clone, Copy, Default)]
         $vis struct $name;
+
+        const _: () = $crate::command::check_commands(&[$((
+            <$command as $crate::command::CommandDefinition>::NAME,
+            <$command as $crate::command::CommandDefinition>::KIND,
+            <$command as $crate::command::CommandDefinition>::SCOPE,
+        )),*]);
 
         impl $name {
             /// Sends components, modals, autocomplete, and commands not in this set to `fallback`
