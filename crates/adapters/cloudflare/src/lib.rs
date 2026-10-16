@@ -1,14 +1,20 @@
 #![doc = include_str!("../README.md")]
 
+mod state;
 mod transport;
 
 pub use composure::command::{HandlerError, InteractionHandler, NoHandler};
 use composure::{
-    command::{ErrorKind, dispatch},
-    types::{Interaction, InteractionResponse},
+    command::dispatch,
+    rest::InteractionClient,
+    types::{Interaction, InteractionResponse, Snowflake},
 };
+pub use state::Worker;
+use state::log_handler_error;
 pub use transport::FetchTransport;
-use worker::{Env, Headers, Request, Response, console_debug, console_error, console_warn};
+use worker::{
+    Context, Env, Headers, Request, Response, console_debug, console_error, console_warn,
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -139,42 +145,44 @@ pub async fn handle_interaction<S, H: InteractionHandler<S>>(
     }
 }
 
-/// Interaction bot for Cloudflare. The handler receives the worker's [`Env`] as its State.
+/// Interaction bot for Cloudflare. The handler receives a [`Worker`] (the worker's [`Env`] and
+/// [`Context`]) as its State.
 pub struct CloudflareInteractionBot<H = NoHandler> {
     req: Request,
-    env: Env,
+    state: Worker,
     handler: H,
 }
 
 impl CloudflareInteractionBot {
     /// Creates a new Cloudflare interaction bot. Without [`with_handler`](Self::with_handler)
     /// every interaction gets the [`InteractionHandler`] defaults.
-    pub fn new(req: Request, env: Env) -> Self {
+    pub fn new(req: Request, env: Env, ctx: Context) -> Self {
         Self {
             req,
-            env,
+            state: Worker::new(env, ctx),
             handler: NoHandler,
         }
     }
 }
 
-impl<H: InteractionHandler<Env>> CloudflareInteractionBot<H> {
+impl<H: InteractionHandler<Worker>> CloudflareInteractionBot<H> {
     /// Handles interactions with `handler`: a Command Set, a Command Set `with_fallback`, or any
     /// [`InteractionHandler`]
-    pub fn with_handler<T: InteractionHandler<Env>>(
+    pub fn with_handler<T: InteractionHandler<Worker>>(
         self,
         handler: T,
     ) -> CloudflareInteractionBot<T> {
         CloudflareInteractionBot {
             req: self.req,
-            env: self.env,
+            state: self.state,
             handler,
         }
     }
 
     /// Validates and handles the request. Every outcome is an HTTP response:
     /// bad signature is 401, unparseable body is 400, a missing public key secret is 500,
-    /// handler errors are logged and answered with an ephemeral error message.
+    /// handler errors are logged and answered with an ephemeral error message. Responses with
+    /// files are sent through the callback endpoint and the request is answered with 202.
     pub async fn process(mut self) -> worker::Result<Response> {
         console_debug!("Processing request");
 
@@ -186,7 +194,7 @@ impl<H: InteractionHandler<Env>> CloudflareInteractionBot<H> {
             }
         };
 
-        let public_key = match self.env.secret(PUBLIC_KEY_SECRET) {
+        let public_key = match self.state.secret(PUBLIC_KEY_SECRET) {
             Ok(secret) => secret.to_string(),
             Err(e) => {
                 console_error!("Missing {} secret: {}", PUBLIC_KEY_SECRET, e);
@@ -203,7 +211,7 @@ impl<H: InteractionHandler<Env>> CloudflareInteractionBot<H> {
             timestamp.as_deref(),
             &bytes,
             &self.handler,
-            &self.env,
+            &self.state,
         )
         .await;
 
@@ -216,18 +224,43 @@ impl<H: InteractionHandler<Env>> CloudflareInteractionBot<H> {
                 console_error!("Failed to parse interaction: {}", e);
                 Response::error("Bad request", 400)
             }
-            InteractionOutcome::Respond(response) => Response::from_json(&response),
+            InteractionOutcome::Respond(response) => reply(&bytes, &response).await,
             InteractionOutcome::HandlerFailed { error, response } => {
-                // User errors are expected outcomes the user already sees
-                if error.kind() == ErrorKind::User {
-                    console_debug!("User error: {}", error);
-                } else {
-                    console_error!("Handler error: {}", error);
-                }
-                Response::from_json(&response)
+                log_handler_error(&error);
+                reply(&bytes, &response).await
             }
         }
     }
+}
+
+/// The response as the HTTP reply, or, when it carries files (multipart, which the reply cannot
+/// be), through the callback endpoint followed by an empty 202
+async fn reply(body: &[u8], response: &InteractionResponse) -> worker::Result<Response> {
+    if response.files().is_empty() {
+        return Response::from_json(response);
+    }
+    let Some(client) = callback_client(body) else {
+        console_error!("Interaction without id, application_id, or token");
+        return Response::error("Bad request", 400);
+    };
+    match client.create_response(response, response.files()).await {
+        Ok(()) => Ok(Response::empty()?.with_status(202)),
+        Err(e) => {
+            console_error!("Failed to send response with files: {}", e);
+            Response::error("Internal error", 500)
+        }
+    }
+}
+
+fn callback_client(body: &[u8]) -> Option<InteractionClient<FetchTransport>> {
+    let interaction: serde_json::Value = serde_json::from_slice(body).ok()?;
+    let id = |key: &str| interaction.get(key)?.as_str()?.parse::<Snowflake>().ok();
+    Some(InteractionClient::new(
+        FetchTransport,
+        id("application_id")?,
+        id("id")?,
+        interaction.get("token")?.as_str()?,
+    ))
 }
 
 #[cfg(test)]

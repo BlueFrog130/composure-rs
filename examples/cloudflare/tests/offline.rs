@@ -1,14 +1,56 @@
 //! Signed interactions through `handle_interaction` on the host, and the Definitions Sync would
-//! publish. `TestEnv` stands in for `worker::Env` as State.
+//! publish. `TestEnv` stands in for the Cloudflare `Worker` State: vars, a recording Transport,
+//! and Background Work run on demand.
 
-use composure::command::{CommandSetDefinition, InteractionHandler};
+use std::{cell::RefCell, rc::Rc, time::Duration};
+
+use composure::{
+    command::{BackgroundWork, CommandSetDefinition, HandlerError, InteractionHandler, Platform},
+    rest::{Method, RawResponse, Request, Transport, TransportError},
+};
 use composure_adapter_cloudflare::handle_interaction;
 use composure_example_commands::{Bot, Components, Vars};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
 use serde_json::{Value, json};
 
-struct TestEnv;
+/// Records requests and answers the few that are read with canned bodies
+#[derive(Default)]
+struct Discord {
+    requests: RefCell<Vec<Request>>,
+}
+
+impl Transport for Discord {
+    async fn send(&self, request: &Request) -> Result<RawResponse, TransportError> {
+        self.requests.borrow_mut().push(request.clone());
+        let path = request.url.rsplit("/v10").next().unwrap();
+        let body = match (request.method, path) {
+            (Method::Get, "/users/@me") => json!({
+                "id": "9", "username": "composure", "discriminator": "0",
+                "global_name": "Composure", "avatar": null,
+            }),
+            (Method::Post, "/users/@me/channels") => json!({ "id": "77", "type": 1 }),
+            (Method::Get, p) if p.starts_with("/applications/") => json!([
+                { "id": "1", "application_id": "1", "version": "1", "type": 1, "name": "hello", "description": "Say hello" },
+                { "id": "2", "application_id": "1", "version": "1", "type": 2, "name": "Avatar" },
+            ]),
+            _ => json!({}),
+        };
+        Ok(RawResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: body.to_string().into_bytes(),
+        })
+    }
+
+    async fn sleep(&self, _duration: Duration) {}
+}
+
+#[derive(Clone, Default)]
+struct TestEnv {
+    discord: Rc<Discord>,
+    work: Rc<RefCell<Vec<BackgroundWork>>>,
+}
 
 impl Vars for TestEnv {
     fn var(&self, name: &str) -> Option<String> {
@@ -16,15 +58,61 @@ impl Vars for TestEnv {
     }
 }
 
+impl Platform for TestEnv {
+    type Transport = Rc<Discord>;
+
+    fn transport(&self) -> Rc<Discord> {
+        self.discord.clone()
+    }
+
+    fn spawn(&self, work: BackgroundWork) {
+        self.work.borrow_mut().push(work);
+    }
+
+    fn bot_token(&self) -> Option<String> {
+        Some("bot-token".to_string())
+    }
+}
+
+impl TestEnv {
+    /// Runs the Background Work spawned so far, as `wait_until` would after the response
+    fn run_background(&self) -> Result<(), HandlerError> {
+        let work: Vec<_> = self.work.borrow_mut().drain(..).collect();
+        work.into_iter().try_for_each(block_on)
+    }
+
+    /// (method, path, content type, body) of every request sent
+    fn sent(&self) -> Vec<(Method, String, String, String)> {
+        self.discord
+            .requests
+            .borrow()
+            .iter()
+            .map(|r| {
+                (
+                    r.method,
+                    r.url.rsplit("/v10").next().unwrap().to_string(),
+                    r.header("content-type").unwrap_or_default().to_string(),
+                    String::from_utf8_lossy(r.body.as_deref().unwrap_or_default()).into_owned(),
+                )
+            })
+            .collect()
+    }
+}
+
 const KEY: [u8; 32] = [7; 32];
 const TIMESTAMP: &str = "1760000000";
 const ALICE: &str = "100000000000000001";
+const CHANNEL: &str = "300000000000000001";
 
 fn alice() -> Value {
     json!({ "id": ALICE, "username": "alice", "discriminator": "0", "global_name": "Alice", "avatar": "abc" })
 }
 
-fn send(handler: &impl InteractionHandler<TestEnv>, payload: Value) -> (u16, Value) {
+fn send_with(
+    handler: &impl InteractionHandler<TestEnv>,
+    env: &TestEnv,
+    payload: Value,
+) -> (u16, Value, usize) {
     let body = payload.to_string().into_bytes();
     let key = SigningKey::from_bytes(&KEY);
     let signature = hex::encode(key.sign(&[TIMESTAMP.as_bytes(), &body].concat()).to_bytes());
@@ -34,13 +122,19 @@ fn send(handler: &impl InteractionHandler<TestEnv>, payload: Value) -> (u16, Val
         Some(TIMESTAMP),
         &body,
         handler,
-        &TestEnv,
+        env,
     ));
+    let files = outcome.response().map_or(0, |r| r.files().len());
     let response = outcome
         .response()
         .map(|r| serde_json::to_value(r).unwrap())
         .unwrap_or_default();
-    (outcome.status(), response)
+    (outcome.status(), response, files)
+}
+
+fn send(handler: &impl InteractionHandler<TestEnv>, payload: Value) -> (u16, Value) {
+    let (status, response, _) = send_with(handler, &TestEnv::default(), payload);
+    (status, response)
 }
 
 fn command(data: Value) -> Value {
@@ -50,6 +144,7 @@ fn command(data: Value) -> Value {
         "type": 2,
         "token": "token",
         "version": 1,
+        "channel_id": CHANNEL,
         "user": alice(),
         "data": data,
     })
@@ -63,6 +158,8 @@ fn content(payload: Value) -> String {
         .unwrap_or_default()
         .to_string()
 }
+
+const ORIGINAL: &str = "/webhooks/1052322265397739523/token/messages/@original";
 
 #[test]
 fn chat_input_commands() {
@@ -131,6 +228,161 @@ fn group_and_context_menu_commands() {
 }
 
 #[test]
+fn inline_rest_with_the_bot_token() {
+    let env = TestEnv::default();
+    let (_, response, _) = send_with(
+        &Bot,
+        &env,
+        command(json!({ "id": "1", "name": "whoami", "type": 1 })),
+    );
+    assert_eq!(
+        response["data"]["content"],
+        "I'm Composure, answering from a Worker."
+    );
+    let request = env.discord.requests.borrow()[0].clone();
+    assert_eq!(request.header("authorization"), Some("Bot bot-token"));
+
+    let env = TestEnv::default();
+    let (_, response, _) = send_with(
+        &Bot,
+        &env,
+        command(
+            json!({ "id": "1", "name": "announce", "type": 1, "options": [
+            { "name": "text", "type": 3, "value": "Release day" },
+        ] }),
+        ),
+    );
+    assert_eq!(response["data"]["content"], "Posted.");
+    assert_eq!(
+        env.sent(),
+        [(
+            Method::Post,
+            format!("/channels/{CHANNEL}/messages"),
+            "application/json".to_string(),
+            r#"{"content":"Release day"}"#.to_string()
+        )]
+    );
+
+    let env = TestEnv::default();
+    let (_, response, _) = send_with(
+        &Bot,
+        &env,
+        command(json!({ "id": "1", "name": "dm-me", "type": 1, "options": [
+            { "name": "text", "type": 3, "value": "psst" },
+        ] })),
+    );
+    assert_eq!(response["data"]["content"], "Check your DMs.");
+    let paths: Vec<_> = env.sent().into_iter().map(|(_, path, ..)| path).collect();
+    assert_eq!(paths, ["/users/@me/channels", "/channels/77/messages"]);
+}
+
+#[test]
+fn message_command_reacts() {
+    let env = TestEnv::default();
+    let message = json!({
+        "id": "500000000000000001", "channel_id": CHANNEL, "author": alice(), "content": "nice",
+        "timestamp": "2024-01-01T00:00:00.000000+00:00", "edited_timestamp": null, "tts": false,
+        "mention_everyone": false, "mentions": [], "mention_roles": [], "attachments": [],
+        "embeds": [], "pinned": false, "type": 0,
+    });
+    let (_, response, _) = send_with(
+        &Bot,
+        &env,
+        command(json!({
+            "id": "1", "name": "Thumbs up", "type": 3, "target_id": "500000000000000001",
+            "resolved": { "messages": { "500000000000000001": message } },
+        })),
+    );
+    assert_eq!(response["data"]["content"], "Reacted.");
+    assert_eq!(
+        env.sent()[0].1,
+        format!("/channels/{CHANNEL}/messages/500000000000000001/reactions/%F0%9F%91%8D/@me")
+    );
+}
+
+#[test]
+fn deferred_commands_finish_in_the_background() {
+    let env = TestEnv::default();
+    let (_, response, _) = send_with(
+        &Bot,
+        &env,
+        command(json!({ "id": "1", "name": "remind", "type": 1, "options": [
+            { "name": "text", "type": 3, "value": "stretch" },
+            { "name": "seconds", "type": 4, "value": 2 },
+        ] })),
+    );
+    // Answered right away; nothing sent to Discord until the response is out
+    assert_eq!(response, json!({ "type": 5, "data": { "flags": 64 } }));
+    assert!(env.sent().is_empty());
+
+    env.run_background().unwrap();
+    let sent = env.sent();
+    assert_eq!(sent.len(), 2);
+    assert_eq!(
+        (sent[0].0, sent[0].1.as_str()),
+        (Method::Post, "/webhooks/1052322265397739523/token")
+    );
+    assert!(sent[0].3.contains(&format!("<@{ALICE}> stretch")));
+    assert_eq!((sent[1].0, sent[1].1.as_str()), (Method::Patch, ORIGINAL));
+    assert_eq!(
+        sent[1].3,
+        r#"{"content":"Reminded you about \"stretch\"."}"#
+    );
+
+    let env = TestEnv::default();
+    let (_, response, _) = send_with(
+        &Bot,
+        &env,
+        command(json!({ "id": "1", "name": "countdown", "type": 1 })),
+    );
+    assert_eq!(response, json!({ "type": 5 }));
+    env.run_background().unwrap();
+    let edits: Vec<_> = env.sent().into_iter().map(|(.., body)| body).collect();
+    assert_eq!(
+        edits,
+        [
+            r#"{"content":"3..."}"#,
+            r#"{"content":"2..."}"#,
+            r#"{"content":"1..."}"#,
+            "{\"content\":\"Liftoff! \u{1F680}\"}",
+        ]
+    );
+}
+
+#[test]
+fn files_upload_as_multipart() {
+    // In the initial response: the Adapter sends it through the callback endpoint
+    let (_, response, files) = send_with(
+        &Bot,
+        &TestEnv::default(),
+        command(json!({ "id": "1", "name": "export", "type": 1, "options": [
+            { "name": "text", "type": 3, "value": "hello file" },
+        ] })),
+    );
+    assert_eq!(response["data"]["content"], "Here's your file:");
+    assert_eq!(files, 1);
+
+    // In a deferred result: with the edit of the original response
+    let env = TestEnv::default();
+    send_with(
+        &Bot,
+        &env,
+        command(json!({ "id": "1", "name": "report", "type": 1 })),
+    );
+    env.run_background().unwrap();
+    let sent = env.sent();
+    assert_eq!(
+        sent[0].1,
+        "/applications/1052322265397739523/commands?with_localizations=true"
+    );
+    let (method, path, content_type, body) = &sent[1];
+    assert_eq!((*method, path.as_str()), (Method::Patch, ORIGINAL));
+    assert!(content_type.starts_with("multipart/form-data"));
+    assert!(body.contains("name,type\nhello,slash\nAvatar,user\n"));
+    assert!(body.contains(r#""content":"2 global commands""#));
+}
+
+#[test]
 fn errors_become_ephemeral_messages() {
     let (status, response) = send(
         &Bot,
@@ -148,14 +400,55 @@ fn errors_become_ephemeral_messages() {
     assert_eq!(response["data"]["flags"], 64);
 }
 
-#[test]
-fn fallback_handles_components() {
-    let click = json!({
+fn click(custom_id: &str) -> Value {
+    json!({
         "id": "1", "application_id": "1", "type": 3, "token": "t", "version": 1,
-        "data": { "custom_id": "button", "component_type": 2 },
-    });
-    let (_, response) = send(&Bot.with_fallback(Components), click);
+        "data": { "custom_id": custom_id, "component_type": 2 },
+    })
+}
+
+#[test]
+fn buttons_and_modals() {
+    let bot = Bot.with_fallback(Components);
+
+    let (_, response) = send(
+        &bot,
+        command(json!({ "id": "1", "name": "counter", "type": 1 })),
+    );
+    assert_eq!(response["data"]["content"], "Clicked 0 times");
+    assert_eq!(
+        response["data"]["components"][0]["components"][0]["custom_id"],
+        "counter:0"
+    );
+
+    let (_, response) = send(&bot, click("counter:4"));
+    assert_eq!(response["type"], 7, "updates the clicked message");
+    assert_eq!(response["data"]["content"], "Clicked 5 times");
+    assert_eq!(
+        response["data"]["components"][0]["components"][0]["custom_id"],
+        "counter:5"
+    );
+
+    let (_, response) = send(&bot, click("button"));
     assert_eq!(response["data"]["content"], "Clicked button");
+
+    let (_, response) = send(
+        &bot,
+        command(json!({ "id": "1", "name": "feedback", "type": 1 })),
+    );
+    assert_eq!(response["type"], 9);
+    assert_eq!(response["data"]["custom_id"], "feedback");
+
+    let submit = json!({
+        "id": "1", "application_id": "1", "type": 5, "token": "t", "version": 1,
+        "data": { "custom_id": "feedback", "components": [
+            { "type": 1, "components": [{ "type": 4, "custom_id": "topic", "value": "Docs" }] },
+            { "type": 1, "components": [{ "type": 4, "custom_id": "details", "value": "" }] },
+        ] },
+    });
+    let (_, response) = send(&bot, submit);
+    assert_eq!(response["data"]["content"], "Thanks! **Docs**: (none)");
+    assert_eq!(response["data"]["flags"], 64);
 }
 
 #[test]
@@ -178,6 +471,16 @@ fn definitions_for_sync() {
             (Some("dev"), json!("mod"), json!(1)),
             (None, json!("Avatar"), json!(2)),
             (None, json!("Word count"), json!(3)),
+            (None, json!("whoami"), json!(1)),
+            (None, json!("remind"), json!(1)),
+            (None, json!("countdown"), json!(1)),
+            (Some("dev"), json!("announce"), json!(1)),
+            (None, json!("Thumbs up"), json!(3)),
+            (None, json!("dm-me"), json!(1)),
+            (None, json!("report"), json!(1)),
+            (None, json!("export"), json!(1)),
+            (None, json!("counter"), json!(1)),
+            (None, json!("feedback"), json!(1)),
         ]
     );
 }

@@ -1,0 +1,340 @@
+//! REST and Background Work for Commands, when the Adapter's State provides them (ADR 0006).
+
+use std::{future::Future, pin::Pin, rc::Rc, time::Duration};
+
+use crate::{
+    rest::{BotClient, EditMessage, Error, InteractionClient, Transport},
+    types::{
+        ApplicationCommandInteraction, InteractionResponse, Member, MessageFlags, Snowflake, User,
+    },
+};
+
+use super::{CommandOutput, Ctx, HandlerError, IntoResponse};
+
+/// Background Work handed to the Adapter: runs after the response is sent; an `Err` is logged
+pub type BackgroundWork = Pin<Box<dyn Future<Output = Result<(), HandlerError>>>>;
+
+/// What an Adapter's State offers beyond its own resources: a [`Transport`] for REST, a way to run
+/// Background Work, and the bot token when configured. Implemented by each Adapter's State
+/// (`composure_adapter_cloudflare::Worker`); enables [`Ctx::client`], [`Ctx::bot`] and
+/// [`Ctx::defer`].
+pub trait Platform: Clone + 'static {
+    type Transport: Transport + Clone + 'static;
+
+    fn transport(&self) -> Self::Transport;
+
+    /// Runs `work` after the response is sent (`wait_until` on Cloudflare), within the
+    /// platform's post-response time limit
+    fn spawn(&self, work: BackgroundWork);
+
+    /// The bot token (`DISCORD_TOKEN`), without the `Bot ` prefix
+    fn bot_token(&self) -> Option<String>;
+}
+
+fn interaction_client<S: Platform>(
+    state: &S,
+    interaction: &ApplicationCommandInteraction,
+) -> InteractionClient<S::Transport> {
+    let common = &interaction.common;
+    InteractionClient::new(
+        state.transport(),
+        common.application_id,
+        common.id,
+        common.token.clone(),
+    )
+}
+
+fn bot_client<S: Platform>(
+    state: &S,
+    interaction: &ApplicationCommandInteraction,
+) -> Result<BotClient<S::Transport>, HandlerError> {
+    let token = state
+        .bot_token()
+        .ok_or_else(|| HandlerError::new("the bot token (DISCORD_TOKEN) is not configured"))?;
+    Ok(BotClient::new(
+        state.transport(),
+        &token,
+        interaction.common.application_id,
+    ))
+}
+
+impl<'a, S: Platform> Ctx<'a, S> {
+    /// Follow-ups and the original response of this Interaction. Before the Command returns,
+    /// only Endpoints that do not depend on the initial response work; use [`defer`](Self::defer)
+    /// to act after it.
+    pub fn client(&self) -> InteractionClient<S::Transport> {
+        interaction_client(self.state(), self.interaction())
+    }
+
+    /// Client authorized by the bot token; an error when the Adapter has none
+    pub fn bot(&self) -> Result<BotClient<S::Transport>, HandlerError> {
+        bot_client(self.state(), self.interaction())
+    }
+
+    /// Answers with a Deferred Response (the user sees "thinking...") and runs `work` as
+    /// Background Work; its output then replaces the original response, like a Command's return
+    /// value would have been sent. Wrap in [`Ephemeral`](super::Ephemeral) to make the response
+    /// ephemeral; that is decided now, not by `work`'s output.
+    ///
+    /// ```ignore
+    /// #[command]
+    /// fn report(ctx: Ctx<Worker>) -> Deferred {
+    ///     ctx.defer(async |ctx| {
+    ///         let stats = slow_query(ctx.state()).await?;
+    ///         Ok::<_, HandlerError>(format!("{stats} rows"))
+    ///     })
+    /// }
+    /// ```
+    pub fn defer<F, Fut>(&self, work: F) -> Deferred
+    where
+        F: FnOnce(DeferredCtx<S>) -> Fut,
+        Fut: Future<Output: CommandOutput> + 'static,
+    {
+        let ctx = DeferredCtx {
+            interaction: Rc::new(self.interaction().clone()),
+            state: self.state().clone(),
+        };
+        let client = ctx.client();
+        let output = work(ctx);
+        self.state().spawn(Box::pin(async move {
+            let (response, error) = match output.await.into_result() {
+                Ok(response) => (response, None),
+                Err(error) => (error.response(), Some(error)),
+            };
+            if let Some(data) = response.into_message_data() {
+                // Ephemerality was fixed by the deferred reply; edits cannot change it
+                let flags = data
+                    .flags
+                    .map(|flags| flags - MessageFlags::Ephemeral)
+                    .filter(|flags| !flags.is_empty());
+                let edit = EditMessage {
+                    flags,
+                    ..EditMessage::from(&data)
+                };
+                edit_original(&client, &edit)
+                    .await
+                    .map_err(HandlerError::new)?;
+            }
+            error.map_or(Ok(()), Err)
+        }));
+        Deferred(())
+    }
+}
+
+/// Retries while Discord has not yet seen the deferred reply: Background Work can start before
+/// the platform finishes sending it
+async fn edit_original<T: Transport>(
+    client: &InteractionClient<T>,
+    message: &EditMessage<'_>,
+) -> Result<(), Error> {
+    const ATTEMPTS: u32 = 4;
+    for attempt in 1.. {
+        match client.edit_original(message).await {
+            Err(Error::Api(error)) if error.status == 404 && attempt < ATTEMPTS => {
+                client
+                    .transport()
+                    .sleep(Duration::from_millis(250 * u64::from(attempt)))
+                    .await;
+            }
+            result => return result.map(drop),
+        }
+    }
+    unreachable!()
+}
+
+/// Returned by [`Ctx::defer`]: a Deferred Response whose Background Work is already scheduled
+#[derive(Debug)]
+#[must_use = "return it from the Command, or the user sees no response"]
+pub struct Deferred(());
+
+impl IntoResponse for Deferred {
+    fn into_response(self) -> InteractionResponse {
+        InteractionResponse::DeferredChannelMessageWithSource(None)
+    }
+}
+
+/// What deferred Background Work sees: an owned, `'static` copy of the Interaction and State
+#[derive(Clone)]
+pub struct DeferredCtx<S> {
+    interaction: Rc<ApplicationCommandInteraction>,
+    state: S,
+}
+
+impl<S: Platform> DeferredCtx<S> {
+    pub fn interaction(&self) -> &ApplicationCommandInteraction {
+        &self.interaction
+    }
+
+    pub fn state(&self) -> &S {
+        &self.state
+    }
+
+    pub fn user(&self) -> Option<&User> {
+        self.interaction.common.invoking_user()
+    }
+
+    pub fn member(&self) -> Option<&Member> {
+        self.interaction.common.member.as_ref()
+    }
+
+    pub fn guild_id(&self) -> Option<Snowflake> {
+        self.interaction.common.guild_id
+    }
+
+    pub fn channel_id(&self) -> Option<Snowflake> {
+        self.interaction.common.channel_id
+    }
+
+    /// Follow-ups and the original response of this Interaction
+    pub fn client(&self) -> InteractionClient<S::Transport> {
+        interaction_client(&self.state, &self.interaction)
+    }
+
+    /// Client authorized by the bot token; an error when the Adapter has none
+    pub fn bot(&self) -> Result<BotClient<S::Transport>, HandlerError> {
+        bot_client(&self.state, &self.interaction)
+    }
+
+    /// Waits on the platform's timer (counts toward the Background Work time limit)
+    pub async fn sleep(&self, duration: Duration) {
+        self.state.transport().sleep(duration).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use futures::executor::block_on;
+    use serde_json::json;
+
+    use super::*;
+    use crate::{command::Ephemeral, rest::testing::MockTransport, types::Interaction};
+
+    #[derive(Clone, Default)]
+    struct TestPlatform {
+        transport: Rc<MockTransport>,
+        work: Rc<RefCell<Vec<BackgroundWork>>>,
+    }
+
+    impl Platform for TestPlatform {
+        type Transport = Rc<MockTransport>;
+
+        fn transport(&self) -> Self::Transport {
+            self.transport.clone()
+        }
+
+        fn spawn(&self, work: BackgroundWork) {
+            self.work.borrow_mut().push(work);
+        }
+
+        fn bot_token(&self) -> Option<String> {
+            None
+        }
+    }
+
+    impl TestPlatform {
+        fn run(&self) -> Result<(), HandlerError> {
+            let work = self.work.borrow_mut().pop().expect("work was spawned");
+            block_on(work)
+        }
+
+        fn edits(&self) -> Vec<(String, serde_json::Value)> {
+            self.transport
+                .requests
+                .borrow()
+                .iter()
+                .map(|r| {
+                    let body = serde_json::from_slice(r.body.as_deref().unwrap()).unwrap();
+                    (r.url.clone(), body)
+                })
+                .collect()
+        }
+    }
+
+    fn interaction() -> ApplicationCommandInteraction {
+        let payload = json!({
+            "id": "2", "application_id": "1", "type": 2, "token": "tok", "version": 1,
+            "user": { "id": "3", "username": "a", "discriminator": "0", "global_name": null, "avatar": null },
+            "data": { "id": "4", "name": "slow", "type": 1 },
+        });
+        match serde_json::from_value(payload).unwrap() {
+            Interaction::ApplicationCommand(interaction) => interaction,
+            _ => unreachable!(),
+        }
+    }
+
+    const ORIGINAL: &str = "https://discord.com/api/v10/webhooks/1/tok/messages/@original";
+
+    #[test]
+    fn defer_answers_type_5_and_edits_original_with_the_output() {
+        let platform = TestPlatform::default();
+        let interaction = interaction();
+        let ctx = Ctx::new(&interaction, &platform);
+        let response = ctx
+            .defer(async |ctx| format!("done for {}", ctx.user().unwrap().username))
+            .into_response();
+        assert!(matches!(
+            response,
+            InteractionResponse::DeferredChannelMessageWithSource(None)
+        ));
+        assert!(platform.transport.requests.borrow().is_empty());
+
+        platform.run().unwrap();
+        assert_eq!(
+            platform.edits(),
+            [(ORIGINAL.to_string(), json!({ "content": "done for a" }))]
+        );
+    }
+
+    #[test]
+    fn ephemeral_defer_sets_the_flag() {
+        let platform = TestPlatform::default();
+        let interaction = interaction();
+        let ctx = Ctx::new(&interaction, &platform);
+        let response = Ephemeral(ctx.defer(async |_| "ok")).into_response();
+        assert!(matches!(
+            response,
+            InteractionResponse::DeferredChannelMessageWithSource(Some(MessageFlags::Ephemeral))
+        ));
+    }
+
+    #[test]
+    fn errors_edit_with_the_error_message_and_are_reported() {
+        let platform = TestPlatform::default();
+        let interaction = interaction();
+        let ctx = Ctx::new(&interaction, &platform);
+        let _ = ctx.defer(async |_| Err::<String, _>(HandlerError::user("nope")));
+        assert_eq!(platform.run().unwrap_err().to_string(), "nope");
+        assert_eq!(
+            platform.edits(),
+            [(ORIGINAL.to_string(), json!({ "content": "nope" }))]
+        );
+    }
+
+    #[test]
+    fn retries_while_the_deferral_is_unknown() {
+        let transport = MockTransport::default()
+            .respond(404, r#"{"code":10015,"message":"Unknown Webhook"}"#)
+            .respond(200, "{}");
+        let platform = TestPlatform {
+            transport: Rc::new(transport),
+            ..Default::default()
+        };
+        let interaction = interaction();
+        let _ = Ctx::new(&interaction, &platform).defer(async |_| "ok");
+        platform.run().unwrap();
+        assert_eq!(platform.edits().len(), 2);
+        assert_eq!(
+            *platform.transport.sleeps.borrow(),
+            [Duration::from_millis(250)]
+        );
+    }
+
+    #[test]
+    fn bot_needs_a_token() {
+        let platform = TestPlatform::default();
+        let interaction = interaction();
+        assert!(Ctx::new(&interaction, &platform).bot().is_err());
+    }
+}

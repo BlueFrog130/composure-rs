@@ -1,4 +1,4 @@
-use std::{fmt, time::Duration};
+use std::{fmt, rc::Rc, time::Duration};
 
 /// The Adapter-provided way to send one HTTP request and to sleep; the REST client's only contact
 /// with the platform (`worker::Fetch` on Cloudflare, `reqwest` natively).
@@ -15,6 +15,16 @@ pub trait Transport {
 }
 
 impl<T: Transport + ?Sized> Transport for &T {
+    async fn send(&self, request: &Request) -> Result<RawResponse, TransportError> {
+        (**self).send(request).await
+    }
+
+    async fn sleep(&self, duration: Duration) {
+        (**self).sleep(duration).await
+    }
+}
+
+impl<T: Transport + ?Sized> Transport for Rc<T> {
     async fn send(&self, request: &Request) -> Result<RawResponse, TransportError> {
         (**self).send(request).await
     }

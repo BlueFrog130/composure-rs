@@ -51,6 +51,24 @@ macro_rules! routes {
 
 pub(crate) use routes;
 
+/// A path parameter that is free text (emoji, names): percent-encoded, keeping `:` for
+/// custom emoji (`name:id`)
+pub(crate) struct PathSegment<'a>(pub(crate) &'a str);
+
+impl Display for PathSegment<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for byte in self.0.bytes() {
+            match byte {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b':' => {
+                    f.write_char(byte as char)?
+                }
+                _ => write!(f, "%{byte:02X}")?,
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Appends `?key=value&...` to a URL, percent-encoding values
 pub(crate) struct Query<'a> {
     url: &'a mut String,

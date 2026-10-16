@@ -10,6 +10,10 @@ fn implemented() -> Vec<Route> {
     routes.extend_from_slice(super::interaction::ROUTES);
     #[cfg(feature = "rest-commands")]
     routes.extend_from_slice(super::commands::ROUTES);
+    #[cfg(feature = "rest-messages")]
+    routes.extend_from_slice(super::messages::ROUTES);
+    #[cfg(feature = "rest-users")]
+    routes.extend_from_slice(super::users::ROUTES);
     routes
 }
 

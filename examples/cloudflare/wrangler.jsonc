@@ -14,6 +14,6 @@
     "GREETING": "Hello"
   }
 
-  // DISCORD_PUBLIC_KEY is a secret: `npx wrangler secret put DISCORD_PUBLIC_KEY`,
-  // or `.dev.vars` for `wrangler dev`
+  // DISCORD_PUBLIC_KEY (required) and DISCORD_TOKEN (for REST commands) are secrets:
+  // `npx wrangler secret put <NAME>`, or `.dev.vars` for `wrangler dev`
 }

@@ -9,6 +9,8 @@ mod client;
 mod commands;
 mod error;
 mod interaction;
+#[cfg(feature = "rest-messages")]
+mod messages;
 mod multipart;
 #[cfg(feature = "reqwest")]
 mod reqwest;
@@ -19,6 +21,8 @@ mod spec;
 #[cfg(test)]
 pub(crate) mod testing;
 mod transport;
+#[cfg(feature = "rest-users")]
+mod users;
 
 pub use bot::BotClient;
 pub(crate) use client::{Body, Rest};
@@ -27,6 +31,8 @@ pub use client::{DEFAULT_MAX_RATE_LIMIT_WAIT, DISCORD_API};
 pub use commands::CommandScope;
 pub use error::{ApiError, Error, JsonErrorCode, RateLimited, Result};
 pub use interaction::{CreateFollowup, EditMessage, InteractionClient};
+#[cfg(feature = "rest-messages")]
+pub use messages::CreateMessage;
 #[cfg(feature = "reqwest")]
 pub use reqwest::ReqwestTransport;
 pub use response::Response;

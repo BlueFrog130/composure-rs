@@ -22,6 +22,8 @@ mod ctx;
 mod error;
 mod handler;
 mod option;
+#[cfg(feature = "rest")]
+mod platform;
 mod response;
 mod set;
 
@@ -29,6 +31,8 @@ pub use ctx::*;
 pub use error::*;
 pub use handler::*;
 pub use option::*;
+#[cfg(feature = "rest")]
+pub use platform::*;
 pub use response::*;
 pub use set::*;
 

@@ -11,7 +11,7 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-composure = { path = "../../crates/composure", features = ["macros"] }
+composure = { path = "../../crates/composure", features = ["macros", "tier1"] }
 composure_adapter_cloudflare = { path = "../../crates/adapters/cloudflare" }
 worker = "0.8.7"
 

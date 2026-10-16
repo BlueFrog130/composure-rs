@@ -1,14 +1,16 @@
 # Cloudflare Adapter
 
-Runs a Composure bot on Cloudflare Workers. The adapter verifies the request signature against the `DISCORD_PUBLIC_KEY` secret, answers Discord's Ping, and dispatches everything else to your handler, passing the worker's `Env` as State.
+Runs a Composure bot on Cloudflare Workers. The adapter verifies the request signature against the `DISCORD_PUBLIC_KEY` secret, answers Discord's Ping, and dispatches everything else to your handler, passing a `Worker` (the worker's `Env` and `Context`) as State.
 
 ## Usage
 
-Based on the `worker-rust` template (`npm create cloudflare@latest -- --template=cloudflare/workers-sdk/templates/experimental/worker-rust`). Enable `composure`'s `macros` feature, define commands with `#[command]`, and hand the Command Set to the bot:
+Based on the `worker-rust` template (`npm create cloudflare@latest -- --template=cloudflare/workers-sdk/templates/experimental/worker-rust`). Enable `composure`'s `macros` feature (and `tier1` for REST), define commands with `#[command]`, and hand the Command Set to the bot:
 
 ```rust,no_run
-use composure::{Ctx, command, commands};
-use composure_adapter_cloudflare::CloudflareInteractionBot;
+use std::time::Duration;
+
+use composure::{Ctx, command, command::{Deferred, HandlerError}, commands};
+use composure_adapter_cloudflare::{CloudflareInteractionBot, Worker};
 use worker::*;
 
 /// Say hello
@@ -23,19 +25,29 @@ fn hello(ctx: Ctx) -> String {
     format!("Hello, {name}!")
 }
 
-/// Read a var from wrangler.toml
+/// Read a var from wrangler.jsonc
 #[command]
-async fn greeting(ctx: Ctx<Env>) -> Result<String> {
+async fn greeting(ctx: Ctx<Worker>) -> Result<String> {
     Ok(ctx.state().var("GREETING")?.to_string())
 }
 
+/// Answer now, finish later
+#[command]
+fn slow(ctx: Ctx<Worker>) -> Deferred {
+    ctx.defer(async |ctx| {
+        ctx.sleep(Duration::from_secs(2)).await;
+        let me = ctx.bot()?.get_current_user().await?.model()?;
+        Ok::<_, HandlerError>(format!("{} is done", me.username))
+    })
+}
+
 commands! {
-    pub struct Bot = [hello, greeting];
+    pub struct Bot = [hello, greeting, slow];
 }
 
 #[event(fetch)]
-async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
-    CloudflareInteractionBot::new(req, env)
+async fn fetch(req: Request, env: Env, ctx: Context) -> Result<Response> {
+    CloudflareInteractionBot::new(req, env, ctx)
         .with_handler(Bot)
         .process()
         .await
@@ -43,9 +55,19 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 # fn main() {}
 ```
 
-`Bot.with_fallback(handler)` sends components, modals, autocomplete, and commands not in the set to any `InteractionHandler`. Implement `InteractionHandler<Env>` directly instead of using a Command Set for full control.
+`Bot.with_fallback(handler)` sends components, modals, autocomplete, and commands not in the set to any `InteractionHandler`. Implement `InteractionHandler<Worker>` directly instead of using a Command Set for full control.
 
-`Ctx<Env>` ties a Command (and its Command Set) to Workers. To run it in host tests, take `Ctx<impl YourTrait>` and implement the trait for `Env` and a stand-in; see `/greet` in `examples/cloudflare/`.
+## State and REST
+
+`Worker` derefs to `Env` and implements `composure::command::Platform`, which gives Commands:
+
+- `ctx.client()`: the Interaction Client (follow-ups, the original response); needs no secret.
+- `ctx.bot()`: the Bot Client, from a `DISCORD_TOKEN` secret; an error when it is not set.
+- `ctx.defer(async |ctx| ..)`: replies with a Deferred Response and runs the closure with `wait_until`; its output edits the original response. `Ephemeral(ctx.defer(..))` defers ephemerally. Background Work must finish within Workers' post-response limit (about 30 seconds).
+
+Requests go through `FetchTransport` (Workers `fetch`). A response carrying files (`InteractionResponse::with_file`) is sent through the callback endpoint as multipart and the request is answered with 202.
+
+`Ctx<Worker>` ties a Command (and its Command Set) to Workers. To run it in host tests, take `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) and implement it for a stand-in; see `examples/cloudflare/tests/offline.rs`.
 
 Workers futures are not `Send`; handlers are dispatched statically, so no `Send` bounds or `async_trait` are needed.
 
@@ -66,4 +88,3 @@ composure_adapter_cloudflare = { version = "0.1.0", features = ["web-crypto"] }
 ## Todo
 
 - [ ] Make package size smaller (simple build results in ~800 kb worker size)
-- [ ] Add Discord REST integration (configurable to minimize package size)

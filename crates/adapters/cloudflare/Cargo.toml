@@ -23,5 +23,5 @@ futures = { version = "0.3.34", default-features = false }
 web-crypto = ["composure/web-crypto"]
 
 [dev-dependencies]
-composure = { path = "../../composure", features = ["macros"] }
+composure = { path = "../../composure", features = ["macros", "rest-users"] }
 futures = { version = "0.3.34", default-features = false, features = ["executor"] }
