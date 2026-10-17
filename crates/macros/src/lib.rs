@@ -107,12 +107,60 @@ pub fn modal(args: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
-/// A form shown as a modal: one text input per named field (`String` required,
-/// `Option<String>` optional; at most 5). `#[modal(title = "...")]` on the struct;
-/// `#[input(label = "...", paragraph, min_len = N, max_len = N, placeholder = "...", value =
-/// "...", id = "...")]` on fields (the label defaults to the field name, the input id to the
-/// field name).
-#[proc_macro_derive(Modal, attributes(modal, input))]
+/// A form shown as a modal: each named field is one input inside a Label.
+///
+/// ```ignore
+/// #[derive(Modal)]
+/// #[modal(title = "Report a bug", text = "Thanks for helping!")]
+/// struct BugReport {
+///     #[input(max_len = 100)]
+///     summary: String,
+///     #[input(paragraph, label = "What happened?")]
+///     details: Option<String>,
+///     #[radio]
+///     severity: Severity,               // a #[derive(Choice)] enum supplies the options
+///     #[checkboxes(option("Windows", "win"), option("macOS", "mac"), option("Linux", "linux"))]
+///     platforms: Vec<String>,
+///     #[file_upload(max = 3, file_types("image"))]
+///     screenshots: Vec<Attachment>,
+///     #[checkbox(label = "Contact me")]
+///     contact: bool,
+/// }
+/// ```
+///
+/// The attribute picks the input (default `#[input]`): `input`, `select`, `user_select`,
+/// `role_select`, `mentionable_select`, `channel_select`, `radio`, `checkboxes`, `checkbox`,
+/// `file_upload`. All take `label` (defaults to the field name), `description`, and `id`
+/// (defaults to the field name); then
+/// - `input`: `paragraph`, `min_len`, `max_len`, `placeholder`, `value`
+/// - `select`: `placeholder`, `min`, `max`, `option("Label", "value")`...
+/// - `user_select`, `role_select`, `mentionable_select`: `placeholder`, `min`, `max`
+/// - `channel_select`: those and `channel_types(...)`
+/// - `radio`: `option(...)`...; `checkboxes`: `min`, `max`, `option(...)`...
+/// - `checkbox`: `default`; `file_upload`: `min`, `max`, `file_types("image", ".pdf")`
+///
+/// Without `option(...)`, a `#[derive(Choice)]` field type supplies the options. The type
+/// decides required-ness (`Option` and `Vec` are optional, `Vec` allows several selections) and
+/// how the value is read: `String`, `bool`, `Snowflake`, `User`, `Role`, `PartialChannel`,
+/// `Attachment`, or a Choice enum, each also in `Option` or `Vec`; a mismatch with the input (a
+/// `bool` text input, a `Vec` radio group) fails to compile. On the struct:
+/// `#[modal(title = "...", text = "markdown")]`, `text` repeatable; at most 5 fields and texts.
+#[proc_macro_derive(
+    Modal,
+    attributes(
+        modal,
+        input,
+        select,
+        user_select,
+        role_select,
+        mentionable_select,
+        channel_select,
+        radio,
+        checkboxes,
+        checkbox,
+        file_upload
+    )
+)]
 pub fn derive_modal(item: TokenStream) -> TokenStream {
     modal::expand(item.into())
         .unwrap_or_else(syn::Error::into_compile_error)

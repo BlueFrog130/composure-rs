@@ -35,7 +35,7 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 | `/counter` | `#[component("counter")]` with the count as `custom_id` state (`counter_click::custom_id(n)`); `Update(..)` edits the clicked message |
 | `/roll` | `ctx.defer_update(..)`: acknowledge without a loading message, edit the message from Background Work |
 | `/colors` | A string select; `ComponentCtx::values()` |
-| `/feedback` | `#[derive(Modal)]` form opened with `on_feedback::show()`, submitted to `#[modal("feedback")]` typed |
+| `/feedback` | `#[derive(Modal)]` form (text inputs, a Choice-backed radio group, file upload, checkbox) opened with `on_feedback::show()`, submitted to `#[modal("feedback")]` typed |
 
 [`src/events.rs`](src/events.rs): Webhook Events (`commands! { ..; events = Events; }`), served on `/events`
 

@@ -4,14 +4,15 @@
 use std::time::Duration;
 
 use composure::{
-    Modal, command,
+    Choice, Modal, command,
     command::{
         ComponentCtx, DeferredUpdate, Ephemeral, HandlerError, Platform, Update,
         custom_id::CustomIdError,
     },
     component, modal,
     types::{
-        ActionRow, ButtonStyle, Component, InteractionResponse, MessageCallbackData, SelectOption,
+        ActionRow, Attachment, ButtonStyle, Component, InteractionResponse, MessageCallbackData,
+        SelectOption,
     },
 };
 
@@ -115,13 +116,33 @@ pub fn pick_colors(ctx: ComponentCtx) -> Ephemeral<String> {
     Ephemeral(format!("You picked {}", ctx.values().join(", ")))
 }
 
+#[derive(Choice, Debug)]
+pub enum FeedbackKind {
+    Bug,
+    Idea,
+    #[choice(name = "Something nice")]
+    Praise,
+}
+
+/// Every field is a labeled input; the field type decides required-ness and how the value is
+/// read (`Option` and `Vec` are optional, a Choice enum supplies options)
 #[derive(Modal)]
 #[modal(title = "Feedback")]
 pub struct FeedbackForm {
-    #[input(max_len = 100, placeholder = "What is it about?")]
+    #[input(
+        max_len = 100,
+        placeholder = "What is it about?",
+        description = "Everything else is optional"
+    )]
     topic: String,
+    #[radio(label = "Kind")]
+    kind: FeedbackKind,
     #[input(paragraph, max_len = 1000)]
     details: Option<String>,
+    #[file_upload(max = 3, file_types("image"))]
+    screenshots: Vec<Attachment>,
+    #[checkbox(label = "You may contact me about this")]
+    contact: bool,
 }
 
 /// Send feedback through a form
@@ -134,5 +155,15 @@ pub fn feedback() -> Result<InteractionResponse, CustomIdError> {
 #[modal("feedback")]
 pub fn on_feedback(form: FeedbackForm) -> Ephemeral<String> {
     let details = form.details.as_deref().unwrap_or("(none)");
-    Ephemeral(format!("Thanks! **{}**: {details}", form.topic))
+    let contact = if form.contact {
+        "; we'll be in touch"
+    } else {
+        ""
+    };
+    Ephemeral(format!(
+        "Thanks! {} **{}**: {details} ({} screenshots){contact}",
+        form.kind.name(),
+        form.topic,
+        form.screenshots.len(),
+    ))
 }

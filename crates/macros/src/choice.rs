@@ -104,6 +104,23 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
     let names = variants
         .iter()
         .map(|(variant, name, _)| quote!(Self::#variant => #name,));
+    // Modal options are strings either way
+    let modal_values: Vec<String> = variants
+        .iter()
+        .map(|(variant, _, value)| match value {
+            Value::Integer(value) => value.to_string(),
+            Value::String(value) => value.clone(),
+            _ => variant.to_string(),
+        })
+        .collect();
+    let modal_pairs = variants
+        .iter()
+        .zip(&modal_values)
+        .map(|((_, name, _), value)| quote!((#name, #value)));
+    let modal_arms = variants.iter().zip(&modal_values).map(
+        |((variant, _, _), value)| quote!(#value => ::core::option::Option::Some(Self::#variant),),
+    );
+
     let (option_type, definition, extract, value_type, value_arms) = if integer {
         let pairs = variants.iter().map(|(_, name, value)| {
             let Value::Integer(value) = value else {
@@ -192,6 +209,17 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
             pub const fn value(&self) -> #value_type {
                 match self {
                     #(#value_arms)*
+                }
+            }
+        }
+
+        impl ::composure::command::ModalChoice for #ident {
+            const OPTIONS: &'static [(&'static str, &'static str)] = &[#(#modal_pairs),*];
+
+            fn from_modal_value(value: &str) -> ::core::option::Option<Self> {
+                match value {
+                    #(#modal_arms)*
+                    _ => ::core::option::Option::None,
                 }
             }
         }

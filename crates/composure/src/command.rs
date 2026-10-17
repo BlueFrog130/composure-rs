@@ -25,6 +25,7 @@ pub mod custom_id;
 mod error;
 mod event;
 mod handler;
+mod modal;
 mod option;
 #[cfg(feature = "rest")]
 mod platform;
@@ -37,6 +38,7 @@ pub use ctx::*;
 pub use error::*;
 pub use event::*;
 pub use handler::*;
+pub use modal::*;
 pub use option::*;
 #[cfg(feature = "rest")]
 pub use platform::*;

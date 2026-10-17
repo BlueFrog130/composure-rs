@@ -482,32 +482,43 @@ fn modals_show_and_submit_typed_forms() {
         .as_array()
         .unwrap()
         .iter()
-        .map(|row| {
-            let input = &row["components"][0];
-            (
-                input["custom_id"].clone(),
-                input["label"].clone(),
-                input["required"].clone(),
-            )
+        .map(|label| {
+            assert_eq!(label["type"], 18, "every field is a Label");
+            let input = &label["component"];
+            (input["custom_id"].clone(), input["type"].clone())
         })
         .collect();
     assert_eq!(
         inputs,
         [
-            (json!("topic"), json!("Topic"), json!(true)),
-            (json!("details"), json!("Details"), json!(false)),
+            (json!("topic"), json!(4)),
+            (json!("kind"), json!(21)),
+            (json!("details"), json!(4)),
+            (json!("screenshots"), json!(19)),
+            (json!("contact"), json!(23)),
         ]
     );
+    assert_eq!(
+        response["data"]["components"][1]["component"]["options"][2],
+        json!({ "label": "Something nice", "value": "Praise" })
+    );
 
+    let label = |child: Value| json!({ "type": 18, "id": 1, "component": child });
     let submit = json!({
         "id": "1", "application_id": "1", "type": 5, "token": "t", "version": 1,
         "data": { "custom_id": "feedback", "components": [
-            { "type": 1, "components": [{ "type": 4, "custom_id": "topic", "value": "Docs" }] },
-            { "type": 1, "components": [{ "type": 4, "custom_id": "details", "value": "" }] },
+            label(json!({ "type": 4, "custom_id": "topic", "value": "Docs" })),
+            label(json!({ "type": 21, "custom_id": "kind", "value": "Idea" })),
+            label(json!({ "type": 4, "custom_id": "details", "value": "" })),
+            label(json!({ "type": 19, "custom_id": "screenshots", "values": [] })),
+            label(json!({ "type": 23, "custom_id": "contact", "value": true })),
         ] },
     });
     let (_, response) = send(&Bot, submit);
-    assert_eq!(response["data"]["content"], "Thanks! **Docs**: (none)");
+    assert_eq!(
+        response["data"]["content"],
+        "Thanks! Idea **Docs**: (none) (0 screenshots); we'll be in touch"
+    );
     assert_eq!(response["data"]["flags"], 64);
 }
 

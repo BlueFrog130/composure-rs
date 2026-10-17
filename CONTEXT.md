@@ -99,7 +99,7 @@ _Avoid_: Button handler, listener
 Code answering a modal submit routed by `custom_id` prefix, receiving the submitted fields as a typed Modal.
 
 **Modal**:
-A typed form of text inputs shown to the user and read back on submit (`#[derive(Modal)]`).
+A typed form shown to the user and read back on submit (`#[derive(Modal)]`): labeled text inputs, selects, radio and checkbox groups, checkboxes, and file uploads.
 _Avoid_: Form (alone), dialog
 
 **Custom ID State**:

@@ -89,8 +89,18 @@ impl<'a, S> ComponentCtx<'a, S> {
 }
 
 impl<'a, S> ModalCtx<'a, S> {
-    /// The submitted value of the text input with `custom_id`
+    /// The submitted text of the text input or radio group with `custom_id`
     pub fn value(&self, custom_id: &str) -> Option<&'a str> {
         self.interaction.data.value(custom_id)
+    }
+
+    /// The submitted values of the select, checkbox group, or file upload with `custom_id`
+    pub fn values(&self, custom_id: &str) -> &'a [String] {
+        self.interaction.data.values(custom_id).unwrap_or_default()
+    }
+
+    /// Whether the checkbox with `custom_id` was checked
+    pub fn checked(&self, custom_id: &str) -> Option<bool> {
+        self.interaction.data.checked(custom_id)
     }
 }

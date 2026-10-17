@@ -316,12 +316,41 @@ pub struct ModalSubmitData {
 
     /// the values submitted by the user
     pub components: Vec<ModalSubmitComponent>,
+
+    /// users, roles, channels, and attachments picked in selects and file uploads
+    pub resolved: Option<ResolvedData>,
 }
 
 impl ModalSubmitData {
-    /// The submitted value of the text input with `custom_id`, wherever it is nested
+    /// The submitted text of the text input or radio group with `custom_id`, wherever it is
+    /// nested
     pub fn value(&self, custom_id: &str) -> Option<&str> {
-        self.find(custom_id).and_then(|c| c.value.as_deref())
+        self.find(custom_id).and_then(ModalSubmitComponent::text)
+    }
+
+    /// Whether the checkbox with `custom_id` was checked
+    pub fn checked(&self, custom_id: &str) -> Option<bool> {
+        self.find(custom_id).and_then(ModalSubmitComponent::checked)
+    }
+
+    pub fn resolved_user(&self, id: &Snowflake) -> Option<&User> {
+        self.resolved.as_ref()?.users.as_ref()?.get(id)
+    }
+
+    pub fn resolved_member(&self, id: &Snowflake) -> Option<&PartialMember> {
+        self.resolved.as_ref()?.members.as_ref()?.get(id)
+    }
+
+    pub fn resolved_role(&self, id: &Snowflake) -> Option<&Role> {
+        self.resolved.as_ref()?.roles.as_ref()?.get(id)
+    }
+
+    pub fn resolved_channel(&self, id: &Snowflake) -> Option<&PartialChannel> {
+        self.resolved.as_ref()?.channels.as_ref()?.get(id)
+    }
+
+    pub fn resolved_attachment(&self, id: &Snowflake) -> Option<&Attachment> {
+        self.resolved.as_ref()?.attachments.as_ref()?.get(id)
     }
 
     /// The submitted values of the select with `custom_id`, wherever it is nested
@@ -346,8 +375,8 @@ pub struct ModalSubmitComponent {
     /// Developer-defined id of an input
     pub custom_id: Option<String>,
 
-    /// Submitted text of a text input
-    pub value: Option<String>,
+    /// Submitted text of a text input or radio group, or a checkbox's state
+    pub value: Option<SubmittedValue>,
 
     /// Submitted values of a select
     pub values: Option<Vec<String>>,
@@ -359,7 +388,31 @@ pub struct ModalSubmitComponent {
     pub component: Option<Box<ModalSubmitComponent>>,
 }
 
+/// A submitted `value`: text (text inputs, radio groups) or a checkbox's state
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum SubmittedValue {
+    Text(String),
+    Checked(bool),
+}
+
 impl ModalSubmitComponent {
+    /// Submitted text of a text input or radio group
+    pub fn text(&self) -> Option<&str> {
+        match &self.value {
+            Some(SubmittedValue::Text(text)) => Some(text),
+            _ => None,
+        }
+    }
+
+    /// A checkbox's state
+    pub fn checked(&self) -> Option<bool> {
+        match self.value {
+            Some(SubmittedValue::Checked(checked)) => Some(checked),
+            _ => None,
+        }
+    }
+
     fn find(&self, custom_id: &str) -> Option<&ModalSubmitComponent> {
         if self.custom_id.as_deref() == Some(custom_id) {
             return Some(self);

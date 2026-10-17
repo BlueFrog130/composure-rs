@@ -180,16 +180,13 @@ fn modals_show_and_submit() {
             "custom_id": "rename:5",
             "title": "Rename",
             "components": [
-                { "type": 1, "components": [{
-                    "type": 4, "custom_id": "name", "style": 1, "label": "New name",
-                    "min_length": null, "max_length": 32, "required": true, "value": null,
+                { "type": 18, "label": "New name", "component": {
+                    "type": 4, "custom_id": "name", "style": 1, "max_length": 32,
                     "placeholder": "name",
-                }] },
-                { "type": 1, "components": [{
-                    "type": 4, "custom_id": "reason_why", "style": 2, "label": "Reason why",
-                    "min_length": null, "max_length": null, "required": false, "value": null,
-                    "placeholder": null,
-                }] },
+                } },
+                { "type": 18, "label": "Reason why", "component": {
+                    "type": 4, "custom_id": "reason_why", "style": 2, "required": false,
+                } },
             ],
         } })
     );

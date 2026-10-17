@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Serialize, ser::SerializeMap};
 
 use crate::types::{
-    ActionRow, AllowedMentions, Embed, File, MessageFlags, PartialAttachment, PollCreate,
+    ActionRow, AllowedMentions, Component, Embed, File, MessageFlags, PartialAttachment, PollCreate,
 };
 
 const TYPE_KEY: &str = "type";
@@ -226,9 +226,10 @@ pub struct ModalCallbackData {
     /// the title of the popup modal, max 45 characters
     pub title: String,
 
-    /// between 1 and 5 (inclusive) components that make up the modal
+    /// 1-5 top-level components: [`Label`](crate::types::Label)s wrapping inputs, and text
+    /// displays (action rows with text inputs are deprecated)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<ActionRow>>,
+    pub components: Option<Vec<Component>>,
 
     /// is the response TTS
     #[serde(skip_serializing_if = "Option::is_none")]
