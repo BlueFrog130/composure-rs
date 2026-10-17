@@ -2,9 +2,9 @@
 
 use serde::de::DeserializeOwned;
 
-use crate::types::{InteractionResponse, MessageComponentInteraction, ModalSubmitInteraction};
+use crate::types::InteractionResponse;
 
-use super::{HandlerError, custom_id};
+use super::{ComponentCtx, HandlerError, ModalCtx, custom_id};
 
 /// The `custom_id` prefix a Component Handler answers. Implemented by `#[component]`.
 pub trait ComponentDefinition {
@@ -17,8 +17,7 @@ pub trait ComponentDefinition {
 pub trait ComponentHandler<S>: ComponentDefinition {
     /// `fields` is the `custom_id` after `prefix:`, `None` when there is no `:`
     async fn invoke(
-        interaction: &MessageComponentInteraction,
-        state: &S,
+        ctx: ComponentCtx<'_, S>,
         fields: Option<&str>,
     ) -> Result<InteractionResponse, HandlerError>;
 }
@@ -33,8 +32,7 @@ pub trait ModalDefinition {
 #[allow(async_fn_in_trait)]
 pub trait ModalHandler<S>: ModalDefinition {
     async fn invoke(
-        interaction: &ModalSubmitInteraction,
-        state: &S,
+        ctx: ModalCtx<'_, S>,
         fields: Option<&str>,
     ) -> Result<InteractionResponse, HandlerError>;
 }

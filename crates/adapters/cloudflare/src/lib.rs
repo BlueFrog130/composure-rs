@@ -143,7 +143,7 @@ pub async fn handle_interaction<S, H: InteractionHandler<S>>(
     match dispatch(interaction, handler, state).await {
         Ok(response) => InteractionOutcome::Respond(response),
         Err(error) => InteractionOutcome::HandlerFailed {
-            response: error.response(),
+            response: error.response_with(handler.theme()),
             error,
         },
     }

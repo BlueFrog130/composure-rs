@@ -9,7 +9,7 @@ use composure::{
     rest::{Method, RawResponse, Request, Transport, TransportError},
 };
 use composure_adapter_cloudflare::{handle_event, handle_interaction};
-use composure_example_commands::{Bot, Vars};
+use composure_example_commands::{Bot, THEME, Vars};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
 use serde_json::{Value, json};
@@ -185,7 +185,10 @@ fn chat_input_commands() {
         ] }),
         ),
     );
-    assert_eq!(response["data"]["embeds"][0]["title"], "1 x Mint chip");
+    let embed = &response["data"]["embeds"][0];
+    assert_eq!(embed["title"], "1 x Mint chip");
+    assert_eq!(embed["color"], THEME.primary);
+    assert_eq!(embed["footer"]["text"], "composure example");
 
     assert_eq!(
         content(command(json!({ "id": "1", "name": "greet", "type": 1 }))),
@@ -201,7 +204,10 @@ fn group_and_context_menu_commands() {
         "resolved": { "users": { ALICE: alice() } },
     }));
     let (_, response) = send(&Bot, ban);
-    assert_eq!(response["data"]["content"], "You can't ban yourself.");
+    let error = &response["data"]["embeds"][0];
+    assert_eq!(error["description"], "You can't ban yourself.");
+    assert_eq!(error["color"], THEME.error);
+    assert_eq!(error["footer"]["text"], "composure example");
     assert_eq!(response["data"]["flags"], 64);
 
     let bob = json!({ "id": "100000000000000002", "username": "bob", "discriminator": "0", "global_name": "Bob" });
@@ -214,7 +220,9 @@ fn group_and_context_menu_commands() {
         "resolved": { "users": { "100000000000000002": bob } },
     }));
     let (_, response) = send(&Bot, ban);
-    assert_eq!(response["data"]["content"], "Would ban Bob (spam)");
+    let embed = &response["data"]["embeds"][0];
+    assert_eq!(embed["description"], "Would ban Bob (spam)");
+    assert_eq!(embed["color"], THEME.warning);
     assert_eq!(response["data"]["flags"], 64);
 
     let avatar = command(json!({
@@ -383,13 +391,15 @@ fn files_upload_as_multipart() {
 }
 
 #[test]
-fn errors_become_ephemeral_messages() {
+fn errors_become_ephemeral_themed_embeds() {
     let (status, response) = send(
         &Bot,
         command(json!({ "id": "1", "name": "nope", "type": 1 })),
     );
     assert_eq!(status, 200);
-    assert_eq!(response["data"]["content"], "Unknown command.");
+    let error = &response["data"]["embeds"][0];
+    assert_eq!(error["description"], "Unknown command.");
+    assert_eq!(error["color"], THEME.error);
     assert_eq!(response["data"]["flags"], 64);
 
     // `text` is required
@@ -434,6 +444,32 @@ fn buttons_carry_state_in_the_custom_id() {
         response["data"]["content"],
         "This bot does not handle components."
     );
+}
+
+#[test]
+fn components_v2_card_is_themed_and_updates_in_place() {
+    let (_, response) = send(
+        &Bot,
+        command(json!({ "id": "1", "name": "card", "type": 1 })),
+    );
+    let data = &response["data"];
+    assert_eq!(data["flags"], 1 << 15, "IS_COMPONENTS_V2");
+    assert_eq!(data.get("content"), None);
+    let container = &data["components"][0];
+    assert_eq!(container["type"], 17);
+    assert_eq!(container["accent_color"], THEME.primary);
+    assert_eq!(container["components"][0]["accessory"]["style"], 5);
+    assert_eq!(container["components"][2]["content"], "-# 0 likes");
+    assert_eq!(
+        container["components"][3]["components"][0]["custom_id"],
+        "like:0"
+    );
+
+    let (_, response) = send(&Bot, click("like:2", &[]));
+    assert_eq!(response["type"], 7);
+    let container = &response["data"]["components"][0];
+    assert_eq!(container["components"][2]["content"], "-# 3 likes");
+    assert_eq!(container["accent_color"], THEME.primary);
 }
 
 #[test]
@@ -653,6 +689,7 @@ fn definitions_for_sync() {
             (None, json!("roll"), json!(1)),
             (None, json!("colors"), json!(1)),
             (None, json!("feedback"), json!(1)),
+            (None, json!("card"), json!(1)),
         ]
     );
 }

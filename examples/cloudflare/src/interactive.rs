@@ -1,5 +1,5 @@
 //! Components and modals: `#[component]` / `#[modal]` handlers routed by `custom_id` prefix, with
-//! their state carried in the `custom_id` itself.
+//! their state carried in the `custom_id` itself. `card` lays out a Components V2 message.
 
 use std::time::Duration;
 
@@ -11,8 +11,8 @@ use composure::{
     },
     component, modal,
     types::{
-        ActionRow, Attachment, ButtonStyle, Component, InteractionResponse, MessageCallbackData,
-        SelectOption,
+        Attachment, ButtonComponent, ButtonStyle, Component, Container, InteractionResponse,
+        MessageCallbackData, SelectOption,
     },
 };
 
@@ -35,7 +35,7 @@ pub fn counter_click(count: u32) -> Result<Update<InteractionResponse>, CustomId
 fn counter_message(count: u32) -> Result<MessageCallbackData, CustomIdError> {
     Ok(MessageCallbackData {
         content: Some(format!("Clicked {count} times")),
-        components: Some(vec![ActionRow::new(vec![button(
+        components: Some(vec![Component::row(vec![button(
             "+1",
             counter_click::custom_id(count)?,
         )])]),
@@ -67,12 +67,47 @@ pub fn reroll(ctx: ComponentCtx<impl Platform>, rolls: u32) -> DeferredUpdate {
 fn dice_message(content: &str, rolls: u32) -> Result<MessageCallbackData, CustomIdError> {
     Ok(MessageCallbackData {
         content: Some(format!("{content} ({rolls} rolls)")),
-        components: Some(vec![ActionRow::new(vec![button(
+        components: Some(vec![Component::row(vec![button(
             "Roll",
             reroll::custom_id(rolls)?,
         )])]),
         ..Default::default()
     })
+}
+
+/// A Components V2 card: a container (accent color from the theme) instead of content and embeds
+#[command]
+pub fn card() -> Result<Container, CustomIdError> {
+    card_container(0)
+}
+
+/// Updates the card in place; the like count lives in the custom_id
+#[component("like")]
+pub fn like(likes: u32) -> Result<Update<Container>, CustomIdError> {
+    Ok(Update(card_container(likes + 1)?))
+}
+
+fn card_container(likes: u32) -> Result<Container, CustomIdError> {
+    let docs = ButtonComponent::new(
+        ButtonStyle::Link,
+        Some("Docs".to_string()),
+        None,
+        None,
+        Some("https://discord.com/developers/docs/components/reference".to_string()),
+        None,
+    );
+    Ok(Container::new(vec![
+        Component::section(
+            vec![
+                Component::text("## Components V2"),
+                Component::text("Sections, separators, galleries and files in a container."),
+            ],
+            docs.into(),
+        ),
+        Component::separator(),
+        Component::text(format!("-# {likes} likes")),
+        Component::row(vec![button("Like", like::custom_id(likes)?)]),
+    ]))
 }
 
 fn button(label: &str, custom_id: String) -> Component {
@@ -104,7 +139,7 @@ pub fn colors() -> Result<InteractionResponse, CustomIdError> {
     Ok(InteractionResponse::ChannelMessageWithSource(
         MessageCallbackData {
             content: Some("Favorite colors?".to_string()),
-            components: Some(vec![ActionRow::new(vec![menu])]),
+            components: Some(vec![Component::row(vec![menu])]),
             ..Default::default()
         },
     ))

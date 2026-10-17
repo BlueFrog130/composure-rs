@@ -3,7 +3,7 @@ use crate::types::{
     ModalSubmitInteraction,
 };
 
-use super::{CommandSet, CommandSetDefinition, HandlerError, ScopedDefinition};
+use super::{CommandSet, CommandSetDefinition, HandlerError, ScopedDefinition, Theme};
 
 /// Answers Interactions; the one contract every Adapter talks to. `S` is the Adapter's State.
 ///
@@ -12,6 +12,11 @@ use super::{CommandSet, CommandSetDefinition, HandlerError, ScopedDefinition};
 /// ephemeral message, or no autocomplete choices.
 #[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
 pub trait InteractionHandler<S> {
+    /// Colors and branding filled into message responses and errors; none by default
+    fn theme(&self) -> Option<&'static Theme> {
+        None
+    }
+
     async fn command(
         &self,
         command: ApplicationCommandInteraction,
@@ -58,8 +63,22 @@ pub struct NoHandler;
 
 impl<S> InteractionHandler<S> for NoHandler {}
 
-/// Routes an Interaction to the handler. Ping is answered with Pong.
+/// Routes an Interaction to the handler. Ping is answered with Pong. The handler's
+/// [`InteractionHandler::theme`] is applied to the response; render an `Err` with
+/// [`HandlerError::response_with`] and the same theme.
 pub async fn dispatch<S, H: InteractionHandler<S>>(
+    interaction: Interaction,
+    handler: &H,
+    state: &S,
+) -> Result<InteractionResponse, HandlerError> {
+    let mut response = route(interaction, handler, state).await?;
+    if let Some(theme) = handler.theme() {
+        theme.apply(&mut response);
+    }
+    Ok(response)
+}
+
+async fn route<S, H: InteractionHandler<S>>(
     interaction: Interaction,
     handler: &H,
     state: &S,
@@ -95,6 +114,10 @@ impl<C, F> WithFallback<C, F> {
 }
 
 impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for WithFallback<C, F> {
+    fn theme(&self) -> Option<&'static Theme> {
+        C::THEME
+    }
+
     async fn command(
         &self,
         command: ApplicationCommandInteraction,

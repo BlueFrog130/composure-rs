@@ -6,7 +6,7 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::types::{
-    ActionRow, AllowedMentions, Embed, File, InteractionResponse, Message, MessageCallbackData,
+    AllowedMentions, Component, Embed, File, InteractionResponse, Message, MessageCallbackData,
     MessageFlags, PartialAttachment, PollCreate, Snowflake,
 };
 
@@ -199,7 +199,7 @@ pub struct CreateFollowup<'a> {
     pub allowed_mentions: Option<&'a AllowedMentions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<&'a [ActionRow]>,
+    pub components: Option<&'a [Component]>,
 
     /// metadata for `files` (and kept attachments); generated from `files` when absent
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -233,7 +233,7 @@ pub struct EditMessage<'a> {
     pub allowed_mentions: Option<&'a AllowedMentions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<&'a [ActionRow]>,
+    pub components: Option<&'a [Component]>,
 
     /// attachments to keep plus metadata for `files`; generated from `files` when absent
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -6,7 +6,7 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::types::{
-    ActionRow, AllowedMentions, Embed, File, Message, MessageFlags, PartialAttachment, PollCreate,
+    AllowedMentions, Component, Embed, File, Message, MessageFlags, PartialAttachment, PollCreate,
     Snowflake, Webhook,
 };
 
@@ -76,7 +76,7 @@ pub struct ExecuteWebhook<'a> {
 
     /// Only for webhooks owned by an application, unless non-interactive
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<&'a [ActionRow]>,
+    pub components: Option<&'a [Component]>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<&'a [PartialAttachment]>,

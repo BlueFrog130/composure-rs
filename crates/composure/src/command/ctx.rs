@@ -1,3 +1,4 @@
+use super::Theme;
 use crate::types::{
     ApplicationCommandInteractionData, DataInteraction, Entitlement, Member, MessageComponentData,
     ModalSubmitData, Snowflake, User,
@@ -8,6 +9,7 @@ use crate::types::{
 pub struct Ctx<'a, S = (), D = ApplicationCommandInteractionData> {
     interaction: &'a DataInteraction<D>,
     state: &'a S,
+    theme: Option<&'static Theme>,
 }
 
 /// [`Ctx`] of a Component Handler: the clicked component's data (custom_id, select values)
@@ -26,7 +28,29 @@ impl<S, D> Copy for Ctx<'_, S, D> {}
 
 impl<'a, S, D> Ctx<'a, S, D> {
     pub fn new(interaction: &'a DataInteraction<D>, state: &'a S) -> Self {
-        Self { interaction, state }
+        Self {
+            interaction,
+            state,
+            theme: None,
+        }
+    }
+
+    /// This Ctx with the Command Set's theme; `None` leaves responses unthemed
+    pub fn with_theme(mut self, theme: Option<&'static Theme>) -> Self {
+        self.theme = theme;
+        self
+    }
+
+    /// The Command Set's colors and branding: `ctx.theme().success("Saved")`.
+    /// [`Theme::DEFAULT`] when the set has none.
+    pub fn theme(&self) -> &'static Theme {
+        self.theme.unwrap_or(&Theme::DEFAULT)
+    }
+
+    /// The Command Set's theme, `None` when it has none
+    #[cfg(feature = "rest")]
+    pub(crate) fn configured_theme(&self) -> Option<&'static Theme> {
+        self.theme
     }
 
     pub fn interaction(&self) -> &'a DataInteraction<D> {

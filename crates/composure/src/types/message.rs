@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 
 use crate::types::{
-    ActionRow, Application, Attachment, Channel, Embed, Emoji, Poll, RoleSubscriptionData,
+    Application, Attachment, Channel, Component, Embed, Emoji, Poll, RoleSubscriptionData,
     Snowflake, StickerItem, User,
 };
 
@@ -92,7 +92,7 @@ pub struct Message {
     pub thread: Option<Channel>,
 
     /// sent if the message contains components like buttons, action rows, or other interactive components
-    pub components: Option<Vec<ActionRow>>,
+    pub components: Option<Vec<Component>>,
 
     /// sent if the message contains stickers
     pub sticker_items: Option<Vec<StickerItem>>,
@@ -305,6 +305,14 @@ bitflags::bitflags! {
 
         /// this message is a voice message
         const IsVoiceMessage = 1 << 13;
+
+        /// this message has a snapshot (via Message Forwarding)
+        const HasSnapshot = 1 << 14;
+
+        /// this message is laid out with [Components V2](https://discord.com/developers/docs/components/reference)
+        /// (containers, text displays, ...): `content`, `embeds`, `poll` and `stickers` can't be
+        /// sent alongside, and the flag can't be removed once set
+        const IsComponentsV2 = 1 << 15;
     }
 }
 
@@ -362,7 +370,7 @@ pub struct MessageReference {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::Component;
+    use crate::types::ActionRow;
 
     use super::*;
 

@@ -3,7 +3,7 @@
 use serde::Serialize;
 
 use crate::types::{
-    ActionRow, AllowedMentions, Embed, File, Message, MessageFlags, PartialAttachment,
+    AllowedMentions, Component, Embed, File, Message, MessageFlags, PartialAttachment,
     PinnedMessages, PollCreate, Snowflake, User,
 };
 
@@ -64,7 +64,7 @@ pub struct CreateMessage<'a> {
     pub allowed_mentions: Option<&'a AllowedMentions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<&'a [ActionRow]>,
+    pub components: Option<&'a [Component]>,
 
     /// metadata for `files`; generated from `files` when absent
     #[serde(skip_serializing_if = "Option::is_none")]

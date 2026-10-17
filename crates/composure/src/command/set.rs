@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-use super::{Ctx, HandlerError};
+use super::{Ctx, HandlerError, Theme};
 
 /// What Discord stores for a top-level Command. Implemented by `#[command]` and `#[group]`.
 pub trait CommandDefinition {
@@ -58,6 +58,7 @@ pub struct Invocation<'a, S> {
     options: &'a OptionList,
     /// Set when routed into a subcommand group: the subcommand chosen inside it
     subcommand: Option<&'a Subcommand>,
+    theme: Option<&'static Theme>,
 }
 
 impl<'a, S> Invocation<'a, S> {
@@ -67,11 +68,18 @@ impl<'a, S> Invocation<'a, S> {
             state,
             options: interaction.data.options.as_ref().unwrap_or(&NO_OPTIONS),
             subcommand: None,
+            theme: None,
         }
     }
 
+    /// This Invocation with the Command Set's theme, passed on to the Ctx
+    pub fn with_theme(mut self, theme: Option<&'static Theme>) -> Self {
+        self.theme = theme;
+        self
+    }
+
     pub fn ctx(&self) -> Ctx<'a, S> {
-        Ctx::new(self.interaction, self.state)
+        Ctx::new(self.interaction, self.state).with_theme(self.theme)
     }
 
     pub fn data(&self) -> &'a ApplicationCommandInteractionData {
@@ -113,6 +121,7 @@ impl<'a, S> Invocation<'a, S> {
             state: self.state,
             options,
             subcommand,
+            theme: self.theme,
         }
     }
 }
@@ -233,6 +242,9 @@ impl ScopedDefinition {
 /// The Commands a bot serves. Implemented by [`commands!`](crate::commands).
 #[allow(async_fn_in_trait)]
 pub trait CommandSet<S> {
+    /// Colors and branding of the set's responses, from `theme = ...;` in `commands!`
+    const THEME: Option<&'static Theme> = None;
+
     /// Runs the matching Command, or `None` if no Command has the invoked name and type
     async fn dispatch(
         &self,

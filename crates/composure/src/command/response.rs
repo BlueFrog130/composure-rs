@@ -1,6 +1,6 @@
 use std::{any::Any, fmt::Display};
 
-use crate::types::{Embed, InteractionResponse, MessageFlags};
+use crate::types::{Container, Embed, InteractionResponse, MessageFlags};
 
 use super::HandlerError;
 
@@ -30,6 +30,13 @@ impl IntoResponse for &str {
 impl IntoResponse for Embed {
     fn into_response(self) -> InteractionResponse {
         InteractionResponse::respond_with_embed(self)
+    }
+}
+
+/// A Components V2 message of one container
+impl IntoResponse for Container {
+    fn into_response(self) -> InteractionResponse {
+        InteractionResponse::respond_with_components(vec![self.into()])
     }
 }
 
@@ -70,6 +77,21 @@ impl<T: IntoResponse> IntoResponse for Update<T> {
             }
             other => other,
         }
+    }
+}
+
+/// A Response sent as is, without the Command Set's [`Theme`](super::Theme) filling in embed
+/// colors, branding and container accent colors: `Unthemed(embed)`, `Ephemeral(Unthemed(embed))`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Unthemed<T>(pub T);
+
+impl<T: IntoResponse> IntoResponse for Unthemed<T> {
+    fn into_response(self) -> InteractionResponse {
+        let mut response = self.0.into_response();
+        if let Some(data) = response.message_data_mut() {
+            data.unthemed = true;
+        }
+        response
     }
 }
 

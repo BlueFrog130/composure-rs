@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-use super::{CommandOutput, Ctx, HandlerError, IntoResponse};
+use super::{CommandOutput, Ctx, HandlerError, IntoResponse, Theme};
 
 /// Background Work handed to the Adapter: runs after the response is sent; an `Err` is logged
 pub type BackgroundWork = Pin<Box<dyn Future<Output = Result<(), HandlerError>>>>;
@@ -100,17 +100,22 @@ impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
         F: FnOnce(DeferredCtx<S, D>) -> Fut,
         Fut: Future<Output: CommandOutput> + 'static,
     {
+        let theme = self.configured_theme();
         let ctx = DeferredCtx {
             interaction: Rc::new(self.interaction().clone()),
             state: self.state().clone(),
+            theme,
         };
         let client = ctx.client();
         let output = work(ctx);
         self.state().spawn(Box::pin(async move {
-            let (response, error) = match output.await.into_result() {
+            let (mut response, error) = match output.await.into_result() {
                 Ok(response) => (response, None),
-                Err(error) => (error.response(), Some(error)),
+                Err(error) => (error.response_with(theme), Some(error)),
             };
+            if let Some(theme) = theme {
+                theme.apply(&mut response);
+            }
             if let Some(data) = response.into_message_data() {
                 // Ephemerality was fixed by the deferred reply; edits cannot change it
                 let flags = data
@@ -203,6 +208,7 @@ impl IntoResponse for DeferredUpdate {
 pub struct DeferredCtx<S, D = ApplicationCommandInteractionData> {
     interaction: Rc<DataInteraction<D>>,
     state: S,
+    theme: Option<&'static Theme>,
 }
 
 impl<S: Clone, D> Clone for DeferredCtx<S, D> {
@@ -210,6 +216,7 @@ impl<S: Clone, D> Clone for DeferredCtx<S, D> {
         Self {
             interaction: self.interaction.clone(),
             state: self.state.clone(),
+            theme: self.theme,
         }
     }
 }
@@ -225,6 +232,11 @@ impl<S: Platform, D> DeferredCtx<S, D> {
 
     pub fn state(&self) -> &S {
         &self.state
+    }
+
+    /// The Command Set's colors and branding; [`Theme::DEFAULT`] when the set has none
+    pub fn theme(&self) -> &'static Theme {
+        self.theme.unwrap_or(&Theme::DEFAULT)
     }
 
     pub fn user(&self) -> Option<&User> {
@@ -391,6 +403,52 @@ mod tests {
             *platform.transport.sleeps.borrow(),
             [Duration::from_millis(250)]
         );
+    }
+
+    const THEME: Theme = Theme::new().with_primary(0x123456).with_footer("Bot", None);
+
+    #[test]
+    fn themed_defer_fills_in_the_edit() {
+        let platform = TestPlatform::default();
+        let interaction = interaction();
+        let ctx = Ctx::new(&interaction, &platform).with_theme(Some(&THEME));
+        let _ = ctx.defer(async |ctx| {
+            assert_eq!(ctx.theme(), &THEME);
+            crate::types::Embed::new().with_title("done")
+        });
+        platform.run().unwrap();
+        let (_, body) = &platform.edits()[0];
+        assert_eq!(body["embeds"][0]["color"], 0x123456);
+        assert_eq!(body["embeds"][0]["footer"]["text"], "Bot");
+    }
+
+    #[test]
+    fn themed_defer_fills_container_accents_and_keeps_v2() {
+        let platform = TestPlatform::default();
+        let interaction = interaction();
+        let ctx = Ctx::new(&interaction, &platform).with_theme(Some(&THEME));
+        let _ = Ephemeral(ctx.defer(async |_| {
+            crate::types::Container::new(vec![crate::types::Component::text("done")])
+        }));
+        platform.run().unwrap();
+        let (_, body) = &platform.edits()[0];
+        assert_eq!(body["components"][0]["type"], 17);
+        assert_eq!(body["components"][0]["accent_color"], 0x123456);
+        assert_eq!(body["flags"], MessageFlags::IsComponentsV2.bits());
+        assert_eq!(body.get("content"), None);
+    }
+
+    #[test]
+    fn themed_defer_errors_are_error_embeds() {
+        let platform = TestPlatform::default();
+        let interaction = interaction();
+        let ctx = Ctx::new(&interaction, &platform).with_theme(Some(&THEME));
+        let _ = ctx.defer(async |_| Err::<String, _>(HandlerError::user("nope")));
+        assert!(platform.run().is_err());
+        let (_, body) = &platform.edits()[0];
+        assert_eq!(body["embeds"][0]["color"], Theme::DEFAULT.error);
+        assert_eq!(body["embeds"][0]["description"], "nope");
+        assert_eq!(body.get("flags"), None);
     }
 
     #[test]

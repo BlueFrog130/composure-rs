@@ -2,6 +2,8 @@ use std::fmt;
 
 use crate::types::InteractionResponse;
 
+use super::{Ephemeral, IntoResponse, Theme};
+
 /// Why an Interaction could not be answered normally. Adapters log it and answer with
 /// [`HandlerError::response`] instead.
 ///
@@ -64,14 +66,27 @@ impl HandlerError {
 
     /// The ephemeral message the invoking user sees instead of Discord's "interaction failed"
     pub fn response(&self) -> InteractionResponse {
-        let message = match self.kind {
+        self.response_with(None)
+    }
+
+    /// [`HandlerError::response`], as an [`Theme::error`] embed when there is a theme. Adapters
+    /// pass the handler's [`InteractionHandler::theme`](super::InteractionHandler::theme).
+    pub fn response_with(&self, theme: Option<&Theme>) -> InteractionResponse {
+        let message = self.user_message();
+        match theme {
+            Some(theme) => Ephemeral(theme.error(message)).into_response(),
+            None => InteractionResponse::respond_with_ephemeral_message(message.to_string()),
+        }
+    }
+
+    fn user_message(&self) -> &str {
+        match self.kind {
             ErrorKind::User => &self.message,
             ErrorKind::UnknownCommand => "Unknown command.",
             ErrorKind::Handler | ErrorKind::InvalidOption => {
                 "Something went wrong handling this interaction."
             }
-        };
-        InteractionResponse::respond_with_ephemeral_message(message.to_string())
+        }
     }
 }
 

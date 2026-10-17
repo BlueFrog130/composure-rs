@@ -113,6 +113,10 @@ Code suggesting Choices for one Option while the user types.
 The explicit list of Commands a bot serves; the single source both for dispatching Interactions and for Sync.
 _Avoid_: Router, registry
 
+**Theme**:
+A Command Set's embed colors (primary plus success, warning, error, info) and branding (author, footer), filled into every message Response and error it answers with (primary also as the accent color of Components V2 Containers); REST messages are untouched.
+_Avoid_: Style, skin, palette (for the whole thing)
+
 ### Deployment
 
 **Sync**:

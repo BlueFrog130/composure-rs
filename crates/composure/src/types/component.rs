@@ -19,6 +19,11 @@ pub type MentionableSelect = SelectMenu<7>;
 /// Select menu for picking from channels
 pub type ChannelSelect = SelectMenu<8>;
 
+/// A [component](https://discord.com/developers/docs/components/reference). Buttons and selects
+/// go in action rows (or a section's accessory); sections, text displays, thumbnails, media
+/// galleries, files, separators and containers lay out
+/// [Components V2](crate::types::MessageFlags::IsComponentsV2) messages; labels and their inputs
+/// build modals.
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum Component {
@@ -30,15 +35,125 @@ pub enum Component {
     RoleSelect(RoleSelect),
     MentionableSelect(MentionableSelect),
     ChannelSelect(ChannelSelect),
+    Section(Section),
     TextDisplay(TextDisplay),
+    Thumbnail(Thumbnail),
+    MediaGallery(MediaGallery),
+    File(FileComponent),
+    Separator(Separator),
+    Container(Container),
     Label(Label),
     FileUpload(FileUpload),
     RadioGroup(RadioGroup),
     CheckboxGroup(CheckboxGroup),
     Checkbox(Checkbox),
+    /// A component type Discord added after this version, kept as received
+    Unknown(Value),
 }
 
 impl Component {
+    /// An [Action Row](https://discord.com/developers/docs/components/reference#action-row): up to
+    /// 5 buttons, or one select
+    pub fn row(components: Vec<Component>) -> Component {
+        Component::ActionRow(ActionRow::new(components))
+    }
+
+    /// A [Container](https://discord.com/developers/docs/components/reference#container) for
+    /// Components V2 messages: up to 40 action rows, text displays, sections, media galleries,
+    /// separators and files, framed like an embed
+    pub fn container(components: Vec<Component>) -> Component {
+        Component::Container(Container::new(components))
+    }
+
+    /// A [Section](https://discord.com/developers/docs/components/reference#section): 1-3 text
+    /// displays beside an accessory (a button or a [thumbnail](Component::thumbnail))
+    pub fn section(components: Vec<Component>, accessory: Component) -> Component {
+        Component::Section(Section::new(components, accessory))
+    }
+
+    /// A [Thumbnail](https://discord.com/developers/docs/components/reference#thumbnail): a
+    /// small image from a url or `attachment://<filename>`, as a section's accessory
+    pub fn thumbnail(url: impl Into<String>) -> Component {
+        Component::Thumbnail(Thumbnail::new(url))
+    }
+
+    /// A [Media Gallery](https://discord.com/developers/docs/components/reference#media-gallery)
+    /// of 1-10 images and videos
+    pub fn gallery(items: Vec<MediaGalleryItem>) -> Component {
+        Component::MediaGallery(MediaGallery::new(items))
+    }
+
+    /// A [File](https://discord.com/developers/docs/components/reference#file): a file uploaded
+    /// with the message, referenced as `attachment://<filename>`
+    pub fn file(url: impl Into<String>) -> Component {
+        Component::File(FileComponent::new(url))
+    }
+
+    /// A [Separator](https://discord.com/developers/docs/components/reference#separator): a
+    /// divider with small spacing
+    pub fn separator() -> Component {
+        Component::Separator(Separator::new())
+    }
+
+    /// The component's `id`; `None` when unset, and for [`Component::Unknown`] without one
+    pub fn id(&self) -> Option<i32> {
+        match self {
+            Component::ActionRow(c) => c.id,
+            Component::Button(c) => c.id,
+            Component::StringSelect(c) => c.id,
+            Component::TextInput(c) => c.id,
+            Component::UserSelect(c) => c.id,
+            Component::RoleSelect(c) => c.id,
+            Component::MentionableSelect(c) => c.id,
+            Component::ChannelSelect(c) => c.id,
+            Component::Section(c) => c.id,
+            Component::TextDisplay(c) => c.id,
+            Component::Thumbnail(c) => c.id,
+            Component::MediaGallery(c) => c.id,
+            Component::File(c) => c.id,
+            Component::Separator(c) => c.id,
+            Component::Container(c) => c.id,
+            Component::Label(c) => c.id,
+            Component::FileUpload(c) => c.id,
+            Component::RadioGroup(c) => c.id,
+            Component::CheckboxGroup(c) => c.id,
+            Component::Checkbox(c) => c.id,
+            Component::Unknown(value) => value
+                .get("id")
+                .and_then(Value::as_i64)
+                .and_then(|id| i32::try_from(id).ok()),
+        }
+    }
+
+    /// Sets the component's `id`, unique within the message; no-op for [`Component::Unknown`]
+    pub fn with_id(mut self, id: i32) -> Component {
+        let slot = match &mut self {
+            Component::ActionRow(c) => &mut c.id,
+            Component::Button(c) => &mut c.id,
+            Component::StringSelect(c) => &mut c.id,
+            Component::TextInput(c) => &mut c.id,
+            Component::UserSelect(c) => &mut c.id,
+            Component::RoleSelect(c) => &mut c.id,
+            Component::MentionableSelect(c) => &mut c.id,
+            Component::ChannelSelect(c) => &mut c.id,
+            Component::Section(c) => &mut c.id,
+            Component::TextDisplay(c) => &mut c.id,
+            Component::Thumbnail(c) => &mut c.id,
+            Component::MediaGallery(c) => &mut c.id,
+            Component::File(c) => &mut c.id,
+            Component::Separator(c) => &mut c.id,
+            Component::Container(c) => &mut c.id,
+            Component::Label(c) => &mut c.id,
+            Component::FileUpload(c) => &mut c.id,
+            Component::RadioGroup(c) => &mut c.id,
+            Component::CheckboxGroup(c) => &mut c.id,
+            Component::Checkbox(c) => &mut c.id,
+            Component::Unknown(_) => return self,
+        };
+        *slot = Some(id);
+        self
+    }
+
     /// A [Label](https://discord.com/developers/docs/components/reference#label): `label` (and
     /// optionally a description) above one modal input
     pub fn label(label: impl Into<String>, component: Component) -> Component {
@@ -225,8 +340,26 @@ impl<'de> Deserialize<'de> for Component {
             8 => Ok(Component::ChannelSelect(
                 SelectMenu::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
+            9 => Ok(Component::Section(
+                Section::deserialize(value).map_err(serde::de::Error::custom)?,
+            )),
             10 => Ok(Component::TextDisplay(
                 TextDisplay::deserialize(value).map_err(serde::de::Error::custom)?,
+            )),
+            11 => Ok(Component::Thumbnail(
+                Thumbnail::deserialize(value).map_err(serde::de::Error::custom)?,
+            )),
+            12 => Ok(Component::MediaGallery(
+                MediaGallery::deserialize(value).map_err(serde::de::Error::custom)?,
+            )),
+            13 => Ok(Component::File(
+                FileComponent::deserialize(value).map_err(serde::de::Error::custom)?,
+            )),
+            14 => Ok(Component::Separator(
+                Separator::deserialize(value).map_err(serde::de::Error::custom)?,
+            )),
+            17 => Ok(Component::Container(
+                Container::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
             18 => Ok(Component::Label(
                 Label::deserialize(value).map_err(serde::de::Error::custom)?,
@@ -243,16 +376,21 @@ impl<'de> Deserialize<'de> for Component {
             23 => Ok(Component::Checkbox(
                 Checkbox::deserialize(value).map_err(serde::de::Error::custom)?,
             )),
-            _ => Err(serde::de::Error::custom("Unknown component")),
+            _ => Ok(Component::Unknown(value)),
         }
     }
 }
 
-/// Container for other components
+/// [Action Row](https://discord.com/developers/docs/components/reference#action-row): a row of up
+/// to 5 buttons, or one select
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ActionRow {
     #[serde(rename = "type")]
     pub t: TypeField<1>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
 
     pub components: Vec<Component>,
 }
@@ -261,6 +399,7 @@ impl ActionRow {
     pub fn new(components: Vec<Component>) -> Self {
         Self {
             t: TypeField,
+            id: None,
             components,
         }
     }
@@ -272,22 +411,31 @@ pub struct ButtonComponent {
     #[serde(rename = "type")]
     pub t: TypeField<2>,
 
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
     /// Button style
     pub style: ButtonStyle,
 
     /// Text that appears on the button; max 80 characters
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 
     /// name, id, and animated
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub emoji: Option<PartialEmoji>,
 
     /// Developer-defined identifier for the button; max 100 characters
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_id: Option<String>,
 
     /// URL for link-style buttons
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 
     /// Whether the button is disabled (defaults to false)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disabled: Option<bool>,
 
     /// Premium buttons: the SKU to buy
@@ -306,6 +454,7 @@ impl ButtonComponent {
     ) -> Self {
         Self {
             t: TypeField,
+            id: None,
             style,
             label,
             emoji,
@@ -355,6 +504,10 @@ pub struct SelectMenu<const T: u8> {
     #[serde(rename = "type")]
     pub t: TypeField<T>,
 
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
     /// ID for the select menu; max 100 characters
     pub custom_id: String,
 
@@ -403,6 +556,7 @@ impl<const T: u8> SelectMenu<T> {
     ) -> Self {
         Self {
             t: TypeField,
+            id: None,
             custom_id,
             options,
             channel_types,
@@ -424,6 +578,27 @@ pub struct SelectDefaultValue {
     /// `"user"`, `"role"`, or `"channel"`
     #[serde(rename = "type")]
     pub kind: String,
+}
+
+impl SelectDefaultValue {
+    pub fn user(id: Snowflake) -> Self {
+        Self::of(id, "user")
+    }
+
+    pub fn role(id: Snowflake) -> Self {
+        Self::of(id, "role")
+    }
+
+    pub fn channel(id: Snowflake) -> Self {
+        Self::of(id, "channel")
+    }
+
+    fn of(id: Snowflake, kind: &str) -> Self {
+        Self {
+            id,
+            kind: kind.to_string(),
+        }
+    }
 }
 
 /// [Select Option Structure](https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure)
@@ -471,6 +646,10 @@ pub struct TextInput {
     #[serde(rename = "type")]
     pub t: TypeField<4>,
 
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
     /// Developer-defined identifier for the input; max 100 characters
     pub custom_id: String,
 
@@ -517,6 +696,7 @@ impl TextInput {
     ) -> Self {
         Self {
             t: TypeField,
+            id: None,
             custom_id,
             style,
             label: Some(label),
@@ -535,6 +715,10 @@ pub struct TextDisplay {
     #[serde(rename = "type")]
     pub t: TypeField<10>,
 
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
     pub content: String,
 }
 
@@ -542,9 +726,406 @@ impl TextDisplay {
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             t: TypeField,
+            id: None,
             content: content.into(),
         }
     }
+}
+
+/// [Container](https://discord.com/developers/docs/components/reference#container): top-level
+/// component of a Components V2 message, grouping others in a frame with an optional accent bar
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Container {
+    #[serde(rename = "type")]
+    pub t: TypeField<17>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
+    /// Up to 40 action rows, text displays, sections, media galleries, separators and files
+    pub components: Vec<Component>,
+
+    /// Color of the accent bar on the left; filled in by the Command Set's
+    /// [`Theme`](crate::command::Theme) when unset
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accent_color: Option<u32>,
+
+    /// Blurs the content until clicked
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spoiler: Option<bool>,
+}
+
+impl Container {
+    pub fn new(components: Vec<Component>) -> Self {
+        Self {
+            t: TypeField,
+            id: None,
+            components,
+            accent_color: None,
+            spoiler: None,
+        }
+    }
+
+    pub fn with_accent_color(mut self, color: u32) -> Self {
+        self.accent_color = Some(color);
+        self
+    }
+
+    pub fn spoiler(mut self) -> Self {
+        self.spoiler = Some(true);
+        self
+    }
+}
+
+/// [Section](https://discord.com/developers/docs/components/reference#section): text beside an
+/// accessory, in Components V2 messages
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Section {
+    #[serde(rename = "type")]
+    pub t: TypeField<9>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
+    /// 1-3 text displays
+    pub components: Vec<Component>,
+
+    /// A button or a thumbnail
+    pub accessory: Box<Component>,
+}
+
+impl Section {
+    pub fn new(components: Vec<Component>, accessory: Component) -> Self {
+        Self {
+            t: TypeField,
+            id: None,
+            components,
+            accessory: Box::new(accessory),
+        }
+    }
+}
+
+/// A url, or an `attachment://<filename>` reference to a file uploaded with the message, that
+/// Discord [unfurls](https://discord.com/developers/docs/components/reference#unfurled-media-item);
+/// only `url` is sent, the rest is filled in by Discord
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UnfurledMedia {
+    pub url: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_url: Option<String>,
+
+    /// Images and videos only
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+
+    /// Images and videos only
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+
+    /// [Thumbhash](https://evanw.github.io/thumbhash/) of an image or video
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placeholder: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placeholder_version: Option<u8>,
+
+    /// Media type
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flags: Option<UnfurledMediaFlags>,
+
+    /// The uploaded attachment, for `attachment://` media
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_id: Option<Snowflake>,
+}
+
+impl UnfurledMedia {
+    pub fn new(url: impl Into<String>) -> Self {
+        Self {
+            url: url.into(),
+            proxy_url: None,
+            height: None,
+            width: None,
+            placeholder: None,
+            placeholder_version: None,
+            content_type: None,
+            flags: None,
+            attachment_id: None,
+        }
+    }
+}
+
+bitflags::bitflags! {
+    /// [Unfurled Media Item Flags](https://discord.com/developers/docs/components/reference#unfurled-media-item-unfurled-media-item-flags)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct UnfurledMediaFlags: u32 {
+        /// The image is animated
+        const IsAnimated = 1 << 0;
+    }
+}
+
+impl Serialize for UnfurledMediaFlags {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u32(self.bits())
+    }
+}
+
+impl<'de> Deserialize<'de> for UnfurledMediaFlags {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self::from_bits_retain(u32::deserialize(deserializer)?))
+    }
+}
+
+/// [Thumbnail](https://discord.com/developers/docs/components/reference#thumbnail): a small image
+/// as a [`Section`]'s accessory
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Thumbnail {
+    #[serde(rename = "type")]
+    pub t: TypeField<11>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
+    /// An image (GIF and WebP included); no videos
+    pub media: UnfurledMedia,
+
+    /// Alt text; max 1024 characters
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    /// Blurs the image until clicked
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spoiler: Option<bool>,
+}
+
+impl Thumbnail {
+    pub fn new(url: impl Into<String>) -> Self {
+        Self {
+            t: TypeField,
+            id: None,
+            media: UnfurledMedia::new(url),
+            description: None,
+            spoiler: None,
+        }
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn spoiler(mut self) -> Self {
+        self.spoiler = Some(true);
+        self
+    }
+}
+
+/// [Media Gallery](https://discord.com/developers/docs/components/reference#media-gallery): a grid
+/// of images and videos
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MediaGallery {
+    #[serde(rename = "type")]
+    pub t: TypeField<12>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
+    /// 1-10 items
+    pub items: Vec<MediaGalleryItem>,
+}
+
+impl MediaGallery {
+    pub fn new(items: Vec<MediaGalleryItem>) -> Self {
+        Self {
+            t: TypeField,
+            id: None,
+            items,
+        }
+    }
+}
+
+/// [Media Gallery Item](https://discord.com/developers/docs/components/reference#media-gallery-media-gallery-item-structure)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MediaGalleryItem {
+    /// An image or video
+    pub media: UnfurledMedia,
+
+    /// Alt text; max 1024 characters
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    /// Blurs the media until clicked
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spoiler: Option<bool>,
+}
+
+impl MediaGalleryItem {
+    /// An image or video from a url or `attachment://<filename>`
+    pub fn new(url: impl Into<String>) -> Self {
+        Self {
+            media: UnfurledMedia::new(url),
+            description: None,
+            spoiler: None,
+        }
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn spoiler(mut self) -> Self {
+        self.spoiler = Some(true);
+        self
+    }
+}
+
+/// [File](https://discord.com/developers/docs/components/reference#file): one file uploaded with
+/// the message, shown inline
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct FileComponent {
+    #[serde(rename = "type")]
+    pub t: TypeField<13>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
+    /// `attachment://<filename>` only
+    pub file: UnfurledMedia,
+
+    /// Blurs the file until clicked
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spoiler: Option<bool>,
+
+    /// File name; filled in by Discord
+    #[serde(default, skip_serializing)]
+    pub name: Option<String>,
+
+    /// Size in bytes; filled in by Discord
+    #[serde(default, skip_serializing)]
+    pub size: Option<u64>,
+}
+
+impl FileComponent {
+    /// The uploaded file `attachment://<filename>`
+    pub fn new(url: impl Into<String>) -> Self {
+        Self {
+            t: TypeField,
+            id: None,
+            file: UnfurledMedia::new(url),
+            spoiler: None,
+            name: None,
+            size: None,
+        }
+    }
+
+    pub fn spoiler(mut self) -> Self {
+        self.spoiler = Some(true);
+        self
+    }
+}
+
+/// [Separator](https://discord.com/developers/docs/components/reference#separator): vertical
+/// space between components, with a divider line by default
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Separator {
+    #[serde(rename = "type")]
+    pub t: TypeField<14>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
+    /// Draws a line (defaults to true)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub divider: Option<bool>,
+
+    /// Defaults to small
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spacing: Option<SeparatorSpacing>,
+}
+
+impl Separator {
+    pub fn new() -> Self {
+        Self {
+            t: TypeField,
+            id: None,
+            divider: None,
+            spacing: None,
+        }
+    }
+
+    /// Only space, no line
+    pub fn without_divider(mut self) -> Self {
+        self.divider = Some(false);
+        self
+    }
+
+    pub fn with_spacing(mut self, spacing: SeparatorSpacing) -> Self {
+        self.spacing = Some(spacing);
+        self
+    }
+}
+
+impl Default for Separator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Space around a [`Separator`]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
+#[repr(u8)]
+pub enum SeparatorSpacing {
+    Small = 1,
+    Large = 2,
+}
+
+macro_rules! into_component {
+    ($($variant:ident($ty:ty)),* $(,)?) => {
+        $(impl From<$ty> for Component {
+            fn from(component: $ty) -> Self {
+                Component::$variant(component)
+            }
+        })*
+    };
+}
+
+into_component! {
+    ActionRow(ActionRow),
+    Button(ButtonComponent),
+    StringSelect(StringSelect),
+    TextInput(TextInput),
+    UserSelect(UserSelect),
+    RoleSelect(RoleSelect),
+    MentionableSelect(MentionableSelect),
+    ChannelSelect(ChannelSelect),
+    Section(Section),
+    TextDisplay(TextDisplay),
+    Thumbnail(Thumbnail),
+    MediaGallery(MediaGallery),
+    File(FileComponent),
+    Separator(Separator),
+    Container(Container),
+    Label(Label),
+    FileUpload(FileUpload),
+    RadioGroup(RadioGroup),
+    CheckboxGroup(CheckboxGroup),
+    Checkbox(Checkbox),
 }
 
 /// [Label](https://discord.com/developers/docs/components/reference#label): a title (and
@@ -553,6 +1134,10 @@ impl TextDisplay {
 pub struct Label {
     #[serde(rename = "type")]
     pub t: TypeField<18>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
 
     /// Max 45 characters
     pub label: String,
@@ -569,6 +1154,7 @@ impl Label {
     pub fn new(label: impl Into<String>, component: Component) -> Self {
         Self {
             t: TypeField,
+            id: None,
             label: label.into(),
             description: None,
             component: Box::new(component),
@@ -587,6 +1173,10 @@ impl Label {
 pub struct FileUpload {
     #[serde(rename = "type")]
     pub t: TypeField<19>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
 
     pub custom_id: String,
 
@@ -611,6 +1201,7 @@ impl FileUpload {
     pub fn new(custom_id: impl Into<String>) -> Self {
         Self {
             t: TypeField,
+            id: None,
             custom_id: custom_id.into(),
             min_values: None,
             max_values: None,
@@ -655,6 +1246,10 @@ pub struct RadioGroup {
     #[serde(rename = "type")]
     pub t: TypeField<21>,
 
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
     pub custom_id: String,
 
     pub options: Vec<GroupOption>,
@@ -668,6 +1263,7 @@ impl RadioGroup {
     pub fn new(custom_id: impl Into<String>, options: Vec<GroupOption>) -> Self {
         Self {
             t: TypeField,
+            id: None,
             custom_id: custom_id.into(),
             options,
             required: None,
@@ -681,6 +1277,10 @@ impl RadioGroup {
 pub struct CheckboxGroup {
     #[serde(rename = "type")]
     pub t: TypeField<22>,
+
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
 
     pub custom_id: String,
 
@@ -703,6 +1303,7 @@ impl CheckboxGroup {
     pub fn new(custom_id: impl Into<String>, options: Vec<GroupOption>) -> Self {
         Self {
             t: TypeField,
+            id: None,
             custom_id: custom_id.into(),
             options,
             min_values: None,
@@ -719,6 +1320,10 @@ pub struct Checkbox {
     #[serde(rename = "type")]
     pub t: TypeField<23>,
 
+    /// Identifier unique within the message; Discord numbers components without one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
+
     pub custom_id: String,
 
     /// Checked initially
@@ -730,6 +1335,7 @@ impl Checkbox {
     pub fn new(custom_id: impl Into<String>) -> Self {
         Self {
             t: TypeField,
+            id: None,
             custom_id: custom_id.into(),
             default: None,
         }
@@ -745,4 +1351,115 @@ pub enum TextInputStyle {
 
     /// Multi-line input
     Paragraph = 2,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn layout_builders_serialize_like_the_docs() {
+        let message = vec![
+            Component::container(vec![
+                Component::section(
+                    vec![Component::text("# Title"), Component::text("body")],
+                    Thumbnail::new("https://example.com/a.png")
+                        .description("alt")
+                        .into(),
+                ),
+                Separator::new()
+                    .without_divider()
+                    .with_spacing(SeparatorSpacing::Large)
+                    .into(),
+                Component::gallery(vec![MediaGalleryItem::new("attachment://b.png").spoiler()]),
+                Component::file("attachment://c.txt"),
+                Component::row(vec![Component::new_button(
+                    ButtonStyle::Primary,
+                    Some("Go".into()),
+                    None,
+                    Some("go".into()),
+                    None,
+                    None,
+                )]),
+            ])
+            .with_id(7),
+            Component::separator(),
+        ];
+        assert_eq!(
+            serde_json::to_value(&message).unwrap(),
+            json!([
+                { "type": 17, "id": 7, "components": [
+                    { "type": 9,
+                      "components": [
+                        { "type": 10, "content": "# Title" },
+                        { "type": 10, "content": "body" },
+                      ],
+                      "accessory": {
+                        "type": 11,
+                        "media": { "url": "https://example.com/a.png" },
+                        "description": "alt",
+                      } },
+                    { "type": 14, "divider": false, "spacing": 2 },
+                    { "type": 12, "items": [
+                        { "media": { "url": "attachment://b.png" }, "spoiler": true },
+                    ] },
+                    { "type": 13, "file": { "url": "attachment://c.txt" } },
+                    { "type": 1, "components": [
+                        { "type": 2, "style": 1, "label": "Go", "custom_id": "go" },
+                    ] },
+                ] },
+                { "type": 14 },
+            ])
+        );
+    }
+
+    #[test]
+    fn received_components_v2_message_deserializes() {
+        let media = json!({
+            "id": "1", "url": "https://cdn.discordapp.com/a.png",
+            "proxy_url": "https://media.discordapp.net/a.png",
+            "width": 64, "height": 32, "content_type": "image/png",
+            "placeholder": "abc", "placeholder_version": 1, "flags": 1,
+            "attachment_id": "2", "loading_state": 2,
+        });
+        let json = json!([{
+            "type": 17, "id": 1, "accent_color": null, "spoiler": false,
+            "components": [
+                { "type": 9, "id": 2,
+                  "components": [{ "type": 10, "id": 3, "content": "hi" }],
+                  "accessory": { "type": 11, "id": 4, "media": media,
+                                 "description": null, "spoiler": false } },
+                { "type": 14, "id": 5, "divider": true, "spacing": 1 },
+                { "type": 12, "id": 6, "items": [
+                    { "media": media, "description": null, "spoiler": false },
+                ] },
+                { "type": 13, "id": 7, "file": media, "name": "a.png", "size": 10,
+                  "spoiler": false },
+                { "type": 99, "id": 8, "new": true },
+            ],
+        }]);
+        let components: Vec<Component> = serde_json::from_value(json).unwrap();
+        let Component::Container(container) = &components[0] else {
+            panic!("not a container");
+        };
+        assert_eq!(container.accent_color, None);
+        let ids: Vec<_> = container.components.iter().map(Component::id).collect();
+        assert_eq!(ids, [Some(2), Some(5), Some(6), Some(7), Some(8)]);
+
+        let Component::Section(section) = &container.components[0] else {
+            panic!("not a section");
+        };
+        let Component::Thumbnail(thumbnail) = section.accessory.as_ref() else {
+            panic!("not a thumbnail");
+        };
+        assert_eq!(thumbnail.media.width, Some(64));
+        assert_eq!(thumbnail.media.flags, Some(UnfurledMediaFlags::IsAnimated));
+        let Component::File(file) = &container.components[3] else {
+            panic!("not a file");
+        };
+        assert_eq!((file.name.as_deref(), file.size), (Some("a.png"), Some(10)));
+        assert!(matches!(container.components[4], Component::Unknown(_)));
+    }
 }

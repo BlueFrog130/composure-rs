@@ -31,6 +31,7 @@ mod option;
 mod platform;
 mod response;
 mod set;
+mod theme;
 
 pub use autocomplete::*;
 pub use component::*;
@@ -44,6 +45,7 @@ pub use option::*;
 pub use platform::*;
 pub use response::*;
 pub use set::*;
+pub use theme::*;
 
 /// Declares a Command Set: a unit struct that dispatches to the listed Commands and Groups (and
 /// optionally Component and Modal Handlers) and yields their Definitions for Sync.
@@ -54,6 +56,7 @@ pub use set::*;
 ///     pub struct Bot = [ping, echo, Admin];
 ///     components = [counter_click];
 ///     modals = [on_feedback];
+///     theme = THEME;
 ///     events = MyEvents;
 /// }
 /// ```
@@ -61,6 +64,7 @@ pub use set::*;
 /// The struct implements [`InteractionHandler`] for every State its Commands accept; an
 /// Interaction for a Command not in the set is answered with an "Unknown command" message.
 /// Autocomplete goes to the invoked Command's Autocomplete Handler for the focused Option.
+/// Message responses and errors are styled with `theme` (a [`Theme`] constant), if set.
 /// Webhook Events go to `events` (a unit struct implementing [`EventHandler`]), or are ignored.
 /// Components and modals are routed by the `custom_id` prefix; unmatched ones get a "not
 /// handled" message. Two Commands with the same name and type, two handlers with the same
@@ -73,6 +77,7 @@ macro_rules! commands {
         $(#[$attr:meta])* $vis:vis struct $name:ident = [$($command:path),* $(,)?];
         $(components = [$($component:path),* $(,)?];)?
         $(modals = [$($modal:path),* $(,)?];)?
+        $(theme = $theme:expr;)?
         $(events = $events:path;)?
     ) => {
         $(#[$attr])*
@@ -105,6 +110,11 @@ macro_rules! commands {
             $($($component: $crate::command::ComponentHandler<S>,)*)?
             $($($modal: $crate::command::ModalHandler<S>,)*)?
         {
+            $(
+                const THEME: ::core::option::Option<&'static $crate::command::Theme> =
+                    ::core::option::Option::Some(&$theme);
+            )?
+
             async fn dispatch(
                 &self,
                 interaction: &$crate::types::ApplicationCommandInteraction,
@@ -119,7 +129,7 @@ macro_rules! commands {
                     {
                         return ::core::option::Option::Some(
                             <$command as $crate::command::Command<S>>::invoke(
-                                $crate::command::Invocation::new(interaction, state),
+                                $crate::command::Invocation::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
                             )
                             .await,
                         );
@@ -141,7 +151,7 @@ macro_rules! commands {
                         && data.t == <$command as $crate::command::CommandDefinition>::KIND
                     {
                         return <$command as $crate::command::Command<S>>::autocomplete(
-                            $crate::command::Invocation::new(interaction, state),
+                            $crate::command::Invocation::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
                         )
                         .await;
                     }
@@ -162,7 +172,8 @@ macro_rules! commands {
                     if prefix == <$component as $crate::command::ComponentDefinition>::PREFIX {
                         return ::core::option::Option::Some(
                             <$component as $crate::command::ComponentHandler<S>>::invoke(
-                                interaction, state, fields,
+                                $crate::command::Ctx::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
+                                fields,
                             )
                             .await,
                         );
@@ -184,7 +195,8 @@ macro_rules! commands {
                     if prefix == <$modal as $crate::command::ModalDefinition>::PREFIX {
                         return ::core::option::Option::Some(
                             <$modal as $crate::command::ModalHandler<S>>::invoke(
-                                interaction, state, fields,
+                                $crate::command::Ctx::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
+                                fields,
                             )
                             .await,
                         );
@@ -198,6 +210,10 @@ macro_rules! commands {
         where
             $name: $crate::command::CommandSet<S>,
         {
+            fn theme(&self) -> ::core::option::Option<&'static $crate::command::Theme> {
+                <Self as $crate::command::CommandSet<S>>::THEME
+            }
+
             async fn command(
                 &self,
                 command: $crate::types::ApplicationCommandInteraction,

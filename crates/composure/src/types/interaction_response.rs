@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Serialize, ser::SerializeMap};
 
 use crate::types::{
-    ActionRow, AllowedMentions, Component, Embed, File, MessageFlags, PartialAttachment, PollCreate,
+    AllowedMentions, Component, Container, Embed, File, MessageFlags, PartialAttachment, PollCreate,
 };
 
 const TYPE_KEY: &str = "type";
@@ -57,6 +57,15 @@ impl InteractionResponse {
             embeds: Some(vec![embed]),
             ..Default::default()
         })
+    }
+
+    /// Respond with a [Components V2](https://discord.com/developers/docs/components/reference)
+    /// message laid out by `components` (containers, text displays, action rows); it has no
+    /// content or embeds
+    pub fn respond_with_components(components: Vec<Component>) -> Self {
+        InteractionResponse::ChannelMessageWithSource(MessageCallbackData::components_v2(
+            components,
+        ))
     }
 
     /// The message data of a message response (types 4 and 7)
@@ -168,13 +177,15 @@ pub struct MessageCallbackData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<AllowedMentions>,
 
-    /// [message flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field) (only SUPPRESS_EMBEDS and EPHEMERAL can be set)
+    /// [message flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field) (only SUPPRESS_EMBEDS, EPHEMERAL, SUPPRESS_NOTIFICATIONS and IS_COMPONENTS_V2 can be set)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
 
-    /// message components
+    /// message components: action rows, or with
+    /// [`IS_COMPONENTS_V2`](MessageFlags::IsComponentsV2) the whole message (containers, text
+    /// displays, ...)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<ActionRow>>,
+    pub components: Option<Vec<Component>>,
 
     /// attachment objects with filename and description
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -187,6 +198,41 @@ pub struct MessageCallbackData {
     /// files to upload; sent as multipart, so the Adapter answers through the callback endpoint
     #[serde(skip)]
     pub files: Vec<File>,
+
+    /// Leave the embeds as they are instead of filling in the Command Set's
+    /// [`Theme`](crate::command::Theme); set by [`Unthemed`](crate::command::Unthemed)
+    #[serde(skip)]
+    pub unthemed: bool,
+}
+
+impl MessageCallbackData {
+    /// A [Components V2](https://discord.com/developers/docs/components/reference) message laid
+    /// out by `components`. Leave `content`, `embeds` and `poll` unset: Discord rejects them
+    /// alongside [`IS_COMPONENTS_V2`](MessageFlags::IsComponentsV2); use text displays instead.
+    pub fn components_v2(components: Vec<Component>) -> Self {
+        MessageCallbackData {
+            components: Some(components),
+            flags: Some(MessageFlags::IsComponentsV2),
+            ..Default::default()
+        }
+    }
+
+    /// Whether the message is laid out with Components V2
+    pub fn is_components_v2(&self) -> bool {
+        self.flags
+            .is_some_and(|flags| flags.contains(MessageFlags::IsComponentsV2))
+    }
+
+    /// The top-level [`Container`]s of the message
+    pub fn containers_mut(&mut self) -> impl Iterator<Item = &mut Container> {
+        self.components
+            .iter_mut()
+            .flatten()
+            .filter_map(|component| match component {
+                Component::Container(container) => Some(container),
+                _ => None,
+            })
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -280,6 +326,32 @@ mod tests {
             .unwrap(),
             serde_json::json!({ "type": 5, "data": { "flags": 64 } })
         );
+    }
+
+    #[test]
+    pub fn serialize_components_v2() {
+        let container = Container::new(vec![Component::text("hi")])
+            .with_accent_color(0xff0000)
+            .spoiler();
+        let response = InteractionResponse::respond_with_components(vec![container.into()]);
+        let json = serde_json::json!({ "type": 4, "data": {
+            "flags": 1 << 15,
+            "components": [{
+                "type": 17,
+                "components": [{ "type": 10, "content": "hi" }],
+                "accent_color": 0xff0000,
+                "spoiler": true,
+            }],
+        }});
+        assert_eq!(serde_json::to_value(&response).unwrap(), json);
+
+        let parsed: Component = serde_json::from_value(json["data"]["components"][0].clone())
+            .expect("container deserializes");
+        let Component::Container(container) = parsed else {
+            panic!("not a container");
+        };
+        assert_eq!(container.accent_color, Some(0xff0000));
+        assert!(matches!(container.components[0], Component::TextDisplay(_)));
     }
 
     #[test]

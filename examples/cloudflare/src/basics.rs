@@ -1,4 +1,5 @@
-//! Commands that only answer: Options, Choices, State, Groups, context menus, errors.
+//! Commands that only answer: Options, Choices, State, Groups, context menus, errors, themed
+//! embeds (colors and footer come from the Command Set's `THEME`).
 
 use composure::{
     Choice, Ctx, autocomplete, command,
@@ -46,9 +47,7 @@ pub fn ice_cream(
     #[option("Flavor")] flavor: Flavor,
     #[option("Scoops")] scoops: Option<u8>,
 ) -> Embed {
-    Embed::new()
-        .with_title(&format!("{} x {}", scoops.unwrap_or(1), flavor.name()))
-        .with_color(0xf5c2e7)
+    Embed::new().with_title(&format!("{} x {}", scoops.unwrap_or(1), flavor.name()))
 }
 
 const FRUITS: [&str; 8] = [
@@ -105,15 +104,15 @@ pub fn ban(
     ctx: Ctx,
     #[option("Who to ban")] user: &User,
     #[option("Why")] reason: Option<&str>,
-) -> Result<Ephemeral<String>, HandlerError> {
+) -> Result<Ephemeral<Embed>, HandlerError> {
     if ctx.user().is_some_and(|me| me.id == user.id) {
         return Err(HandlerError::user("You can't ban yourself."));
     }
-    Ok(Ephemeral(format!(
+    Ok(Ephemeral(ctx.theme().warning(format!(
         "Would ban {} ({})",
         user.display_name(),
         reason.unwrap_or("no reason")
-    )))
+    ))))
 }
 
 /// Kick a member

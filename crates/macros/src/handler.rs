@@ -119,7 +119,7 @@ pub fn expand(kind: Kind, args: TokenStream, item: TokenStream) -> syn::Result<T
     let vis = &function.vis;
     let names: Vec<_> = state_args.iter().map(|(name, _)| name).collect();
     let types: Vec<_> = state_args.iter().map(|(_, ty)| ty).collect();
-    let ctx_arg = has_ctx.then(|| quote!(::composure::command::Ctx::new(interaction, state),));
+    let ctx_arg = has_ctx.then(|| quote!(ctx,));
     let form_arg = form.as_ref().map(|(name, _)| quote!(#name,));
     let call = if function.sig.asyncness.is_some() {
         quote! { #ident(#ctx_arg #form_arg #(#names),*).await }
@@ -127,21 +127,21 @@ pub fn expand(kind: Kind, args: TokenStream, item: TokenStream) -> syn::Result<T
         quote! { #ident(#ctx_arg #form_arg #(#names),*) }
     };
 
-    let (definition, handler, interaction) = match kind {
+    let (definition, handler, data) = match kind {
         Kind::Component => (
             quote!(ComponentDefinition),
             quote!(ComponentHandler),
-            quote!(MessageComponentInteraction),
+            quote!(MessageComponentData),
         ),
         Kind::Modal => (
             quote!(ModalDefinition),
             quote!(ModalHandler),
-            quote!(ModalSubmitInteraction),
+            quote!(ModalSubmitData),
         ),
     };
     let extract_form = form.as_ref().map(|(name, ty)| {
         quote! {
-            let #name = <#ty as ::composure::command::Modal>::extract(&interaction.data)?;
+            let #name = <#ty as ::composure::command::Modal>::extract(ctx.data())?;
         }
     });
     let show = form.as_ref().map(|(_, ty)| {
@@ -197,14 +197,13 @@ pub fn expand(kind: Kind, args: TokenStream, item: TokenStream) -> syn::Result<T
 
         impl #impl_generics ::composure::command::#handler<#state> for #ident #where_clause {
             async fn invoke(
-                interaction: &::composure::types::#interaction,
-                state: &#state,
+                ctx: ::composure::command::Ctx<'_, #state, ::composure::types::#data>,
                 fields: ::core::option::Option<&str>,
             ) -> ::core::result::Result<
                 ::composure::types::InteractionResponse,
                 ::composure::command::HandlerError,
             > {
-                let _ = state;
+                let _ = ctx;
                 let (#(#names,)*): (#(#types,)*) =
                     ::composure::command::decode_state(#prefix, fields)?;
                 #extract_form
