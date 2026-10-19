@@ -1,4 +1,4 @@
-use std::{fmt, rc::Rc, time::Duration};
+use std::{borrow::Cow, fmt, rc::Rc, time::Duration};
 
 /// The Adapter-provided way to send one HTTP request and to sleep; the REST client's only contact
 /// with the platform (`worker::Fetch` on Cloudflare, `reqwest` natively).
@@ -67,7 +67,8 @@ impl fmt::Display for Method {
 pub struct Request {
     pub method: Method,
     pub url: String,
-    pub headers: Vec<(&'static str, String)>,
+    /// Values are borrowed when constant (`User-Agent`, `Content-Type: application/json`)
+    pub headers: Vec<(&'static str, Cow<'static, str>)>,
     pub body: Option<Vec<u8>>,
 }
 
@@ -76,9 +77,24 @@ impl Request {
         self.headers
             .iter()
             .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .map(|(_, value)| value.as_str())
+            .map(|(_, value)| value.as_ref())
     }
 }
+
+/// The response headers the client reads (rate limits) plus `content-type`. A Transport on a
+/// platform where reading headers is costly (each one crosses into JS on Workers) may keep only
+/// these in [`RawResponse::headers`].
+pub const DISCORD_HEADERS: &[&str] = &[
+    "content-type",
+    "retry-after",
+    "x-ratelimit-bucket",
+    "x-ratelimit-global",
+    "x-ratelimit-limit",
+    "x-ratelimit-remaining",
+    "x-ratelimit-reset",
+    "x-ratelimit-reset-after",
+    "x-ratelimit-scope",
+];
 
 /// An HTTP response as received, any status
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

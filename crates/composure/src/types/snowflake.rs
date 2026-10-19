@@ -1,4 +1,4 @@
-use std::{fmt::Debug, hash::Hash, str::FromStr};
+use std::{fmt::Debug, str::FromStr};
 
 use serde::{Deserialize, Serialize, de::Visitor};
 
@@ -12,65 +12,40 @@ const TIMESTAMP_SHIFT: u8 = 22;
 const WORKER_SHIFT: u8 = 17;
 const PROCESS_ID_SHIFT: u8 = 12;
 
-#[derive(Eq, Clone, Copy)]
-pub struct Snowflake {
-    pub timestamp: u64,
-    worker_id: u8,
-    internal_process_id: u8,
-    increment: u16,
-}
+/// A Discord id: a 64-bit integer carrying its creation time, serialized as a string
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Snowflake(u64);
 
 impl Snowflake {
-    pub fn from_u64(snowflake: u64) -> Self {
-        Snowflake {
-            timestamp: (snowflake >> TIMESTAMP_SHIFT) + DISCORD_EPOCH,
-            worker_id: ((snowflake & WORKER_BITS) >> WORKER_SHIFT) as u8,
-            internal_process_id: ((snowflake & PROCESS_ID_BITS) >> PROCESS_ID_SHIFT) as u8,
-            increment: (snowflake & INCREMENT_BITS) as u16,
-        }
+    pub const fn from_u64(snowflake: u64) -> Self {
+        Snowflake(snowflake)
     }
 
-    pub fn to_u64(&self) -> u64 {
-        let mut snowflake: u64 = 0;
-
-        snowflake |= (self.timestamp - DISCORD_EPOCH) << TIMESTAMP_SHIFT;
-        snowflake |= (self.worker_id as u64) << WORKER_SHIFT;
-        snowflake |= (self.internal_process_id as u64) << PROCESS_ID_SHIFT;
-        snowflake |= self.increment as u64;
-
-        snowflake
+    pub const fn to_u64(&self) -> u64 {
+        self.0
     }
-}
 
-impl Default for Snowflake {
-    fn default() -> Self {
-        Self {
-            timestamp: DISCORD_EPOCH,
-            worker_id: Default::default(),
-            internal_process_id: Default::default(),
-            increment: Default::default(),
-        }
+    /// Creation time in milliseconds since the Unix epoch
+    pub const fn timestamp(&self) -> u64 {
+        (self.0 >> TIMESTAMP_SHIFT) + DISCORD_EPOCH
     }
-}
 
-impl PartialEq for Snowflake {
-    fn eq(&self, other: &Self) -> bool {
-        self.timestamp == other.timestamp
-            && self.worker_id == other.worker_id
-            && self.internal_process_id == other.internal_process_id
-            && self.increment == other.increment
+    pub const fn worker_id(&self) -> u8 {
+        ((self.0 & WORKER_BITS) >> WORKER_SHIFT) as u8
     }
-}
 
-impl Hash for Snowflake {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.to_u64().hash(state);
+    pub const fn internal_process_id(&self) -> u8 {
+        ((self.0 & PROCESS_ID_BITS) >> PROCESS_ID_SHIFT) as u8
+    }
+
+    pub const fn increment(&self) -> u16 {
+        (self.0 & INCREMENT_BITS) as u16
     }
 }
 
 impl From<u64> for Snowflake {
     fn from(value: u64) -> Self {
-        Self::from_u64(value)
+        Self(value)
     }
 }
 
@@ -78,25 +53,25 @@ impl FromStr for Snowflake {
     type Err = <u64 as FromStr>::Err;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::from_u64(s.parse()?))
+        Ok(Self(s.parse()?))
     }
 }
 
 impl From<Snowflake> for u64 {
     fn from(val: Snowflake) -> Self {
-        val.to_u64()
+        val.0
     }
 }
 
 impl Debug for Snowflake {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Snowflake").field(&self.to_u64()).finish()
+        f.debug_tuple("Snowflake").field(&self.0).finish()
     }
 }
 
 impl std::fmt::Display for Snowflake {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_u64())
+        std::fmt::Display::fmt(&self.0, f)
     }
 }
 
@@ -133,7 +108,92 @@ impl Serialize for Snowflake {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.to_string().as_str())
+        serializer.collect_str(&self.0)
+    }
+}
+
+/// Objects keyed by id, as Discord sends resolved data. These hold a handful of entries, so a
+/// list is faster to build and search than a hash map, and smaller in the bundle.
+#[derive(Debug, Clone)]
+pub struct SnowflakeMap<T>(Vec<(Snowflake, T)>);
+
+impl<T> SnowflakeMap<T> {
+    pub fn get(&self, id: &Snowflake) -> Option<&T> {
+        self.0
+            .iter()
+            .find(|(key, _)| key == id)
+            .map(|(_, value)| value)
+    }
+
+    pub fn contains_key(&self, id: &Snowflake) -> bool {
+        self.get(id).is_some()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Snowflake, &T)> {
+        self.0.iter().map(|(key, value)| (key, value))
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = &Snowflake> {
+        self.0.iter().map(|(key, _)| key)
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &T> {
+        self.0.iter().map(|(_, value)| value)
+    }
+}
+
+impl<T> Default for SnowflakeMap<T> {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl<T> FromIterator<(Snowflake, T)> for SnowflakeMap<T> {
+    fn from_iter<I: IntoIterator<Item = (Snowflake, T)>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl<T> std::ops::Index<&Snowflake> for SnowflakeMap<T> {
+    type Output = T;
+
+    fn index(&self, id: &Snowflake) -> &T {
+        self.get(id).expect("no entry for id")
+    }
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for SnowflakeMap<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct MapVisitor<T>(std::marker::PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for MapVisitor<T> {
+            type Value = SnowflakeMap<T>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a map keyed by id")
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<Self::Value, A::Error> {
+                let mut entries = Vec::with_capacity(map.size_hint().unwrap_or(1).min(25));
+                while let Some(entry) = map.next_entry()? {
+                    entries.push(entry);
+                }
+                Ok(SnowflakeMap(entries))
+            }
+        }
+
+        deserializer.deserialize_map(MapVisitor(std::marker::PhantomData))
     }
 }
 
@@ -142,11 +202,43 @@ mod tests {
     use super::*;
 
     #[test]
+    pub fn snowflake_is_one_word() {
+        assert_eq!(std::mem::size_of::<Snowflake>(), 8);
+        let snowflake = Snowflake::from(282265607313817601);
+        assert_eq!(
+            serde_json::to_string(&snowflake).unwrap(),
+            r#""282265607313817601""#
+        );
+        assert_eq!(
+            (
+                snowflake.worker_id(),
+                snowflake.internal_process_id(),
+                snowflake.increment()
+            ),
+            (0, 0, 1)
+        );
+    }
+
+    #[test]
+    pub fn snowflake_map_reads_an_object_keyed_by_id() {
+        let map: SnowflakeMap<String> =
+            serde_json::from_str(r#"{ "1": "one", "22": "twenty-two" }"#).unwrap();
+        assert_eq!(map.len(), 2);
+        assert_eq!(
+            map.get(&Snowflake::from(22)).map(String::as_str),
+            Some("twenty-two")
+        );
+        assert_eq!(map[&Snowflake::from(1)], "one");
+        assert!(!map.contains_key(&Snowflake::from(3)));
+        assert!(serde_json::from_str::<SnowflakeMap<String>>(r#"{ "x": "bad id" }"#).is_err());
+    }
+
+    #[test]
     pub fn timestamp_correct() {
         let snowflake: u64 = 282265607313817601;
         let snowflake = Snowflake::from(snowflake);
 
-        assert_eq!(snowflake.timestamp, 1487367765025);
+        assert_eq!(snowflake.timestamp(), 1487367765025);
     }
 
     #[test]
@@ -158,7 +250,7 @@ mod tests {
 
         let snowflake = snowflake.unwrap();
 
-        assert_eq!(snowflake.timestamp, 1487367765025);
+        assert_eq!(snowflake.timestamp(), 1487367765025);
     }
 
     #[test]
@@ -181,7 +273,7 @@ mod tests {
 
         let snowflake = snowflake.unwrap();
 
-        assert_eq!(snowflake.timestamp, 1487367765025);
+        assert_eq!(snowflake.timestamp(), 1487367765025);
         let trimmed = &snowflake_id[1..snowflake_id.len() - 1];
         assert_eq!(trimmed, snowflake.to_string().as_str());
     }

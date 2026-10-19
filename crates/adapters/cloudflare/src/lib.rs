@@ -3,18 +3,20 @@
 mod state;
 mod transport;
 
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
+
+pub use composure::auth::PublicKey;
 pub use composure::command::{EventHandler, HandlerError, InteractionHandler, NoHandler};
 use composure::{
     command::{Platform, dispatch, spawn_event},
     rest::InteractionClient,
     types::{Interaction, InteractionResponse, Snowflake, WebhookEventPayload},
 };
+use serde::Deserialize;
 use state::log_handler_error;
 pub use state::{Worker, bot_client};
 pub use transport::FetchTransport;
-use worker::{
-    Context, Env, Headers, Request, Response, console_debug, console_error, console_warn,
-};
+use worker::{Context, Env, Headers, Request, Response, console_error, console_warn};
 
 #[derive(Debug)]
 pub enum Error {
@@ -45,11 +47,7 @@ pub const DEFAULT_EVENTS_PATH: &str = "/events";
 pub async fn validate_request(env: &Env, headers: &Headers, body: &[u8]) -> Result<()> {
     let signature = headers.get(SIGNATURE_HEADER).map_err(Error::WorkerError)?;
     let timestamp = headers.get(TIMESTAMP_HEADER).map_err(Error::WorkerError)?;
-
-    let public_key = env
-        .secret(PUBLIC_KEY_SECRET)
-        .map_err(Error::WorkerError)?
-        .to_string();
+    let public_key = public_key(env).await?;
 
     verify(
         &public_key,
@@ -60,8 +58,34 @@ pub async fn validate_request(env: &Env, headers: &Headers, body: &[u8]) -> Resu
     .await
 }
 
+thread_local! {
+    /// The `DISCORD_PUBLIC_KEY` secret, parsed (and with `web-crypto`, imported) on the first
+    /// request and reused for the life of the isolate. A changed secret is a new deployment, so
+    /// a new isolate.
+    static PUBLIC_KEY: RefCell<Option<Rc<PublicKey>>> = const { RefCell::new(None) };
+}
+
+/// The cached public key. A missing secret is an [`Error::WorkerError`]; one that is not a valid
+/// key is an [`Error::ValidationError`] (and is read again next time).
+async fn public_key(env: &Env) -> Result<Rc<PublicKey>> {
+    if let Some(key) = PUBLIC_KEY.with_borrow(Option::clone) {
+        return Ok(key);
+    }
+    let hex = env
+        .secret(PUBLIC_KEY_SECRET)
+        .map_err(Error::WorkerError)?
+        .to_string();
+    let key = Rc::new(
+        PublicKey::from_hex(&hex)
+            .await
+            .map_err(|_| Error::ValidationError)?,
+    );
+    PUBLIC_KEY.set(Some(key.clone()));
+    Ok(key)
+}
+
 async fn verify(
-    public_key: &str,
+    public_key: &PublicKey,
     signature: Option<&str>,
     timestamp: Option<&str>,
     body: &[u8],
@@ -70,7 +94,8 @@ async fn verify(
         return Err(Error::ValidationError);
     };
 
-    composure::auth::validate_request(public_key, signature, timestamp, body)
+    public_key
+        .verify(signature, timestamp, body)
         .await
         .map_err(|_| Error::ValidationError)
 }
@@ -122,6 +147,22 @@ impl InteractionOutcome {
 /// * `state` - passed to the handler; `worker::Env` when running on Workers
 pub async fn handle_interaction<S, H: InteractionHandler<S>>(
     public_key: &str,
+    signature: Option<&str>,
+    timestamp: Option<&str>,
+    body: &[u8],
+    handler: &H,
+    state: &S,
+) -> InteractionOutcome {
+    let Ok(public_key) = PublicKey::from_hex(public_key).await else {
+        return InteractionOutcome::Unauthorized;
+    };
+    handle_interaction_with_key(&public_key, signature, timestamp, body, handler, state).await
+}
+
+/// [`handle_interaction`] with a parsed [`PublicKey`], as [`CloudflareInteractionBot::process`]
+/// calls it
+pub async fn handle_interaction_with_key<S, H: InteractionHandler<S>>(
+    public_key: &PublicKey,
     signature: Option<&str>,
     timestamp: Option<&str>,
     body: &[u8],
@@ -184,6 +225,21 @@ pub async fn handle_event<S: Platform, H: EventHandler<S> + 'static>(
     handler: H,
     state: &S,
 ) -> EventOutcome {
+    let Ok(public_key) = PublicKey::from_hex(public_key).await else {
+        return EventOutcome::Unauthorized;
+    };
+    handle_event_with_key(&public_key, signature, timestamp, body, handler, state).await
+}
+
+/// [`handle_event`] with a parsed [`PublicKey`], as [`CloudflareInteractionBot::process`] calls it
+pub async fn handle_event_with_key<S: Platform, H: EventHandler<S> + 'static>(
+    public_key: &PublicKey,
+    signature: Option<&str>,
+    timestamp: Option<&str>,
+    body: &[u8],
+    handler: H,
+    state: &S,
+) -> EventOutcome {
     if verify(public_key, signature, timestamp, body)
         .await
         .is_err()
@@ -207,7 +263,7 @@ pub struct CloudflareInteractionBot<H = NoHandler> {
     req: Request,
     state: Worker,
     handler: H,
-    events_path: String,
+    events_path: Cow<'static, str>,
 }
 
 impl CloudflareInteractionBot {
@@ -218,7 +274,7 @@ impl CloudflareInteractionBot {
             req,
             state: Worker::new(env, ctx),
             handler: NoHandler,
-            events_path: DEFAULT_EVENTS_PATH.to_string(),
+            events_path: Cow::Borrowed(DEFAULT_EVENTS_PATH),
         }
     }
 }
@@ -240,7 +296,7 @@ impl<H: InteractionHandler<Worker>> CloudflareInteractionBot<H> {
 
     /// Serves Webhook Events on `path` instead of `/events`; set the app's Webhook Events URL to
     /// match. Every other path serves Interactions.
-    pub fn with_events_path(mut self, path: impl Into<String>) -> Self {
+    pub fn with_events_path(mut self, path: impl Into<Cow<'static, str>>) -> Self {
         self.events_path = path.into();
         self
     }
@@ -253,8 +309,6 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
     /// files are sent through the callback endpoint and the request is answered with 202.
     /// Webhook Events are acknowledged with 204 and handled as Background Work.
     pub async fn process(mut self) -> worker::Result<Response> {
-        console_debug!("Processing request");
-
         let bytes = match self.req.bytes().await {
             Ok(bytes) => bytes,
             Err(e) => {
@@ -263,11 +317,15 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
             }
         };
 
-        let public_key = match self.state.secret(PUBLIC_KEY_SECRET) {
-            Ok(secret) => secret.to_string(),
-            Err(e) => {
+        let public_key = match public_key(&self.state).await {
+            Ok(key) => key,
+            Err(Error::WorkerError(e)) => {
                 console_error!("Missing {} secret: {}", PUBLIC_KEY_SECRET, e);
                 return Response::error("Internal error", 500);
+            }
+            Err(Error::ValidationError) => {
+                console_error!("{} is not a valid public key", PUBLIC_KEY_SECRET);
+                return Response::error("Validation failed", 401);
             }
         };
         let headers = self.req.headers();
@@ -275,7 +333,7 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
         let timestamp = headers.get(TIMESTAMP_HEADER).ok().flatten();
 
         if self.req.path() == self.events_path {
-            let outcome = handle_event(
+            let outcome = handle_event_with_key(
                 &public_key,
                 signature.as_deref(),
                 timestamp.as_deref(),
@@ -301,7 +359,7 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
             };
         }
 
-        let outcome = handle_interaction(
+        let outcome = handle_interaction_with_key(
             &public_key,
             signature.as_deref(),
             timestamp.as_deref(),
@@ -348,14 +406,25 @@ async fn reply(body: &[u8], response: &InteractionResponse) -> worker::Result<Re
     }
 }
 
+/// Reads just the ids and token again: only responses with files need them, so the common path
+/// keeps no copy
 fn callback_client(body: &[u8]) -> Option<InteractionClient<FetchTransport>> {
-    let interaction: serde_json::Value = serde_json::from_slice(body).ok()?;
-    let id = |key: &str| interaction.get(key)?.as_str()?.parse::<Snowflake>().ok();
+    #[derive(Deserialize)]
+    struct Callback {
+        id: Snowflake,
+        application_id: Snowflake,
+        token: String,
+    }
+    let Callback {
+        id,
+        application_id,
+        token,
+    } = serde_json::from_slice(body).ok()?;
     Some(InteractionClient::new(
         FetchTransport,
-        id("application_id")?,
-        id("id")?,
-        interaction.get("token")?.as_str()?,
+        application_id,
+        id,
+        token,
     ))
 }
 

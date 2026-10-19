@@ -458,7 +458,11 @@ fn fallback_handles_the_rest() {
 fn functions_stay_callable() {
     assert_eq!(ping(), "pong");
     assert_eq!(
-        block_on(echo(Ctx::new(&dummy_command(), &()), "a", Some(2))),
+        block_on(echo(
+            Ctx::new(&std::rc::Rc::new(dummy_command()), &()),
+            "a",
+            Some(2)
+        )),
         "aa"
     );
     // A local binding can share a command's name

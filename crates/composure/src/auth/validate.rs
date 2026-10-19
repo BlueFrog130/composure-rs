@@ -27,7 +27,42 @@ pub enum ValidateError {
     InvalidSignature,
 }
 
-/// Validates a request using ed25519
+/// The application's public key, decoded (and with `web-crypto`, imported into the host) once so
+/// it can verify any number of requests. Adapters keep one for the life of the isolate.
+#[derive(Clone)]
+pub struct PublicKey(backend::Key);
+
+impl PublicKey {
+    /// Parses the hex public key from the Developer Portal
+    pub async fn from_hex(public_key: &str) -> Result<Self, ValidateError> {
+        let mut bytes = [0u8; 32];
+        hex::decode_to_slice(public_key, &mut bytes).map_err(ValidateError::HexError)?;
+        backend::Key::new(&bytes).await.map(Self)
+    }
+
+    /// Checks the `X-Signature-Ed25519` signature (hex) of `timestamp || body`
+    pub async fn verify(
+        &self,
+        signature: &str,
+        timestamp: &str,
+        body: &[u8],
+    ) -> Result<(), ValidateError> {
+        let mut signature_bytes = [0u8; 64];
+        hex::decode_to_slice(signature, &mut signature_bytes).map_err(ValidateError::HexError)?;
+        self.0
+            .verify(&signature_bytes, timestamp.as_bytes(), body)
+            .await
+    }
+}
+
+impl std::fmt::Debug for PublicKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("PublicKey")
+    }
+}
+
+/// Validates a request using ed25519. Parses `public_key` on every call; keep a [`PublicKey`] to
+/// verify many requests.
 ///
 /// Async because Web Crypto is; with dalek it completes on first poll.
 pub async fn validate_request(
@@ -36,18 +71,10 @@ pub async fn validate_request(
     timestamp: &str,
     body: &[u8],
 ) -> Result<(), ValidateError> {
-    let mut public_key_bytes = [0u8; 32];
-    let mut signature_bytes = [0u8; 64];
-    hex::decode_to_slice(public_key, &mut public_key_bytes).map_err(ValidateError::HexError)?;
-    hex::decode_to_slice(signature, &mut signature_bytes).map_err(ValidateError::HexError)?;
-
-    backend::verify(
-        &public_key_bytes,
-        &signature_bytes,
-        timestamp.as_bytes(),
-        body,
-    )
-    .await
+    PublicKey::from_hex(public_key)
+        .await?
+        .verify(signature, timestamp, body)
+        .await
 }
 
 #[cfg(test)]

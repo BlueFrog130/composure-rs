@@ -1,9 +1,10 @@
 use std::time::Duration;
 
-use composure::rest::{self, RawResponse, Transport, TransportError};
+use composure::rest::{self, DISCORD_HEADERS, RawResponse, Transport, TransportError};
 use worker::{Delay, Fetch, Headers, Method, Request, RequestInit, js_sys::Uint8Array};
 
-/// [`Transport`] over Workers' `fetch`, sleeping with a JS timer
+/// [`Transport`] over Workers' `fetch`, sleeping with a JS timer. Responses keep only the
+/// [`DISCORD_HEADERS`] (rate limits and `content-type`): each header read crosses into JS.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FetchTransport;
 
@@ -33,9 +34,14 @@ impl Transport for FetchTransport {
             .send()
             .await
             .map_err(TransportError::new)?;
+        let received = response.headers();
+        let headers = DISCORD_HEADERS
+            .iter()
+            .filter_map(|&name| Some((name.to_string(), received.get(name).ok()??)))
+            .collect();
         Ok(RawResponse {
             status: response.status_code(),
-            headers: response.headers().entries().collect(),
+            headers,
             body: response.bytes().await.map_err(TransportError::new)?,
         })
     }

@@ -91,16 +91,24 @@ Sync the Command Set with Discord from a host-only bin; see `examples/cloudflare
 
 ## Signature validation
 
-By default signatures are checked with `ed25519-dalek` compiled into the worker. Enable the `web-crypto` feature to use Workers' built-in Web Crypto (Ed25519) instead: faster, and dalek drops out of the bundle.
+Signatures are checked with Workers' built-in Web Crypto (Ed25519, the default `web-crypto` feature), so no crypto code is compiled into the worker. The public key is parsed and imported once per isolate and reused: about 61 µs per verify of a 1 KB body on workerd, against 84 µs importing it each time and 97-132 µs with dalek (`bench/`).
+
+To compile `ed25519-dalek` in instead, turn default features off. Building the curve at `opt-level = 3` instead of a size-optimized "z" makes a verify about 22% faster for about 15 KB more bundle:
 
 ```toml
-composure_adapter_cloudflare = { version = "0.1.0", features = ["web-crypto"] }
+composure_adapter_cloudflare = { version = "0.1.0", default-features = false }
+
+[profile.release.package.curve25519-dalek]
+opt-level = 3
+
+[profile.release.package.sha2]
+opt-level = 3
 ```
 
 ## Testing a handler
 
-`handle_interaction(public_key, signature, timestamp, body, &handler, &state)` runs the same verify, parse, and dispatch steps as `process` without the Workers runtime. It returns an `InteractionOutcome` with the HTTP status and response, so a handler can be tested with signed payloads in plain `cargo test`. Commands generic over State (`ctx: Ctx`) can be tested with `&()` as the state. See `examples/cloudflare/tests/offline.rs`, and `examples/cloudflare/tests/regression.rs` for signed fixtures covering every interaction shape.
+`handle_interaction(public_key, signature, timestamp, body, &handler, &state)` runs the same verify, parse, and dispatch steps as `process` without the Workers runtime. It returns an `InteractionOutcome` with the HTTP status and response, so a handler can be tested with signed payloads in plain `cargo test`. Commands generic over State (`ctx: Ctx`) can be tested with `&()` as the state. `handle_interaction_with_key` / `handle_event_with_key` take a parsed `PublicKey` instead, as `process` does. See `examples/cloudflare/tests/offline.rs`, and `examples/cloudflare/tests/regression.rs` for signed fixtures covering every interaction shape.
 
-## Todo
+## Size and speed
 
-- [ ] Make package size smaller (simple build results in ~800 kb worker size)
+The example bot (`examples/cloudflare`) builds to about 1.16 MB of wasm (344 KB gzipped). Parsing, dispatching and answering an interaction takes a few microseconds and 20-45 small allocations; `examples/cloudflare/tests/perf.rs` measures each path and fails if one allocates more than its budget. `FetchTransport` keeps only the rate limit headers and `content-type` of REST responses (`composure::rest::DISCORD_HEADERS`).

@@ -117,7 +117,7 @@ macro_rules! commands {
 
             async fn dispatch(
                 &self,
-                interaction: &$crate::types::ApplicationCommandInteraction,
+                interaction: &::std::rc::Rc<$crate::types::ApplicationCommandInteraction>,
                 state: &S,
             ) -> ::core::option::Option<
                 ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
@@ -140,7 +140,7 @@ macro_rules! commands {
 
             async fn dispatch_autocomplete(
                 &self,
-                interaction: &$crate::types::ApplicationCommandInteraction,
+                interaction: &::std::rc::Rc<$crate::types::ApplicationCommandInteraction>,
                 state: &S,
             ) -> ::core::option::Option<
                 ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
@@ -162,7 +162,7 @@ macro_rules! commands {
             #[allow(unused_variables)]
             async fn dispatch_component(
                 &self,
-                interaction: &$crate::types::MessageComponentInteraction,
+                interaction: &::std::rc::Rc<$crate::types::MessageComponentInteraction>,
                 state: &S,
             ) -> ::core::option::Option<
                 ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
@@ -185,7 +185,7 @@ macro_rules! commands {
             #[allow(unused_variables)]
             async fn dispatch_modal(
                 &self,
-                interaction: &$crate::types::ModalSubmitInteraction,
+                interaction: &::std::rc::Rc<$crate::types::ModalSubmitInteraction>,
                 state: &S,
             ) -> ::core::option::Option<
                 ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
@@ -219,6 +219,7 @@ macro_rules! commands {
                 command: $crate::types::ApplicationCommandInteraction,
                 state: &S,
             ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
+                let command = ::std::rc::Rc::new(command);
                 match $crate::command::CommandSet::dispatch(self, &command, state).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => ::core::result::Result::Err(
@@ -232,11 +233,12 @@ macro_rules! commands {
                 autocomplete: $crate::types::ApplicationCommandInteraction,
                 state: &S,
             ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
+                let autocomplete = ::std::rc::Rc::new(autocomplete);
                 match $crate::command::CommandSet::dispatch_autocomplete(self, &autocomplete, state).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => {
                         $crate::command::InteractionHandler::<S>::autocomplete(
-                            &$crate::command::NoHandler, autocomplete, state,
+                            &$crate::command::NoHandler, $crate::command::__unshare(autocomplete), state,
                         )
                         .await
                     }
@@ -248,11 +250,12 @@ macro_rules! commands {
                 component: $crate::types::MessageComponentInteraction,
                 state: &S,
             ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
+                let component = ::std::rc::Rc::new(component);
                 match $crate::command::CommandSet::dispatch_component(self, &component, state).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => {
                         $crate::command::InteractionHandler::<S>::component(
-                            &$crate::command::NoHandler, component, state,
+                            &$crate::command::NoHandler, $crate::command::__unshare(component), state,
                         )
                         .await
                     }
@@ -264,11 +267,12 @@ macro_rules! commands {
                 modal: $crate::types::ModalSubmitInteraction,
                 state: &S,
             ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
+                let modal = ::std::rc::Rc::new(modal);
                 match $crate::command::CommandSet::dispatch_modal(self, &modal, state).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => {
                         $crate::command::InteractionHandler::<S>::modal_submit(
-                            &$crate::command::NoHandler, modal, state,
+                            &$crate::command::NoHandler, $crate::command::__unshare(modal), state,
                         )
                         .await
                     }

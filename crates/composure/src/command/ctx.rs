@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use super::Theme;
 use crate::types::{
     ApplicationCommandInteractionData, DataInteraction, Entitlement, Member, MessageComponentData,
@@ -7,7 +9,8 @@ use crate::types::{
 /// What a handler sees besides its inputs: the Interaction it answers and the Adapter's State.
 /// `D` is the Interaction's data: a Command's by default, see [`ComponentCtx`] and [`ModalCtx`].
 pub struct Ctx<'a, S = (), D = ApplicationCommandInteractionData> {
-    interaction: &'a DataInteraction<D>,
+    /// Shared so deferred work keeps the Interaction without copying it
+    interaction: &'a Rc<DataInteraction<D>>,
     state: &'a S,
     theme: Option<&'static Theme>,
 }
@@ -27,7 +30,7 @@ impl<S, D> Clone for Ctx<'_, S, D> {
 impl<S, D> Copy for Ctx<'_, S, D> {}
 
 impl<'a, S, D> Ctx<'a, S, D> {
-    pub fn new(interaction: &'a DataInteraction<D>, state: &'a S) -> Self {
+    pub fn new(interaction: &'a Rc<DataInteraction<D>>, state: &'a S) -> Self {
         Self {
             interaction,
             state,
@@ -54,6 +57,12 @@ impl<'a, S, D> Ctx<'a, S, D> {
     }
 
     pub fn interaction(&self) -> &'a DataInteraction<D> {
+        self.interaction
+    }
+
+    /// The Interaction, shared
+    #[cfg(feature = "rest")]
+    pub(crate) fn shared_interaction(&self) -> &'a Rc<DataInteraction<D>> {
         self.interaction
     }
 

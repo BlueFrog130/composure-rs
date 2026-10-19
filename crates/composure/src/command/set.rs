@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     definition::{
         ApplicationCommand, ApplicationCommandOption, ChatInputCommand, CommandDetails,
@@ -53,7 +55,7 @@ static NO_OPTIONS: OptionList = OptionList::empty();
 /// One Command (or subcommand) being invoked: the Interaction, the State, and the Options at
 /// this level of the subcommand tree.
 pub struct Invocation<'a, S> {
-    interaction: &'a ApplicationCommandInteraction,
+    interaction: &'a Rc<ApplicationCommandInteraction>,
     state: &'a S,
     options: &'a OptionList,
     /// Set when routed into a subcommand group: the subcommand chosen inside it
@@ -62,7 +64,7 @@ pub struct Invocation<'a, S> {
 }
 
 impl<'a, S> Invocation<'a, S> {
-    pub fn new(interaction: &'a ApplicationCommandInteraction, state: &'a S) -> Self {
+    pub fn new(interaction: &'a Rc<ApplicationCommandInteraction>, state: &'a S) -> Self {
         Self {
             interaction,
             state,
@@ -248,14 +250,14 @@ pub trait CommandSet<S> {
     /// Runs the matching Command, or `None` if no Command has the invoked name and type
     async fn dispatch(
         &self,
-        interaction: &ApplicationCommandInteraction,
+        interaction: &Rc<ApplicationCommandInteraction>,
         state: &S,
     ) -> Option<Result<InteractionResponse, HandlerError>>;
 
     /// Runs the matching Command's Autocomplete Handler for the focused Option, or `None`
     async fn dispatch_autocomplete(
         &self,
-        _interaction: &ApplicationCommandInteraction,
+        _interaction: &Rc<ApplicationCommandInteraction>,
         _state: &S,
     ) -> Option<Result<InteractionResponse, HandlerError>> {
         None
@@ -264,7 +266,7 @@ pub trait CommandSet<S> {
     /// Runs the Component Handler whose prefix the `custom_id` starts with, or `None`
     async fn dispatch_component(
         &self,
-        _interaction: &MessageComponentInteraction,
+        _interaction: &Rc<MessageComponentInteraction>,
         _state: &S,
     ) -> Option<Result<InteractionResponse, HandlerError>> {
         None
@@ -273,11 +275,18 @@ pub trait CommandSet<S> {
     /// Runs the Modal Handler whose prefix the `custom_id` starts with, or `None`
     async fn dispatch_modal(
         &self,
-        _interaction: &ModalSubmitInteraction,
+        _interaction: &Rc<ModalSubmitInteraction>,
         _state: &S,
     ) -> Option<Result<InteractionResponse, HandlerError>> {
         None
     }
+}
+
+/// The Interaction back from the [`Rc`] it was dispatched in, for handlers that take it by value.
+/// Nothing else holds it once dispatch found no handler, so this does not copy.
+#[doc(hidden)]
+pub fn __unshare<T: Clone>(interaction: Rc<T>) -> T {
+    Rc::try_unwrap(interaction).unwrap_or_else(|shared| (*shared).clone())
 }
 
 /// The Command Definitions of a Command Set, for Sync

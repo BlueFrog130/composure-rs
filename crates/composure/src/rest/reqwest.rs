@@ -31,7 +31,7 @@ impl Transport for ReqwestTransport {
         };
         let mut builder = self.client.request(method, &request.url);
         for (name, value) in &request.headers {
-            builder = builder.header(*name, value);
+            builder = builder.header(*name, value.as_ref());
         }
         if let Some(body) = &request.body {
             builder = builder.body(body.clone());

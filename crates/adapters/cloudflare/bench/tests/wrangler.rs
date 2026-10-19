@@ -75,10 +75,17 @@ fn env_or<T: std::str::FromStr>(name: &str, default: T) -> T {
 }
 
 /// One request running `iterations` validations; asserts every one passed
-fn time_request(client: &Client, url: &str, signed: &Signed, iterations: u32) -> Duration {
+fn time_request(
+    client: &Client,
+    url: &str,
+    signed: &Signed,
+    cached: bool,
+    iterations: u32,
+) -> Duration {
     let started = Instant::now();
     let response = client
         .post(url)
+        .header("X-Cached-Key", if cached { "1" } else { "0" })
         .header("X-Public-Key", &signed.public_key)
         .header("X-Signature-Ed25519", &signed.signature)
         .header("X-Signature-Timestamp", TIMESTAMP)
@@ -97,11 +104,12 @@ fn median(
     client: &Client,
     url: &str,
     signed: &Signed,
+    cached: bool,
     iterations: u32,
     samples: usize,
 ) -> Duration {
     let mut times: Vec<_> = (0..samples)
-        .map(|_| time_request(client, url, signed, iterations))
+        .map(|_| time_request(client, url, signed, cached, iterations))
         .collect();
     times.sort();
     times[samples / 2]
@@ -121,6 +129,8 @@ fn build(dir: &Path, backend: &Backend) -> String {
 
 struct Row {
     backend: &'static str,
+    /// Key parsed once (as the adapter does) or per verify (`validate_request`)
+    cached: bool,
     wasm_bytes: u64,
     body_bytes: usize,
     per_verify: Duration,
@@ -149,21 +159,24 @@ fn validate_request_speed() {
         let mut wrangler = Wrangler::start(dir, port, &[&script]);
         wrangler.wait_ready(port, Duration::from_secs(120));
 
-        for size in BODY_SIZES {
-            let signed = signed_body(size);
-            // Warm up: wasm tier-up and Web Crypto init
-            for _ in 0..5 {
-                time_request(&client, &url, &signed, iterations);
-            }
+        for cached in [false, true] {
+            for size in BODY_SIZES {
+                let signed = signed_body(size);
+                // Warm up: wasm tier-up and Web Crypto init
+                for _ in 0..5 {
+                    time_request(&client, &url, &signed, cached, iterations);
+                }
 
-            let one = median(&client, &url, &signed, 1, samples);
-            let many = median(&client, &url, &signed, iterations, samples);
-            rows.push(Row {
-                backend: backend.name,
-                wasm_bytes,
-                body_bytes: size,
-                per_verify: many.saturating_sub(one) / (iterations - 1),
-            });
+                let one = median(&client, &url, &signed, cached, 1, samples);
+                let many = median(&client, &url, &signed, cached, iterations, samples);
+                rows.push(Row {
+                    backend: backend.name,
+                    cached,
+                    wasm_bytes,
+                    body_bytes: size,
+                    per_verify: many.saturating_sub(one) / (iterations - 1),
+                });
+            }
         }
 
         drop(wrangler);
@@ -171,18 +184,19 @@ fn validate_request_speed() {
 
     println!("\nvalidate_request on wrangler dev ({iterations} iterations, median of {samples})\n");
     println!(
-        "| {:<10} | {:>10} | {:>8} | {:>10} | {:>10} |",
-        "backend", "wasm", "body", "µs/verify", "verify/s"
+        "| {:<10} | {:<6} | {:>10} | {:>8} | {:>10} | {:>10} |",
+        "backend", "key", "wasm", "body", "µs/verify", "verify/s"
     );
     println!(
-        "|{:-<12}|{:->12}|{:->10}|{:->12}|{:->12}|",
-        "", "", "", "", ""
+        "|{:-<12}|{:-<8}|{:->12}|{:->10}|{:->12}|{:->12}|",
+        "", "", "", "", "", ""
     );
     for row in &rows {
         let micros = row.per_verify.as_secs_f64() * 1e6;
         println!(
-            "| {:<10} | {:>8}KB | {:>6}KB | {:>10.1} | {:>10.0} |",
+            "| {:<10} | {:<6} | {:>8}KB | {:>6}KB | {:>10.1} | {:>10.0} |",
             row.backend,
+            if row.cached { "cached" } else { "hex" },
             row.wasm_bytes / 1024,
             row.body_bytes / 1024,
             micros,

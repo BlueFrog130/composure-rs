@@ -281,6 +281,7 @@ version = "0.1.0"
 dependencies = [
  "composure",
  "futures",
+ "serde",
  "serde_json",
  "worker",
 ]

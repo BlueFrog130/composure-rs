@@ -22,3 +22,11 @@ codegen-units = 1
 [profile.release.package."*"]
 codegen-units = 1
 opt-level = "z"
+
+# Signature checking without `web-crypto`: on workerd a 1 KB verify takes ~132 us at "z", ~103 us
+# at 3, for ~15 KB of bundle (bench/). Parsing stays at "z": "s"/3 save a few us for 75-180 KB.
+[profile.release.package.curve25519-dalek]
+opt-level = 3
+
+[profile.release.package.sha2]
+opt-level = 3

@@ -26,42 +26,56 @@ extern "C" {
 
 const ALGORITHM: &str = "Ed25519";
 
-/// Verifies with the host's `crypto.subtle`
-pub(super) async fn verify(
-    public_key: &[u8; 32],
-    signature: &[u8; 64],
-    timestamp: &[u8],
-    body: &[u8],
-) -> Result<(), ValidateError> {
-    let usages = Array::of1(&JsValue::from_str("verify"));
-    let key = import_key(
-        "raw",
-        &Uint8Array::from(&public_key[..]),
-        ALGORITHM,
-        false,
-        &usages,
-    )
-    .map_err(|_| ValidateError::InvalidPublicKey)?;
-    let key = JsFuture::from(key)
-        .await
+/// A `CryptoKey` imported into the host once, so later requests skip `importKey`
+#[derive(Clone)]
+pub(super) struct Key(JsValue);
+
+impl Key {
+    pub(super) async fn new(public_key: &[u8; 32]) -> Result<Self, ValidateError> {
+        let usages = Array::of1(&JsValue::from_str("verify"));
+        let key = import_key(
+            "raw",
+            &Uint8Array::from(&public_key[..]),
+            ALGORITHM,
+            false,
+            &usages,
+        )
         .map_err(|_| ValidateError::InvalidPublicKey)?;
+        JsFuture::from(key)
+            .await
+            .map(Self)
+            .map_err(|_| ValidateError::InvalidPublicKey)
+    }
 
-    // Web Crypto needs one contiguous message. Build it directly in JS memory, so the body is
-    // copied once and nothing is allocated on the wasm heap.
-    let split = timestamp.len() as u32;
-    let message = Uint8Array::new_with_length(split + body.len() as u32);
-    message.subarray(0, split).copy_from(timestamp);
-    message.subarray(split, message.length()).copy_from(body);
+    /// Verifies with the host's `crypto.subtle`
+    pub(super) async fn verify(
+        &self,
+        signature: &[u8; 64],
+        timestamp: &[u8],
+        body: &[u8],
+    ) -> Result<(), ValidateError> {
+        // Web Crypto needs one contiguous message. Build it directly in JS memory, so the body is
+        // copied once and nothing is allocated on the wasm heap.
+        let split = timestamp.len() as u32;
+        let message = Uint8Array::new_with_length(split + body.len() as u32);
+        message.subarray(0, split).copy_from(timestamp);
+        message.subarray(split, message.length()).copy_from(body);
 
-    let valid = subtle_verify(ALGORITHM, &key, &Uint8Array::from(&signature[..]), &message)
+        let valid = subtle_verify(
+            ALGORITHM,
+            &self.0,
+            &Uint8Array::from(&signature[..]),
+            &message,
+        )
         .map_err(|_| ValidateError::InvalidSignature)?;
-    let valid = JsFuture::from(valid)
-        .await
-        .map_err(|_| ValidateError::InvalidSignature)?;
+        let valid = JsFuture::from(valid)
+            .await
+            .map_err(|_| ValidateError::InvalidSignature)?;
 
-    if valid.is_truthy() {
-        Ok(())
-    } else {
-        Err(ValidateError::InvalidSignature)
+        if valid.is_truthy() {
+            Ok(())
+        } else {
+            Err(ValidateError::InvalidSignature)
+        }
     }
 }

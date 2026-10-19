@@ -1,8 +1,7 @@
 //! [Uploading files](https://discord.com/developers/docs/reference#uploading-files): `payload_json`
 //! plus one `files[n]` part per file.
 
-use serde::Serialize;
-use serde_json::{Map, Value};
+use serde::{Deserialize, Deserializer, Serialize, de::IgnoredAny};
 
 use crate::types::File;
 
@@ -13,27 +12,10 @@ use super::{Error, Result};
 /// When `payload` has no `attachments`, one `{id, filename, description}` entry per file is added
 /// so descriptions reach Discord; an explicit `attachments` is sent as is.
 pub(crate) fn encode(payload: &impl Serialize, files: &[File]) -> Result<(Vec<u8>, String)> {
-    let mut payload = match serde_json::to_value(payload).map_err(Error::Encode)? {
-        Value::Object(map) => map,
-        _ => Map::new(),
-    };
-    if !payload.contains_key("attachments") {
-        let attachments = files
-            .iter()
-            .enumerate()
-            .map(|(id, file)| {
-                let mut attachment = Map::new();
-                attachment.insert("id".into(), id.into());
-                attachment.insert("filename".into(), file.name.clone().into());
-                if let Some(description) = &file.description {
-                    attachment.insert("description".into(), description.clone().into());
-                }
-                Value::Object(attachment)
-            })
-            .collect();
-        payload.insert("attachments".into(), Value::Array(attachments));
+    let mut payload = serde_json::to_vec(payload).map_err(Error::Encode)?;
+    if !has_attachments(&payload) {
+        add_attachments(&mut payload, files)?;
     }
-    let payload = serde_json::to_vec(&payload).map_err(Error::Encode)?;
 
     let boundary = boundary(&payload, files);
     let size = payload.len() + files.iter().map(|f| f.bytes.len() + 200).sum::<usize>() + 200;
@@ -135,6 +117,57 @@ fn boundary(payload: &[u8], files: &[File]) -> String {
     boundary
 }
 
+/// Whether the encoded payload object has an `attachments` key (even `null`)
+fn has_attachments(payload: &[u8]) -> bool {
+    #[derive(Deserialize)]
+    struct Probe {
+        #[serde(default, deserialize_with = "present")]
+        attachments: bool,
+    }
+
+    fn present<'de, D: Deserializer<'de>>(deserializer: D) -> std::result::Result<bool, D::Error> {
+        IgnoredAny::deserialize(deserializer).map(|_| true)
+    }
+
+    serde_json::from_slice::<Probe>(payload).is_ok_and(|probe| probe.attachments)
+}
+
+/// Appends one `{id, filename, description}` entry per file as `attachments` to the encoded
+/// payload object, without decoding it
+fn add_attachments(payload: &mut Vec<u8>, files: &[File]) -> Result<()> {
+    #[derive(Serialize)]
+    struct Entry<'a> {
+        id: usize,
+        filename: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<&'a str>,
+    }
+
+    let entries: Vec<_> = files
+        .iter()
+        .enumerate()
+        .map(|(id, file)| Entry {
+            id,
+            filename: &file.name,
+            description: file.description.as_deref(),
+        })
+        .collect();
+
+    if payload.last() != Some(&b'}') {
+        payload.clear();
+        payload.push(b'{');
+    } else {
+        payload.pop();
+    }
+    if payload.len() > 1 {
+        payload.push(b',');
+    }
+    payload.extend_from_slice(br#""attachments":"#);
+    serde_json::to_writer(&mut *payload, &entries).map_err(Error::Encode)?;
+    payload.push(b'}');
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -155,11 +188,34 @@ mod tests {
             body,
             format!(
                 "--{boundary}\r\nContent-Disposition: form-data; name=\"payload_json\"\r\nContent-Type: application/json\r\n\r\n\
-                 {{\"attachments\":[{{\"description\":\"alt\",\"filename\":\"a.txt\",\"id\":0}}],\"content\":\"hi\"}}\r\n\
+                 {{\"content\":\"hi\",\"attachments\":[{{\"id\":0,\"filename\":\"a.txt\",\"description\":\"alt\"}}]}}\r\n\
                  --{boundary}\r\nContent-Disposition: form-data; name=\"files[0]\"; filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\n\
                  hello\r\n--{boundary}--\r\n"
             )
         );
+    }
+
+    fn payload_json(payload: &impl Serialize, files: &[File]) -> serde_json::Value {
+        let (body, _) = encode(payload, files).unwrap();
+        let body = String::from_utf8(body).unwrap();
+        let json = body.split("\r\n\r\n").nth(1).unwrap();
+        serde_json::from_str(json.split("\r\n").next().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn adds_attachments_only_when_absent() {
+        let files = [File::new("a.txt", "x"), File::new("b.txt", "y")];
+        assert_eq!(
+            payload_json(&json!({}), &files),
+            json!({ "attachments": [
+                { "id": 0, "filename": "a.txt" },
+                { "id": 1, "filename": "b.txt" },
+            ] })
+        );
+        let explicit = json!({ "content": "hi", "attachments": [{ "id": 0 }] });
+        assert_eq!(payload_json(&explicit, &files), explicit);
+        let null = json!({ "attachments": null });
+        assert_eq!(payload_json(&null, &files), null);
     }
 
     #[test]

@@ -1,8 +1,27 @@
 use crate::types::{Permissions, Snowflake, TypeField};
-use serde::Deserialize;
-use serde_json::Value;
+use serde::{Deserialize, de::DeserializeOwned};
+use serde_json::value::RawValue;
 
 use super::*;
+
+/// `type` and the JSON of a type-tagged object, so it can be parsed as the type it names without
+/// building a `serde_json::Value` tree
+fn tagged<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<(u64, Box<RawValue>), D::Error> {
+    #[derive(Deserialize)]
+    struct Tag {
+        #[serde(rename = "type")]
+        t: u64,
+    }
+    let raw = Box::<RawValue>::deserialize(deserializer)?;
+    let Tag { t } = parse(&raw)?;
+    Ok((t, raw))
+}
+
+fn parse<T: DeserializeOwned, E: serde::de::Error>(raw: &RawValue) -> Result<T, E> {
+    serde_json::from_slice(raw.get().as_bytes()).map_err(E::custom)
+}
 
 impl ApplicationCommand {
     pub fn new_chat_input_command(
@@ -92,23 +111,16 @@ impl<'de> Deserialize<'de> for ApplicationCommand {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = Value::deserialize(deserializer)?;
-
-        let t = value
-            .get("type")
-            .and_then(Value::as_u64)
-            .ok_or(serde::de::Error::missing_field("type"))?;
+        let (t, raw) = tagged(deserializer)?;
 
         match t {
-            1 => Ok(ApplicationCommand::ChatInputCommand(
-                ChatInputCommand::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            2 => Ok(ApplicationCommand::UserCommand(
-                CommandDetails::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            3 => Ok(ApplicationCommand::MessageCommand(
-                CommandDetails::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
+            1 => Ok(ApplicationCommand::ChatInputCommand(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            2 => Ok(ApplicationCommand::UserCommand(parse::<_, D::Error>(&raw)?)),
+            3 => Ok(ApplicationCommand::MessageCommand(parse::<_, D::Error>(
+                &raw,
+            )?)),
             _ => Err(serde::de::Error::custom("Unknown command")),
         }
     }
@@ -299,47 +311,41 @@ impl<'de> Deserialize<'de> for ApplicationCommandOption {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = Value::deserialize(deserializer)?;
-
-        let t = value
-            .get("type")
-            .and_then(Value::as_u64)
-            .ok_or(serde::de::Error::missing_field("type"))?;
+        let (t, raw) = tagged(deserializer)?;
 
         match t {
-            1 => Ok(ApplicationCommandOption::Subcommand(
-                SubcommandOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            2 => Ok(ApplicationCommandOption::SubcommandGroup(
-                SubcommandGroupOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            3 => Ok(ApplicationCommandOption::String(
-                StringOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            4 => Ok(ApplicationCommandOption::Integer(
-                IntegerOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            5 => Ok(ApplicationCommandOption::Boolean(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            6 => Ok(ApplicationCommandOption::User(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            7 => Ok(ApplicationCommandOption::Channel(
-                ChannelOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            8 => Ok(ApplicationCommandOption::Role(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            9 => Ok(ApplicationCommandOption::Mentionable(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            10 => Ok(ApplicationCommandOption::Number(
-                NumberOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            11 => Ok(ApplicationCommandOption::Attachment(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
+            1 => Ok(ApplicationCommandOption::Subcommand(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            2 => Ok(ApplicationCommandOption::SubcommandGroup(parse::<
+                _,
+                D::Error,
+            >(
+                &raw
+            )?)),
+            3 => Ok(ApplicationCommandOption::String(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            4 => Ok(ApplicationCommandOption::Integer(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            5 => Ok(ApplicationCommandOption::Boolean(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            6 => Ok(ApplicationCommandOption::User(parse::<_, D::Error>(&raw)?)),
+            7 => Ok(ApplicationCommandOption::Channel(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            8 => Ok(ApplicationCommandOption::Role(parse::<_, D::Error>(&raw)?)),
+            9 => Ok(ApplicationCommandOption::Mentionable(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            10 => Ok(ApplicationCommandOption::Number(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            11 => Ok(ApplicationCommandOption::Attachment(parse::<_, D::Error>(
+                &raw,
+            )?)),
             _ => Err(serde::de::Error::custom("Unknown option")),
         }
     }
@@ -520,41 +526,28 @@ impl<'de> Deserialize<'de> for SubcommandCommandOption {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = Value::deserialize(deserializer)?;
-
-        let t = value
-            .get("type")
-            .and_then(Value::as_u64)
-            .ok_or(serde::de::Error::missing_field("type"))?;
+        let (t, raw) = tagged(deserializer)?;
 
         match t {
-            3 => Ok(SubcommandCommandOption::String(
-                StringOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            4 => Ok(SubcommandCommandOption::Integer(
-                IntegerOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            5 => Ok(SubcommandCommandOption::Boolean(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            6 => Ok(SubcommandCommandOption::User(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            7 => Ok(SubcommandCommandOption::Channel(
-                ChannelOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            8 => Ok(SubcommandCommandOption::Role(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            9 => Ok(SubcommandCommandOption::Mentionable(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            10 => Ok(SubcommandCommandOption::Number(
-                NumberOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            11 => Ok(SubcommandCommandOption::Attachment(
-                BaseOption::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
+            3 => Ok(SubcommandCommandOption::String(parse::<_, D::Error>(&raw)?)),
+            4 => Ok(SubcommandCommandOption::Integer(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            5 => Ok(SubcommandCommandOption::Boolean(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            6 => Ok(SubcommandCommandOption::User(parse::<_, D::Error>(&raw)?)),
+            7 => Ok(SubcommandCommandOption::Channel(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            8 => Ok(SubcommandCommandOption::Role(parse::<_, D::Error>(&raw)?)),
+            9 => Ok(SubcommandCommandOption::Mentionable(parse::<_, D::Error>(
+                &raw,
+            )?)),
+            10 => Ok(SubcommandCommandOption::Number(parse::<_, D::Error>(&raw)?)),
+            11 => Ok(SubcommandCommandOption::Attachment(parse::<_, D::Error>(
+                &raw,
+            )?)),
             _ => Err(serde::de::Error::custom("Unknown option")),
         }
     }

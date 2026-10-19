@@ -1,9 +1,11 @@
+use std::rc::Rc;
+
 use crate::types::{
     ApplicationCommandInteraction, Interaction, InteractionResponse, MessageComponentInteraction,
     ModalSubmitInteraction,
 };
 
-use super::{CommandSet, CommandSetDefinition, HandlerError, ScopedDefinition, Theme};
+use super::{__unshare, CommandSet, CommandSetDefinition, HandlerError, ScopedDefinition, Theme};
 
 /// Answers Interactions; the one contract every Adapter talks to. `S` is the Adapter's State.
 ///
@@ -123,9 +125,10 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         command: ApplicationCommandInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
+        let command = Rc::new(command);
         match self.commands.dispatch(&command, state).await {
             Some(result) => result,
-            None => self.fallback.command(command, state).await,
+            None => self.fallback.command(__unshare(command), state).await,
         }
     }
 
@@ -134,9 +137,10 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         component: MessageComponentInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
+        let component = Rc::new(component);
         match self.commands.dispatch_component(&component, state).await {
             Some(result) => result,
-            None => self.fallback.component(component, state).await,
+            None => self.fallback.component(__unshare(component), state).await,
         }
     }
 
@@ -145,13 +149,18 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         autocomplete: ApplicationCommandInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
+        let autocomplete = Rc::new(autocomplete);
         match self
             .commands
             .dispatch_autocomplete(&autocomplete, state)
             .await
         {
             Some(result) => result,
-            None => self.fallback.autocomplete(autocomplete, state).await,
+            None => {
+                self.fallback
+                    .autocomplete(__unshare(autocomplete), state)
+                    .await
+            }
         }
     }
 
@@ -160,9 +169,10 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         modal: ModalSubmitInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
+        let modal = Rc::new(modal);
         match self.commands.dispatch_modal(&modal, state).await {
             Some(result) => result,
-            None => self.fallback.modal_submit(modal, state).await,
+            None => self.fallback.modal_submit(__unshare(modal), state).await,
         }
     }
 }

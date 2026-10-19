@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Deserializer, de, de::DeserializeOwned};
-use serde_json::{Value, value::RawValue};
+use serde_json::value::RawValue;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::types::{
-    ApplicationIntegrationType, Attachment, Channel, Entitlement, InteractionContextType, Member,
-    Message, PartialChannel, PartialMember, Permissions, Role, Snowflake, User,
+    ApplicationIntegrationType, Attachment, Channel, Entitlement, InteractionContextType, Lazy,
+    Member, Message, PartialChannel, PartialMember, Permissions, Role, Snowflake, SnowflakeMap,
+    User,
 };
 
 pub type ApplicationCommandInteraction = DataInteraction<ApplicationCommandInteractionData>;
@@ -73,19 +72,19 @@ struct Envelope {
     id: Snowflake,
     application_id: Snowflake,
     guild_id: Option<Snowflake>,
-    channel: Option<Channel>,
+    channel: Option<Lazy<Channel>>,
     channel_id: Option<Snowflake>,
     member: Option<Member>,
     user: Option<User>,
     token: String,
     version: u8,
-    message: Option<Box<Message>>,
+    message: Option<Lazy<Message>>,
     app_permissions: Option<Permissions>,
     guild_locale: Option<String>,
     #[serde(default)]
     entitlements: Vec<Entitlement>,
-    #[serde(default, deserialize_with = "deserialize_integration_owners")]
-    authorizing_integration_owners: HashMap<ApplicationIntegrationType, Snowflake>,
+    #[serde(default)]
+    authorizing_integration_owners: IntegrationOwners,
     context: Option<InteractionContextType>,
 }
 
@@ -100,8 +99,8 @@ pub struct InteractionCommon {
     /// Guild that the interaction was sent from
     pub guild_id: Option<Snowflake>,
 
-    /// Channel that the interaction was sent from
-    pub channel: Option<Channel>,
+    /// Channel that the interaction was sent from, parsed on first read
+    pub channel: Option<Lazy<Channel>>,
 
     /// Channel that the interaction was sent from
     pub channel_id: Option<Snowflake>,
@@ -118,8 +117,9 @@ pub struct InteractionCommon {
     /// Read-only property, always 1
     pub version: u8,
 
-    /// For components, the message they are attached to
-    pub message: Option<Box<Message>>,
+    /// For components, the message they are attached to, parsed on first read; see
+    /// [`InteractionCommon::message`]
+    pub message: Option<Lazy<Message>>,
 
     /// Bitwise set of permissions the app or bot has within the channel the interaction was sent from
     pub app_permissions: Option<Permissions>,
@@ -129,8 +129,8 @@ pub struct InteractionCommon {
 
     /// Installation contexts the interaction is authorized for, mapped to the guild id (guild install;
     /// `"0"` in a DM with the bot) or the authorizing user's id (user install)
-    #[serde(default, deserialize_with = "deserialize_integration_owners")]
-    pub authorizing_integration_owners: HashMap<ApplicationIntegrationType, Snowflake>,
+    #[serde(default)]
+    pub authorizing_integration_owners: IntegrationOwners,
 
     /// Context the interaction was triggered from
     pub context: Option<InteractionContextType>,
@@ -141,24 +141,35 @@ pub struct InteractionCommon {
     pub entitlements: Vec<Entitlement>,
 }
 
-/// Keys are integration types as strings (`"0"`, `"1"`); unknown types are skipped.
-fn deserialize_integration_owners<'de, D>(
-    deserializer: D,
-) -> Result<HashMap<ApplicationIntegrationType, Snowflake>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let owners = HashMap::<String, Snowflake>::deserialize(deserializer)?;
+/// Installation contexts an Interaction is authorized for: Discord's
+/// `authorizing_integration_owners`, keyed by [`ApplicationIntegrationType`]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+pub struct IntegrationOwners {
+    /// Guild install: the guild's id, or `0` in a DM with the bot
+    #[serde(rename = "0")]
+    pub guild: Option<Snowflake>,
 
-    Ok(owners
-        .into_iter()
-        .filter_map(|(key, owner)| {
-            let key = key.parse::<u8>().ok()?;
-            let integration_type =
-                ApplicationIntegrationType::deserialize(Value::from(key)).ok()?;
-            Some((integration_type, owner))
-        })
-        .collect())
+    /// User install: the authorizing user's id
+    #[serde(rename = "1")]
+    pub user: Option<Snowflake>,
+}
+
+impl IntegrationOwners {
+    pub fn get(&self, integration_type: ApplicationIntegrationType) -> Option<Snowflake> {
+        match integration_type {
+            ApplicationIntegrationType::GuildInstall => self.guild,
+            ApplicationIntegrationType::UserInstall => self.user,
+        }
+    }
+
+    /// How many installation contexts authorized the Interaction
+    pub fn len(&self) -> usize {
+        usize::from(self.guild.is_some()) + usize::from(self.user.is_some())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl InteractionCommon {
@@ -169,6 +180,16 @@ impl InteractionCommon {
             .as_ref()
             .map(|member| &member.user)
             .or(self.user.as_ref())
+    }
+
+    /// For components, the message they are attached to; parsed on the first call
+    pub fn message(&self) -> Option<&Message> {
+        self.message.as_ref()?.get()
+    }
+
+    /// The channel the interaction was sent from; parsed on the first call
+    pub fn channel(&self) -> Option<&Channel> {
+        self.channel.as_ref()?.get()
     }
 }
 
@@ -194,7 +215,8 @@ impl<D: DeserializeOwned> DataInteraction<D> {
         Ok(Self {
             common,
             locale,
-            data: serde_json::from_str(data.get()).map_err(E::custom)?,
+            // `from_slice` like the envelope, so serde_json's parser is compiled once
+            data: serde_json::from_slice(data.get().as_bytes()).map_err(E::custom)?,
         })
     }
 }
@@ -429,22 +451,22 @@ impl ModalSubmitComponent {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ResolvedData {
     /// the ids and User objects
-    pub users: Option<HashMap<Snowflake, User>>,
+    pub users: Option<SnowflakeMap<User>>,
 
     /// the ids and partial Member objects
-    pub members: Option<HashMap<Snowflake, PartialMember>>,
+    pub members: Option<SnowflakeMap<PartialMember>>,
 
     /// the ids and Role objects
-    pub roles: Option<HashMap<Snowflake, Role>>,
+    pub roles: Option<SnowflakeMap<Role>>,
 
     /// the ids and partial Channel objects
-    pub channels: Option<HashMap<Snowflake, PartialChannel>>,
+    pub channels: Option<SnowflakeMap<PartialChannel>>,
 
     /// the ids and partial Message objects
-    pub messages: Option<HashMap<Snowflake, Message>>,
+    pub messages: Option<SnowflakeMap<Message>>,
 
     /// the ids and attachment objects
-    pub attachments: Option<HashMap<Snowflake, Attachment>>,
+    pub attachments: Option<SnowflakeMap<Attachment>>,
 }
 
 pub type StringOption = ValueOption<String>;
@@ -877,6 +899,51 @@ pub struct InteractionData {
 mod tests {
     use super::*;
 
+    fn button_click(message: serde_json::Value) -> MessageComponentInteraction {
+        let json = serde_json::json!({
+            "id": "1", "application_id": "2", "type": 3, "token": "t", "version": 1,
+            "channel": { "id": "3", "type": 0, "name": "general" },
+            "data": { "custom_id": "go", "component_type": 2 },
+            "message": message,
+        });
+        match serde_json::from_value(json).unwrap() {
+            Interaction::MessageComponent(click) => click,
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    pub fn message_and_channel_parse_on_first_read() {
+        let click = button_click(serde_json::json!({
+            "id": "4", "channel_id": "3", "content": "hello", "timestamp": "2026-01-01T00:00:00Z",
+            "edited_timestamp": null, "tts": false, "mention_everyone": false, "mentions": [],
+            "mention_roles": [], "attachments": [], "embeds": [], "pinned": false, "type": 0,
+            "author": { "id": "5", "username": "a", "discriminator": "0", "avatar": null },
+            "components": [{ "type": 1, "components": [
+                { "type": 2, "style": 1, "label": "Go", "custom_id": "go" },
+            ] }],
+        }));
+        let message = click.common.message().unwrap();
+        assert_eq!(message.content, "hello");
+        assert!(matches!(
+            message.components.as_deref(),
+            Some([crate::types::Component::ActionRow(_)])
+        ));
+        assert!(std::ptr::eq(message, click.common.message().unwrap()));
+        assert_eq!(
+            click.common.channel().unwrap().name.as_deref(),
+            Some("general")
+        );
+    }
+
+    #[test]
+    pub fn malformed_message_does_not_fail_the_interaction() {
+        let click = button_click(serde_json::json!({ "id": "not a message" }));
+        assert_eq!(click.data.custom_id, "go");
+        assert!(click.common.message().is_none());
+        assert!(click.common.message.as_ref().unwrap().parse().is_err());
+    }
+
     #[test]
     pub fn ping_interaction() {
         let json = r#"{
@@ -1189,7 +1256,10 @@ mod tests {
 
         assert_eq!(common.context, Some(InteractionContextType::Guild));
         assert_eq!(
-            common.authorizing_integration_owners[&ApplicationIntegrationType::UserInstall],
+            common
+                .authorizing_integration_owners
+                .get(ApplicationIntegrationType::UserInstall)
+                .unwrap(),
             Snowflake::from_u64(282265607313817601)
         );
         assert!(common.user.is_none());
@@ -1254,11 +1324,13 @@ mod tests {
 
         let owners = &ping.common.authorizing_integration_owners;
         assert_eq!(
-            owners[&ApplicationIntegrationType::GuildInstall],
+            owners
+                .get(ApplicationIntegrationType::GuildInstall)
+                .unwrap(),
             Snowflake::from_u64(798662131062931547)
         );
         assert_eq!(
-            owners[&ApplicationIntegrationType::UserInstall],
+            owners.get(ApplicationIntegrationType::UserInstall).unwrap(),
             Snowflake::from_u64(282265607313817601)
         );
         assert!(ping.common.invoking_user().is_none());

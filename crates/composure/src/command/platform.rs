@@ -102,7 +102,7 @@ impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
     {
         let theme = self.configured_theme();
         let ctx = DeferredCtx {
-            interaction: Rc::new(self.interaction().clone()),
+            interaction: Rc::clone(self.shared_interaction()),
             state: self.state().clone(),
             theme,
         };
@@ -326,14 +326,14 @@ mod tests {
         }
     }
 
-    fn interaction() -> ApplicationCommandInteraction {
+    fn interaction() -> Rc<ApplicationCommandInteraction> {
         let payload = json!({
             "id": "2", "application_id": "1", "type": 2, "token": "tok", "version": 1,
             "user": { "id": "3", "username": "a", "discriminator": "0", "global_name": null, "avatar": null },
             "data": { "id": "4", "name": "slow", "type": 1 },
         });
         match serde_json::from_value(payload).unwrap() {
-            Interaction::ApplicationCommand(interaction) => interaction,
+            Interaction::ApplicationCommand(interaction) => Rc::new(interaction),
             _ => unreachable!(),
         }
     }

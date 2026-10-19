@@ -101,6 +101,6 @@ pub use soundboard::{SoundboardSoundFields, SoundboardSounds};
 pub use stickers::{CreateSticker, ModifySticker, StickerPack, StickerPacks};
 #[cfg(feature = "rest-threads")]
 pub use threads::{ArchivedThreads, StartForumThread, StartThread};
-pub use transport::{Method, RawResponse, Request, Transport, TransportError};
+pub use transport::{DISCORD_HEADERS, Method, RawResponse, Request, Transport, TransportError};
 #[cfg(feature = "rest-webhooks")]
 pub use webhooks::{ExecuteWebhook, WebhookClient, WebhookFields};

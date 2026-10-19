@@ -48,7 +48,7 @@ impl EventBody {
     /// its model, are [`Event::Unknown`], so a new or changed event never breaks a bot.
     pub fn parse(&self) -> Event {
         fn data<T: serde::de::DeserializeOwned>(body: &EventBody) -> Option<T> {
-            serde_json::from_str(body.data.as_ref()?.get()).ok()
+            serde_json::from_slice(body.data.as_ref()?.get().as_bytes()).ok()
         }
         let event = match self.kind.as_str() {
             "APPLICATION_AUTHORIZED" => data(self).map(Event::ApplicationAuthorized),

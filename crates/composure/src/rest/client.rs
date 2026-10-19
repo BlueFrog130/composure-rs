@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::Duration};
+use std::{borrow::Cow, fmt::Display, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +30,7 @@ pub const DEFAULT_MAX_RATE_LIMIT_WAIT: Duration = Duration::from_secs(2);
 pub(crate) struct Rest<T> {
     transport: T,
     authorization: Option<String>,
-    base: String,
+    base: Cow<'static, str>,
     max_rate_limit_wait: Duration,
 }
 
@@ -53,13 +53,13 @@ impl<T: Transport> Rest<T> {
         Self {
             transport,
             authorization,
-            base: DISCORD_API.to_string(),
+            base: Cow::Borrowed(DISCORD_API),
             max_rate_limit_wait: DEFAULT_MAX_RATE_LIMIT_WAIT,
         }
     }
 
     pub(crate) fn set_base(&mut self, base: String) {
-        self.base = base;
+        self.base = Cow::Owned(base);
     }
 
     pub(crate) fn set_max_rate_limit_wait(&mut self, wait: Duration) {
@@ -83,31 +83,31 @@ impl<T: Transport> Rest<T> {
         reason: Option<&str>,
     ) -> Result<Request> {
         let mut headers = Vec::with_capacity(4);
-        headers.push(("User-Agent", USER_AGENT.to_string()));
+        headers.push(("User-Agent", Cow::Borrowed(USER_AGENT)));
         if let Some(authorization) = &self.authorization {
-            headers.push(("Authorization", authorization.clone()));
+            headers.push(("Authorization", Cow::Owned(authorization.clone())));
         }
         if let Some(reason) = reason {
-            headers.push(("X-Audit-Log-Reason", encode_reason(reason)));
+            headers.push(("X-Audit-Log-Reason", Cow::Owned(encode_reason(reason))));
         }
         let body = match body {
             Body::None => None,
             Body::Json(body) => {
-                headers.push(("Content-Type", "application/json".to_string()));
+                headers.push(("Content-Type", Cow::Borrowed("application/json")));
                 Some(serde_json::to_vec(body).map_err(Error::Encode)?)
             }
             Body::WithFiles(body, []) => {
-                headers.push(("Content-Type", "application/json".to_string()));
+                headers.push(("Content-Type", Cow::Borrowed("application/json")));
                 Some(serde_json::to_vec(body).map_err(Error::Encode)?)
             }
             Body::WithFiles(body, files) => {
                 let (bytes, content_type) = multipart::encode(body, files)?;
-                headers.push(("Content-Type", content_type));
+                headers.push(("Content-Type", Cow::Owned(content_type)));
                 Some(bytes)
             }
             Body::Form(fields, file) => {
                 let (bytes, content_type) = multipart::encode_form(fields, file);
-                headers.push(("Content-Type", content_type));
+                headers.push(("Content-Type", Cow::Owned(content_type)));
                 Some(bytes)
             }
         };

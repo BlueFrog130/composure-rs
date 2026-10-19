@@ -1,5 +1,5 @@
-use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::Value;
+use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
+use serde_json::value::RawValue;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::types::{ChannelType, PartialEmoji, Snowflake, TypeField};
@@ -48,7 +48,7 @@ pub enum Component {
     CheckboxGroup(CheckboxGroup),
     Checkbox(Checkbox),
     /// A component type Discord added after this version, kept as received
-    Unknown(Value),
+    Unknown(Box<RawValue>),
 }
 
 impl Component {
@@ -118,10 +118,16 @@ impl Component {
             Component::RadioGroup(c) => c.id,
             Component::CheckboxGroup(c) => c.id,
             Component::Checkbox(c) => c.id,
-            Component::Unknown(value) => value
-                .get("id")
-                .and_then(Value::as_i64)
-                .and_then(|id| i32::try_from(id).ok()),
+            Component::Unknown(raw) => {
+                #[derive(Deserialize)]
+                struct Id {
+                    id: Option<i64>,
+                }
+                serde_json::from_slice::<Id>(raw.get().as_bytes())
+                    .ok()?
+                    .id
+                    .and_then(|id| i32::try_from(id).ok())
+            }
         }
     }
 
@@ -308,76 +314,51 @@ impl<'de> Deserialize<'de> for Component {
     where
         D: Deserializer<'de>,
     {
-        let value = Value::deserialize(deserializer)?;
+        let raw = Box::<RawValue>::deserialize(deserializer)?;
+        Component::from_raw(raw).map_err(serde::de::Error::custom)
+    }
+}
 
-        let t = value
-            .get("type")
-            .and_then(Value::as_u64)
-            .ok_or(serde::de::Error::missing_field("type"))?;
+/// The `type` of a component, read before parsing the component as that type
+#[derive(Deserialize)]
+struct ComponentType {
+    #[serde(rename = "type")]
+    t: u64,
+}
 
-        match t {
-            1 => Ok(Component::ActionRow(
-                ActionRow::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            2 => Ok(Component::Button(
-                ButtonComponent::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            3 => Ok(Component::StringSelect(
-                SelectMenu::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            4 => Ok(Component::TextInput(
-                TextInput::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            5 => Ok(Component::UserSelect(
-                SelectMenu::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            6 => Ok(Component::RoleSelect(
-                SelectMenu::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            7 => Ok(Component::MentionableSelect(
-                SelectMenu::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            8 => Ok(Component::ChannelSelect(
-                SelectMenu::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            9 => Ok(Component::Section(
-                Section::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            10 => Ok(Component::TextDisplay(
-                TextDisplay::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            11 => Ok(Component::Thumbnail(
-                Thumbnail::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            12 => Ok(Component::MediaGallery(
-                MediaGallery::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            13 => Ok(Component::File(
-                FileComponent::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            14 => Ok(Component::Separator(
-                Separator::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            17 => Ok(Component::Container(
-                Container::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            18 => Ok(Component::Label(
-                Label::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            19 => Ok(Component::FileUpload(
-                FileUpload::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            21 => Ok(Component::RadioGroup(
-                RadioGroup::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            22 => Ok(Component::CheckboxGroup(
-                CheckboxGroup::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            23 => Ok(Component::Checkbox(
-                Checkbox::deserialize(value).map_err(serde::de::Error::custom)?,
-            )),
-            _ => Ok(Component::Unknown(value)),
+impl Component {
+    /// Reads `type`, then parses the JSON once more as that component. Keeps the JSON as the
+    /// slice it arrived in (no `serde_json::Value` tree), and parses with `from_slice` like the
+    /// Interaction envelope so one copy of the parser serves both.
+    fn from_raw(raw: Box<RawValue>) -> serde_json::Result<Self> {
+        fn parse<T: DeserializeOwned>(raw: &RawValue) -> serde_json::Result<T> {
+            serde_json::from_slice(raw.get().as_bytes())
         }
+
+        let ComponentType { t } = parse(&raw)?;
+        Ok(match t {
+            1 => Component::ActionRow(parse(&raw)?),
+            2 => Component::Button(parse(&raw)?),
+            3 => Component::StringSelect(parse(&raw)?),
+            4 => Component::TextInput(parse(&raw)?),
+            5 => Component::UserSelect(parse(&raw)?),
+            6 => Component::RoleSelect(parse(&raw)?),
+            7 => Component::MentionableSelect(parse(&raw)?),
+            8 => Component::ChannelSelect(parse(&raw)?),
+            9 => Component::Section(parse(&raw)?),
+            10 => Component::TextDisplay(parse(&raw)?),
+            11 => Component::Thumbnail(parse(&raw)?),
+            12 => Component::MediaGallery(parse(&raw)?),
+            13 => Component::File(parse(&raw)?),
+            14 => Component::Separator(parse(&raw)?),
+            17 => Component::Container(parse(&raw)?),
+            18 => Component::Label(parse(&raw)?),
+            19 => Component::FileUpload(parse(&raw)?),
+            21 => Component::RadioGroup(parse(&raw)?),
+            22 => Component::CheckboxGroup(parse(&raw)?),
+            23 => Component::Checkbox(parse(&raw)?),
+            _ => Component::Unknown(raw),
+        })
     }
 }
 
