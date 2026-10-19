@@ -1,12 +1,12 @@
 //! Commands defined with the macros: their Definitions, and dispatching Interactions to them.
 
 use composure::{
-    Choice, Ctx,
+    Choice, Ctx, app,
     command::{
         CommandSetDefinition, Ephemeral, ErrorKind, HandlerError, InteractionHandler,
         ResolvedMember, UserOrRole, dispatch,
     },
-    commands, group,
+    group,
     types::{Embed, Interaction, InteractionResponse, Message, PartialChannel, Role, User},
 };
 use futures::executor::block_on;
@@ -149,19 +149,18 @@ fn tally<S: Counter>(ctx: Ctx<S>, #[option("Add")] add: Option<u32>) -> String {
     format!("tally {}", ctx.state().count() + add.unwrap_or(0))
 }
 
-commands! {
-    /// Everything under test
-    pub struct Bot = [echo, ping, show_state, paint, fail, resolve, Admin, inspect, quote, refuse, count, tally];
-}
+/// Everything under test
+#[app(handlers(
+    echo, ping, show_state, paint, fail, resolve, Admin, inspect, quote, refuse, count, tally
+))]
+pub struct Bot;
 
-commands! {
-    /// Bounded-State Commands only, so any `Counter` State works
-    struct Counting = [count, tally];
-}
+/// Bounded-State Commands only, so any `Counter` State works
+#[app(handlers(count, tally))]
+struct Counting;
 
-commands! {
-    struct Small = [ping];
-}
+#[app(handlers(ping))]
+struct Small;
 
 const USER: &str = "100000000000000001";
 const ROLE: &str = "200000000000000001";

@@ -30,7 +30,7 @@ wasm-bindgen = { version = "0.2.129", optional = true }
 wasm-bindgen-futures = { version = "0.4.79", optional = true }
 
 [features]
-## `#[command]`, `#[group]`, and `#[derive(Choice)]`
+## `#[app]`, `#[command]`, `#[group]`, `#[component]`, `#[modal]`, `#[view]`, `rsx!`, and the derives
 macros = ["dep:composure_macros"]
 ## Validate requests with the host's Web Crypto (`crypto.subtle`, Ed25519) instead of
 ## ed25519-dalek. Only takes effect on `wasm32-unknown-unknown`; the host must support Ed25519.

@@ -158,7 +158,7 @@ pub fn primes(
             .map_err(HandlerError::new)?;
         let took = started.elapsed().as_millis();
 
-        // The final edit: a success embed in the Command Set's theme, like a direct reply
+        // The final edit: a success embed in the App's theme, like a direct reply
         Ok::<_, HandlerError>(ctx.theme().success(format!(
             "{count} primes up to {up_to}, the largest {largest}.
 Counted in {took} ms."

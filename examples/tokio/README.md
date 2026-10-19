@@ -1,6 +1,6 @@
 # Composure example bot on a hosted server (tokio)
 
-Serves the [example bot](../bot)'s shared commands from a plain process with [`composure_adapter_tokio`](../../crates/adapters/tokio) (an HTTP server on tokio, each Interaction on its own task), plus what only a server has. `src/lib.rs` declares the set with `example_bot! { pub struct TokioBot = [file, uptime, primes]; }`; [`src/main.rs`](src/main.rs) serves it with a `Server` as the `Host` data.
+Serves the [example bot](../bot)'s shared commands from a plain process with [`composure_adapter_tokio`](../../crates/adapters/tokio) (an HTTP server on tokio, each Interaction on its own task), plus what only a server has. `src/lib.rs` declares its App with `#[app(handlers(Bot, file, uptime, primes), theme = THEME)] pub struct TokioBot;`; [`src/main.rs`](src/main.rs) serves it with a `Server` as the `Host` data.
 
 [`src/server.rs`](src/server.rs): the server's disk, process and threads, through `Ctx<Host<Server>>`
 

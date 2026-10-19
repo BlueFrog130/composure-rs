@@ -14,7 +14,7 @@ Composure is a lightweight interaction bot that aims to run on the edge. Everyth
 - Flexible [adapter](#adapters) system
 
 ```rust,ignore
-use composure::{command, commands};
+use composure::{app, command};
 
 /// Repeat some text
 #[command]
@@ -25,9 +25,9 @@ fn echo(
     text.repeat(times.unwrap_or(1).into())
 }
 
-commands! {
-    pub struct Bot = [echo];
-}
+/// Everything the bot serves: Commands, Groups, component and modal handlers, Views
+#[app(handlers(echo))]
+pub struct Bot;
 ```
 
 `Bot` is handed to an adapter to serve interactions, and to `composure_sync::sync_from_env` in a host-only bin to sync the command definitions. See [the example bot](./examples/bot), served on [Cloudflare Workers](./examples/cloudflare) and on [a tokio server](./examples/tokio).

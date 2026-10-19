@@ -38,19 +38,19 @@ impl<'a, S, D> Ctx<'a, S, D> {
         }
     }
 
-    /// This Ctx with the Command Set's theme; `None` leaves responses unthemed
+    /// This Ctx with the App's theme; `None` leaves responses unthemed
     pub fn with_theme(mut self, theme: Option<&'static Theme>) -> Self {
         self.theme = theme;
         self
     }
 
-    /// The Command Set's colors and branding: `ctx.theme().success("Saved")`.
-    /// [`Theme::DEFAULT`] when the set has none.
+    /// The App's colors and branding: `ctx.theme().success("Saved")`.
+    /// [`Theme::DEFAULT`] when the App has none.
     pub fn theme(&self) -> &'static Theme {
         self.theme.unwrap_or(&Theme::DEFAULT)
     }
 
-    /// The Command Set's theme, `None` when it has none
+    /// The App's theme, `None` when it has none
     #[cfg(feature = "rest")]
     pub(crate) fn configured_theme(&self) -> Option<&'static Theme> {
         self.theme

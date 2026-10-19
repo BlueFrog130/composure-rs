@@ -1,4 +1,4 @@
-//! Sync: make Discord's stored Command Definitions match a Command Set.
+//! Sync: make Discord's stored Command Definitions match an App's Commands.
 //!
 //! Each target (global, or one guild) gets every Command whose Scope maps to it. A Sync Plan is
 //! computed by comparing Definitions by name and type; targets with changes are overwritten with
@@ -53,7 +53,7 @@ pub struct SyncConfig {
     /// anymore (which clears its Commands).
     pub scopes: HashMap<String, Vec<String>>,
 
-    /// Send the whole Command Set to this guild instead, ignoring Scopes and leaving global
+    /// Send every Command to this guild instead, ignoring Scopes and leaving global
     /// Commands alone. For testing.
     pub override_guild: Option<String>,
 }

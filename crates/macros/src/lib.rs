@@ -1,8 +1,9 @@
 //! Macros for defining Composure Commands and handlers. Use them through `composure` with the
-//! `macros` feature: `composure::{command, group, component, modal, view, rsx, Choice, Modal}`.
+//! `macros` feature: `composure::{app, command, group, component, modal, view, rsx, Choice, Modal}`.
 
 use proc_macro::TokenStream;
 
+mod app;
 mod autocomplete;
 mod choice;
 mod command;
@@ -11,6 +12,36 @@ mod handler;
 mod meta;
 mod modal;
 mod view;
+
+/// Makes a unit struct an App: the Interaction Handler routing to the Commands, Groups, Component
+/// and Modal Handlers, Views and other Apps listed in `handlers(..)`, in any mix and order.
+///
+/// ```ignore
+/// /// Everything the bot serves
+/// #[app(handlers(ping, echo, Admin, counter_click, on_feedback, Card, Moderation),
+///       theme = THEME, events = MyEvents)]
+/// pub struct Bot;
+/// ```
+///
+/// - Implements `InteractionHandler` (for every State all listed items accept), `EventHandler`
+///   and `CommandSetDefinition` (for Sync); `Bot.with_fallback(handler)` sends what nothing
+///   listed handles (components, modals, autocomplete, commands) to `handler`
+/// - Apps nest: a module can declare its own `#[app]` next to its handlers and be listed in the
+///   root one
+/// - `theme = THEME` (a `Theme` constant): fills in unset colors and branding on this App's
+///   responses; a nested App's own Theme wins for its Routes, the outer one fills in the rest
+/// - `events = MyEvents` (a unit struct implementing `EventHandler`): handles Webhook Events;
+///   at most one App in a tree sets it
+///
+/// Two Commands with the same name and type, two handlers with the same `custom_id` prefix, more
+/// Commands than Discord allows in one Scope, or a placed sub-View with handlers that is not
+/// listed fail to compile.
+#[proc_macro_attribute]
+pub fn app(args: TokenStream, item: TokenStream) -> TokenStream {
+    app::expand(args.into(), item.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
 
 /// Defines a Command from a function. Parameters after an optional leading `ctx: Ctx` become
 /// Options; the doc comment becomes the description.
@@ -36,7 +67,7 @@ mod view;
 ///   `channel_types(...)`, `autocomplete = handler` (an `#[autocomplete]` function)
 ///
 /// The function stays callable as written; a same-named empty struct is added for
-/// `commands!` and Groups to refer to.
+/// `#[app]` and Groups to refer to.
 #[proc_macro_attribute]
 pub fn command(args: TokenStream, item: TokenStream) -> TokenStream {
     command::expand(args.into(), item.into())
@@ -76,8 +107,8 @@ pub fn group(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The return value answers like a Command's: a new message by default, `Update(..)` to edit the
-/// message the component is on, `ctx.defer_update(..)` to do that later. List the handler in
-/// `commands!` under `components = [...]`.
+/// message the component is on, `ctx.defer_update(..)` to do that later. List the handler in an
+/// `#[app]`.
 #[proc_macro_attribute]
 pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
     handler::expand(handler::Kind::Component, args.into(), item.into())
@@ -100,7 +131,7 @@ pub fn component(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// List the handler in `commands!` under `modals = [...]`.
+/// List the handler in an `#[app]`.
 #[proc_macro_attribute]
 pub fn modal(args: TokenStream, item: TokenStream) -> TokenStream {
     handler::expand(handler::Kind::Modal, args.into(), item.into())
@@ -262,7 +293,7 @@ pub fn rsx(input: TokenStream) -> TokenStream {
 /// values: Vec<Choice>| ..`, `on:submit:name=|ctx, field: Type, ..| ..` on a `<Modal>`) becomes a
 /// handler routed by `custom_id` `prefix:name:state`; the Props it names are its state. The
 /// prefix defaults to the name in `snake_case` (`#[view(prefix = "c")]`). List Views with
-/// handlers in `commands!` under `views = [...]`.
+/// handlers in an `#[app]`.
 #[proc_macro_attribute]
 pub fn view(args: TokenStream, item: TokenStream) -> TokenStream {
     view::expand_attr(args.into(), item.into())

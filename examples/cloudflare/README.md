@@ -1,6 +1,6 @@
 # Composure example bot on Cloudflare Workers
 
-Serves the [example bot](../bot)'s shared commands from a Worker with `CloudflareInteractionBot`, plus what only Workers has, and a cron trigger using the Bot Client outside Interactions. `src/lib.rs` declares the set with `example_bot! { pub struct CloudflareBot = [Note]; }`.
+Serves the [example bot](../bot)'s shared commands from a Worker with `CloudflareInteractionBot`, plus what only Workers has, and a cron trigger using the Bot Client outside Interactions. `src/lib.rs` declares its App with `#[app(handlers(Bot, Note), theme = THEME)] pub struct CloudflareBot;`.
 
 [`src/notes.rs`](src/notes.rs): Workers KV
 

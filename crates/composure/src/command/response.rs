@@ -96,7 +96,7 @@ impl<T: IntoResponse> IntoResponse for Update<T> {
     }
 }
 
-/// A Response sent as is, without the Command Set's [`Theme`](super::Theme) filling in embed
+/// A Response sent as is, without the App's [`Theme`](super::Theme) filling in embed
 /// colors, branding and container accent colors: `Unthemed(embed)`, `Ephemeral(Unthemed(embed))`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Unthemed<T>(pub T);

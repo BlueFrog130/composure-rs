@@ -1,8 +1,8 @@
 //! Commands that only answer: Options, Choices, State, Groups, context menus, errors, themed
-//! embeds (colors and footer come from the Command Set's `THEME`).
+//! embeds (colors and footer come from the bot's `THEME`).
 
 use composure::{
-    Choice, Ctx, autocomplete, command,
+    Choice, Ctx, app, autocomplete, command,
     command::{Ephemeral, HandlerError},
     group,
     types::{Embed, Message, User},
@@ -136,3 +136,7 @@ pub fn avatar(target: &User) -> String {
 pub fn word_count(target: &Message) -> String {
     format!("{} words", target.content.split_whitespace().count())
 }
+
+/// This module's Commands, listed in [`Bot`](crate::Bot)
+#[app(handlers(hello, echo, ice_cream, fruit, greet, Mod, avatar, word_count))]
+pub struct Basics;

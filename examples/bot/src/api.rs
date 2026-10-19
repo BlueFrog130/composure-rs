@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use composure::{
-    Ctx, Mentionable, autocomplete, command,
+    Ctx, Mentionable, app, autocomplete, command,
     command::{Deferred, Ephemeral, HandlerError, Platform},
     definition::ApplicationCommand,
     rest::{CommandScope, EditMessage},
@@ -190,3 +190,17 @@ pub fn export(
     InteractionResponse::respond_with_message("Here's your file:".to_string())
         .with_file(File::new("export.txt", text.as_bytes().to_vec()).content_type("text/plain"))
 }
+
+/// This module's Commands, listed in [`Bot`](crate::Bot)
+#[app(handlers(
+    whoami,
+    remind,
+    countdown,
+    announce,
+    thumbs_up,
+    dm_me,
+    report,
+    command_info,
+    export
+))]
+pub struct Api;

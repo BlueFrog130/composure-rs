@@ -1,9 +1,9 @@
 //! Autocomplete Handlers attached to Options: Definitions and routing the focused Option.
 
 use composure::{
-    Ctx, autocomplete,
+    Ctx, app, autocomplete,
     command::{CommandSetDefinition, HandlerError, dispatch},
-    commands, group,
+    group,
     types::Interaction,
 };
 use futures::executor::block_on;
@@ -49,9 +49,8 @@ fn multiply(_ctx: Ctx<u32>, #[option("Number", autocomplete = multiples)] n: i64
 #[group(subcommands(fruit))]
 struct Shop;
 
-commands! {
-    pub struct Bot = [fruit, multiply, Shop];
-}
+#[app(handlers(fruit, multiply, Shop))]
+pub struct Bot;
 
 fn autocomplete_interaction(data: Value) -> Interaction {
     serde_json::from_value(json!({

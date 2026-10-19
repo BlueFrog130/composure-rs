@@ -97,6 +97,8 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
         }
     });
 
+    let route = crate::app::command_route(ident);
+
     Ok(quote! {
         #item
 
@@ -181,5 +183,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 ::core::option::Option::None
             }
         }
+
+        #route
     })
 }

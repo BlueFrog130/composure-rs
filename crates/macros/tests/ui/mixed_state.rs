@@ -1,4 +1,4 @@
-use composure::{Ctx, commands};
+use composure::{Ctx, app};
 
 /// A
 #[composure::command]
@@ -12,9 +12,8 @@ fn b(ctx: Ctx<String>) -> String {
     ctx.state().clone()
 }
 
-commands! {
-    struct Bot = [a, b];
-}
+#[app(handlers(a, b))]
+struct Bot;
 
 fn main() {
     let _ = futures::executor::block_on(composure::command::dispatch(

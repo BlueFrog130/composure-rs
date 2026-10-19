@@ -1,4 +1,4 @@
-use composure::{command, commands, component};
+use composure::{command, app, component};
 
 /// A command
 #[command]
@@ -16,9 +16,7 @@ fn second() -> String {
     String::new()
 }
 
-commands! {
-    pub struct Bot = [ping];
-    components = [first, second];
-}
+#[app(handlers(ping, first, second))]
+pub struct Bot;
 
 fn main() {}

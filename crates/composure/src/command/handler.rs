@@ -6,12 +6,12 @@ use crate::types::{
     ModalSubmitInteraction,
 };
 
-use super::{__unshare, CommandSet, CommandSetDefinition, HandlerError, ScopedDefinition, Theme};
+use super::{__unshare, CommandSetDefinition, HandlerError, Route, ScopedDefinition, Theme};
 
 /// Answers Interactions; the one contract every Adapter talks to. `S` is the Adapter's State.
 ///
-/// A Command Set implements this for commands. Implement it directly for components, modals,
-/// autocomplete, or full control. Every method has a default: unknown command, a "not handled"
+/// An `#[app]` implements this by routing to what it lists. Implement it directly for full
+/// control. Every method has a default: unknown command, a "not handled"
 /// ephemeral message, or no autocomplete choices.
 ///
 /// Futures are `Send` so Adapters can run each Interaction on any thread (ADR 0012); `async fn`
@@ -169,9 +169,9 @@ async fn route<S, H: InteractionHandler<S>>(
     }
 }
 
-/// A Command Set plus a handler for everything it does not handle: components and modals
-/// without a matching handler, autocomplete without an Autocomplete Handler, and commands not
-/// in the set. Built with the set's `with_fallback`.
+/// An App plus a handler for everything it does not handle: components and modals without a
+/// matching handler, autocomplete without an Autocomplete Handler, and commands it does not
+/// list. Built with the App's `with_fallback`.
 #[derive(Debug, Clone, Copy)]
 pub struct WithFallback<C, F> {
     commands: C,
@@ -188,7 +188,7 @@ impl<C, F> WithFallback<C, F> {
     }
 }
 
-impl<S: Sync, C: CommandSet<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHandler<S>
+impl<S: Sync, C: Route<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHandler<S>
     for WithFallback<C, F>
 {
     fn theme(&self) -> Option<&'static Theme> {
@@ -201,7 +201,7 @@ impl<S: Sync, C: CommandSet<S> + Sync, F: InteractionHandler<S> + Sync> Interact
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         let command = Arc::new(command);
-        match self.commands.dispatch(&command, state).await {
+        match C::dispatch(&command, state, None).await {
             Some(result) => result,
             None => self.fallback.command(__unshare(command), state).await,
         }
@@ -213,7 +213,7 @@ impl<S: Sync, C: CommandSet<S> + Sync, F: InteractionHandler<S> + Sync> Interact
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         let component = Arc::new(component);
-        match self.commands.dispatch_component(&component, state).await {
+        match C::dispatch_component(&component, state, None).await {
             Some(result) => result,
             None => self.fallback.component(__unshare(component), state).await,
         }
@@ -225,11 +225,7 @@ impl<S: Sync, C: CommandSet<S> + Sync, F: InteractionHandler<S> + Sync> Interact
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         let autocomplete = Arc::new(autocomplete);
-        match self
-            .commands
-            .dispatch_autocomplete(&autocomplete, state)
-            .await
-        {
+        match C::dispatch_autocomplete(&autocomplete, state, None).await {
             Some(result) => result,
             None => {
                 self.fallback
@@ -245,7 +241,7 @@ impl<S: Sync, C: CommandSet<S> + Sync, F: InteractionHandler<S> + Sync> Interact
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         let modal = Arc::new(modal);
-        match self.commands.dispatch_modal(&modal, state).await {
+        match C::dispatch_modal(&modal, state, None).await {
             Some(result) => result,
             None => self.fallback.modal_submit(__unshare(modal), state).await,
         }

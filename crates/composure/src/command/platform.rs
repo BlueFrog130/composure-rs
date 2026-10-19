@@ -261,7 +261,7 @@ impl<S: Platform, D> DeferredCtx<S, D> {
         &self.state
     }
 
-    /// The Command Set's colors and branding; [`Theme::DEFAULT`] when the set has none
+    /// The App's colors and branding; [`Theme::DEFAULT`] when the App has none
     pub fn theme(&self) -> &'static Theme {
         self.theme.unwrap_or(&Theme::DEFAULT)
     }

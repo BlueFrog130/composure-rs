@@ -42,7 +42,7 @@ A non-interaction notification Discord POSTs to the app's events URL (app author
 _Avoid_: Gateway event, Interaction
 
 **Event Handler**:
-What answers Webhook Events, registered on the Command Set alongside its Commands.
+What answers Webhook Events, registered on an App alongside its Commands.
 
 ### Discord types
 
@@ -68,7 +68,7 @@ _Avoid_: HTTP client, API client
 
 **Endpoint**:
 One Discord REST route (method + path) exposed as a client method.
-_Avoid_: Route (outside the spec check), call
+_Avoid_: Route (that is what an App lists; `routes!` and the spec check are the exception), call
 
 ### Commands
 
@@ -117,12 +117,16 @@ _Avoid_: Session, payload
 **Autocomplete Handler**:
 Code suggesting Choices for one Option while the user types.
 
-**Command Set**:
-The explicit list of Commands a bot serves; the single source both for dispatching Interactions and for Sync.
-_Avoid_: Router, registry
+**App**:
+The explicit list (`#[app]`) of Routes a bot serves: Commands, Groups, Component and Modal Handlers, Views, and other Apps; the single source both for dispatching Interactions and for Sync. Apps nest, so a module can list its own and the root lists the module's.
+_Avoid_: Command Set, router, registry, bot (that is the Bot Client)
+
+**Route**:
+Anything an App lists: it answers the Interactions addressed to it (by command name and type, or by `custom_id` prefix) and declares what the App's compile-time checks need.
+_Avoid_: Handler (alone), endpoint
 
 **Theme**:
-A Command Set's embed colors (primary plus success, warning, error, info) and branding (author, footer), filled into every message Response and error it answers with (primary also as the accent color of Components V2 Containers); REST messages are untouched.
+An App's embed colors (primary plus success, warning, error, info) and branding (author, footer), filled into every message Response and error it answers with (primary also as the accent color of Components V2 Containers); a nested App's Theme fills in first, the outer ones after. REST messages are untouched.
 _Avoid_: Style, skin, palette (for the whole thing)
 
 ### Deployment

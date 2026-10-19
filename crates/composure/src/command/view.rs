@@ -531,7 +531,7 @@ impl<T: CommandOutput> ViaOutput for HandlerOutput<T> {
     }
 }
 
-/// A View as `commands!` sees it: its `custom_id` prefix, whether it has inline handlers, and
+/// A View as the `#[app]` listing it sees it: its `custom_id` prefix, whether it has inline handlers, and
 /// the Views its markup places, so a forgotten sub-View fails to compile
 #[derive(Debug, Clone, Copy)]
 pub struct ViewInfo {
@@ -546,7 +546,7 @@ pub trait ViewDefinition {
 }
 
 /// Runs a View's inline handlers; `None` when the handler named in the `custom_id` is not one of
-/// them. Implemented by `#[view]`; listed in `commands!` under `views = [...]`.
+/// them. Implemented by `#[view]`; Views with handlers are listed in an `#[app]`.
 pub trait ViewHandler<S>: ViewDefinition {
     /// `fields` is the `custom_id` after `prefix:`: the handler name, then its captured Props
     fn component(
@@ -562,45 +562,6 @@ pub trait ViewHandler<S>: ViewDefinition {
     ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
         async { None }
     }
-}
-
-/// Compile-time check that every View with handlers placed by a listed View is listed too. Used
-/// by [`commands!`](crate::commands).
-#[doc(hidden)]
-pub const fn check_views(views: &[ViewInfo]) {
-    let mut i = 0;
-    while i < views.len() {
-        check_placed(views, views[i].views, 0);
-        i += 1;
-    }
-}
-
-const fn check_placed(listed: &[ViewInfo], placed: &[ViewInfo], depth: usize) {
-    if depth > 16 {
-        return;
-    }
-    let mut i = 0;
-    while i < placed.len() {
-        let view = placed[i];
-        if view.handled && !is_listed(listed, view.prefix) {
-            panic!(
-                "a View with handlers placed by a listed View (a `<SubView .. />` tag in its markup) is missing from `views = [...]`"
-            );
-        }
-        check_placed(listed, view.views, depth + 1);
-        i += 1;
-    }
-}
-
-const fn is_listed(listed: &[ViewInfo], prefix: &str) -> bool {
-    let mut i = 0;
-    while i < listed.len() {
-        if super::set::str_eq(listed[i].prefix, prefix) {
-            return true;
-        }
-        i += 1;
-    }
-    false
 }
 
 /// A typed select handler parameter (`on:select:name=|ctx, picked: Vec<Color>| ..`): the

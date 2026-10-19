@@ -1,4 +1,4 @@
-use composure::commands;
+use composure::app;
 
 /// A
 #[composure::command]
@@ -14,8 +14,7 @@ mod other {
     }
 }
 
-commands! {
-    struct Bot = [a, other::b];
-}
+#[app(handlers(a, other::b))]
+struct Bot;
 
 fn main() {}

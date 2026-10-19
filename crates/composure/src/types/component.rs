@@ -727,7 +727,7 @@ pub struct Container {
     /// Up to 40 action rows, text displays, sections, media galleries, separators and files
     pub components: Vec<Component>,
 
-    /// Color of the accent bar on the left; filled in by the Command Set's
+    /// Color of the accent bar on the left; filled in by the App's
     /// [`Theme`](crate::command::Theme) when unset
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accent_color: Option<u32>,

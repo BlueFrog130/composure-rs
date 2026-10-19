@@ -1,4 +1,5 @@
-//! Webhook Events, registered with `commands! { ..; events = Events; }` and served on `/events`.
+//! Webhook Events, registered with `#[app(.., events = Events)]` on [`Bot`](crate::Bot) and served
+//! on `/events`.
 
 use composure::{
     command::{EventCtx, EventHandler, HandlerError, Platform},

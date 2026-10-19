@@ -112,7 +112,7 @@ impl CloudflareInteractionBot {
 }
 
 impl<H: InteractionHandler<Worker>> CloudflareInteractionBot<H> {
-    /// Handles interactions with `handler`: a Command Set, a Command Set `with_fallback`, or any
+    /// Handles interactions with `handler`: an `#[app]`, an App `with_fallback`, or any
     /// [`InteractionHandler`]
     pub fn with_handler<T: InteractionHandler<Worker>>(
         self,

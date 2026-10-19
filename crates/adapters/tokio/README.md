@@ -8,7 +8,7 @@ use composure_adapter_tokio::TokioInteractionBot;
 #[tokio::main]
 async fn main() -> Result<(), composure_adapter_tokio::Error> {
     TokioInteractionBot::from_env()? // DISCORD_PUBLIC_KEY, DISCORD_TOKEN?, DISCORD_APPLICATION_ID?, PORT?
-        .with_handler(Bot)            // a Command Set from `commands!`
+        .with_handler(Bot)            // an `#[app]`
         .serve()                      // 0.0.0.0:$PORT (8080), until Ctrl-C / SIGTERM
         .await
 }

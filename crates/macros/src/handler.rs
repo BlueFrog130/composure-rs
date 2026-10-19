@@ -167,6 +167,8 @@ pub fn expand(kind: Kind, args: TokenStream, item: TokenStream) -> syn::Result<T
         .filter(|attr| attr.path().is_ident("doc"))
         .collect();
 
+    let route = crate::app::handler_route(&ident, matches!(kind, Kind::Modal));
+
     // A braced struct lives only in the type namespace, so the function keeps its name
     Ok(quote! {
         #function
@@ -210,6 +212,8 @@ pub fn expand(kind: Kind, args: TokenStream, item: TokenStream) -> syn::Result<T
                 ::composure::command::CommandOutput::into_result(#call)
             }
         }
+
+        #route
     })
 }
 

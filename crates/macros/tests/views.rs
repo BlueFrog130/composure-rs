@@ -1,9 +1,9 @@
 //! Views: `rsx!` markup expansion, `#[view]` Props, inline handlers and their routing.
 
 use composure::{
-    Choice,
+    Choice, app,
     command::{Ephemeral, HandlerError, IntoResponse, ModalView, Update, View, dispatch},
-    commands, component, rsx,
+    component, rsx,
     types::{Interaction, InteractionResponse},
     view,
 };
@@ -129,11 +129,8 @@ fn counter() -> Counter {
     Counter::builder().count(0).build()
 }
 
-commands! {
-    pub struct Bot = [counter];
-    components = [count];
-    views = [Counter, Card, ItemRow, Palette, Feedback, Opener];
-}
+#[app(handlers(counter, count, Counter, Card, ItemRow, Palette, Feedback, Opener))]
+pub struct Bot;
 
 fn json(response: InteractionResponse) -> Value {
     serde_json::to_value(response).unwrap()

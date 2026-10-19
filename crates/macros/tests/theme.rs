@@ -1,11 +1,11 @@
-//! A Command Set's Theme: helpers through `ctx.theme()`, auto-filled responses, themed errors.
+//! An App's Theme: helpers through `ctx.theme()`, auto-filled responses, themed errors.
 
 use composure::{
-    Ctx,
+    Ctx, app,
     command::{
         ComponentCtx, Ephemeral, HandlerError, InteractionHandler, Theme, Unthemed, dispatch,
     },
-    commands, component, group,
+    component, group,
     types::{Embed, Interaction},
 };
 use futures::executor::block_on;
@@ -61,27 +61,21 @@ fn warn(ctx: ComponentCtx) -> Embed {
     ctx.theme().warning("careful")
 }
 
-commands! {
-    pub struct Themed = [plain, saved, raw, text, refuse, Tools];
-    components = [warn];
-    theme = THEME;
-}
+#[app(handlers(plain, saved, raw, text, refuse, Tools, warn), theme = THEME)]
+pub struct Themed;
 
 mod unthemed {
     use super::*;
 
-    commands! {
-        pub struct Unthemed = [plain, saved, refuse];
-    }
+    #[app(handlers(plain, saved, refuse))]
+    pub struct Unthemed;
 }
 
 mod inline {
     use super::*;
 
-    commands! {
-        pub struct Inline = [plain];
-        theme = Theme::new().with_primary(0x123456);
-    }
+    #[app(handlers(plain), theme = Theme::new().with_primary(0x123456))]
+    pub struct Inline;
 }
 
 fn interaction(t: u8, data: Value) -> Interaction {

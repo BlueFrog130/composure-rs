@@ -1998,6 +1998,7 @@ pub fn expand_attr(args: TokenStream, item: TokenStream) -> syn::Result<TokenStr
     let handled = !gen_.handlers.is_empty();
     let views = &gen_.views;
     let handler = view_handler(&name, &prefix, &gen_.handlers)?;
+    let route = crate::app::view_route(&name);
 
     Ok(quote! {
         #[allow(non_snake_case)]
@@ -2042,6 +2043,7 @@ pub fn expand_attr(args: TokenStream, item: TokenStream) -> syn::Result<TokenStr
         }
 
         #handler
+        #route
     })
 }
 

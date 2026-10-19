@@ -7,13 +7,14 @@
 
 pub mod server;
 
+use composure::app;
+use composure_example_bot::{Bot, THEME};
 pub use server::Server;
 use server::{file, primes, uptime};
 
-composure_example_bot::example_bot! {
-    /// Every command the bot serves on tokio, synced by `src/bin/sync.rs`
-    pub struct TokioBot = [file, uptime, primes];
-}
+/// Every command the bot serves on tokio, synced by `src/bin/sync.rs`
+#[app(handlers(Bot, file, uptime, primes), theme = THEME)]
+pub struct TokioBot;
 
 /// Where `/file` reads from when `FILES_DIR` is not set: the sample files next to this crate
 pub const DEFAULT_FILES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/files");

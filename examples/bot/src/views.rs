@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 use composure::{
-    Choice,
+    Choice, app,
     command::{ComponentCtx, Ephemeral, ModalView, Platform, View},
     rsx, view,
 };
@@ -87,3 +87,7 @@ pub fn card() -> Card {
 pub fn dice() -> Dice {
     Dice { face: 1, rolls: 0 }
 }
+
+/// The Views (their inline handlers) and the Commands sending them, listed in [`Bot`](crate::Bot)
+#[app(handlers(Card, Review, Dice, card, dice))]
+pub struct Views;

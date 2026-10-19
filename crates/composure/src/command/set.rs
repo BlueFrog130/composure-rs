@@ -9,8 +9,7 @@ use crate::{
         ApplicationCommandInteraction, ApplicationCommandInteractionData,
         ApplicationCommandInteractionDataOption as DataOption, ApplicationCommandType,
         ApplicationIntegrationType, FocusedOption, InteractionContextType, InteractionResponse,
-        MessageComponentInteraction, ModalSubmitInteraction, OptionList, Permissions, Subcommand,
-        TypeField,
+        OptionList, Permissions, Subcommand, TypeField,
     },
 };
 
@@ -75,7 +74,7 @@ impl<'a, S> Invocation<'a, S> {
         }
     }
 
-    /// This Invocation with the Command Set's theme, passed on to the Ctx
+    /// This Invocation with the App's theme, passed on to the Ctx
     pub fn with_theme(mut self, theme: Option<&'static Theme>) -> Self {
         self.theme = theme;
         self
@@ -242,46 +241,6 @@ impl ScopedDefinition {
     }
 }
 
-/// The Commands a bot serves. Implemented by [`commands!`](crate::commands).
-pub trait CommandSet<S> {
-    /// Colors and branding of the set's responses, from `theme = ...;` in `commands!`
-    const THEME: Option<&'static Theme> = None;
-
-    /// Runs the matching Command, or `None` if no Command has the invoked name and type
-    fn dispatch(
-        &self,
-        interaction: &Arc<ApplicationCommandInteraction>,
-        state: &S,
-    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send;
-
-    /// Runs the matching Command's Autocomplete Handler for the focused Option, or `None`
-    fn dispatch_autocomplete(
-        &self,
-        _interaction: &Arc<ApplicationCommandInteraction>,
-        _state: &S,
-    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
-        async { None }
-    }
-
-    /// Runs the Component Handler whose prefix the `custom_id` starts with, or `None`
-    fn dispatch_component(
-        &self,
-        _interaction: &Arc<MessageComponentInteraction>,
-        _state: &S,
-    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
-        async { None }
-    }
-
-    /// Runs the Modal Handler whose prefix the `custom_id` starts with, or `None`
-    fn dispatch_modal(
-        &self,
-        _interaction: &Arc<ModalSubmitInteraction>,
-        _state: &S,
-    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
-        async { None }
-    }
-}
-
 /// The Interaction back from the [`Arc`] it was dispatched in, for handlers that take it by value.
 /// Nothing else holds it once dispatch found no handler, so this does not copy.
 #[doc(hidden)]
@@ -289,14 +248,13 @@ pub fn __unshare<T: Clone>(interaction: Arc<T>) -> T {
     Arc::try_unwrap(interaction).unwrap_or_else(|shared| (*shared).clone())
 }
 
-/// The Command Definitions of a Command Set, for Sync
+/// The Command Definitions of an App, for Sync. Implemented by `#[app]`.
 pub trait CommandSetDefinition {
     fn definitions() -> Vec<ScopedDefinition>;
 }
 
-/// Compile-time checks for the Commands of a Command Set or Group, as `(name, kind, scope)`: no
-/// two share a name and kind, and no Scope exceeds Discord's per-kind limit. Used by
-/// [`commands!`](crate::commands) and `#[group]`.
+/// Compile-time checks for the subcommands of a Group, as `(name, kind, scope)`: no two share a
+/// name and kind, and no Scope exceeds Discord's per-kind limit. Used by `#[group]`.
 #[doc(hidden)]
 pub const fn check_commands(commands: &[(&str, ApplicationCommandType, Option<&str>)]) {
     let mut i = 0;
@@ -344,7 +302,7 @@ pub(crate) const fn str_eq(a: &str, b: &str) -> bool {
     true
 }
 
-const fn scope_eq(a: Option<&str>, b: Option<&str>) -> bool {
+pub(crate) const fn scope_eq(a: Option<&str>, b: Option<&str>) -> bool {
     match (a, b) {
         (Some(a), Some(b)) => str_eq(a, b),
         (None, None) => true,

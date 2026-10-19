@@ -1,6 +1,6 @@
 use composure::{
     command::{Ephemeral, View},
-    commands, rsx, view,
+    app, rsx, view,
 };
 
 #[view]
@@ -19,9 +19,7 @@ fn list() -> List {
     List {}
 }
 
-commands! {
-    pub struct Bot = [list];
-    views = [List];
-}
+#[app(handlers(list, List))]
+pub struct Bot;
 
 fn main() {}

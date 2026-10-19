@@ -171,7 +171,7 @@ fn var(name: &'static str) -> Result<Option<String>, Error> {
 }
 
 impl<H, T> TokioInteractionBot<H, T> {
-    /// Handles interactions with `handler`: a Command Set, a Command Set `with_fallback`, or any
+    /// Handles interactions with `handler`: an `#[app]`, an App `with_fallback`, or any
     /// [`InteractionHandler`]
     pub fn with_handler<U>(self, handler: U) -> TokioInteractionBot<U, T> {
         TokioInteractionBot {

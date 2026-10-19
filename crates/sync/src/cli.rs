@@ -22,7 +22,7 @@ use crate::{
 /// `--check` found changes
 const OUT_OF_DATE: u8 = 2;
 
-/// Make Discord's commands match the bot's Command Set
+/// Make Discord's commands match the bot's App
 #[derive(Debug, Parser)]
 #[command(
     name = "sync",

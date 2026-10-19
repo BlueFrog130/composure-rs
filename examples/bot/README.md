@@ -1,6 +1,6 @@
 # Composure example bot
 
-A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[derive(Choice)]` and collected with `commands!`. Nothing here depends on a platform. `example_bot! { pub struct MyBot = [extra, ...]; }` declares a Command Set with every command below plus a platform's own: [`examples/cloudflare`](../cloudflare) adds Workers KV notes, [`examples/tokio`](../tokio) adds local files, process data and blocking work. Each serves and syncs its own set (`Bot` here is the shared commands alone, for the tests). `/greet` reads its `GREETING` through the `Vars` trait, implemented for each Adapter's State behind the `cloudflare` / `tokio` features.
+A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[derive(Choice)]` and collected with `#[app]`: each module lists its own in an App (`Basics`, `Api`, `Interactive`, `Views`), and `Bot` lists those with the theme and the Webhook Events. Nothing here depends on a platform. Each example lists `Bot` in its own App next to its platform's commands (`#[app(handlers(Bot, Note), theme = THEME)]`): [`examples/cloudflare`](../cloudflare) adds Workers KV notes, [`examples/tokio`](../tokio) adds local files, process data and blocking work, and each serves and syncs that App (the tests use `Bot` alone). `/greet` reads its `GREETING` through the `Vars` trait, implemented for each Adapter's State behind the `cloudflare` / `tokio` features.
 
 [`src/basics.rs`](src/basics.rs): answering directly
 
@@ -28,7 +28,7 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 | `/command-info` | Async autocomplete with `Ctx<impl Platform>`: suggestions fetched with the bot token |
 | `/export` | A file in the initial response (the Adapter answers through the callback endpoint) |
 
-[`src/interactive.rs`](src/interactive.rs): `#[component]` / `#[modal]` handlers, listed in `commands!` under `components` / `modals`
+[`src/interactive.rs`](src/interactive.rs): `#[component]` / `#[modal]` handlers, listed in the module's App next to the Commands that send them
 
 | Command | Shows |
 |---|---|
@@ -37,7 +37,7 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 | `/colors` | A string select; `ComponentCtx::values()` |
 | `/feedback` | `#[derive(Modal)]` form (text inputs, a Choice-backed radio group, file upload, checkbox) opened with `on_feedback::show()`, submitted to `#[modal("feedback")]` typed |
 
-[`src/events.rs`](src/events.rs): Webhook Events (`commands! { ..; events = Events; }`), served on `/events`
+[`src/events.rs`](src/events.rs): Webhook Events (`#[app(.., events = Events)]` on `Bot`), served on `/events`
 
 | Event | Shows |
 |---|---|

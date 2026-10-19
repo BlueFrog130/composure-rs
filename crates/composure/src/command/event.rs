@@ -64,8 +64,8 @@ impl<S: super::Platform> EventCtx<'_, S> {
 }
 
 /// Answers Webhook Events. Every method defaults to ignoring the event; override the ones you
-/// care about, or [`handle`](Self::handle) to see every event. Registered on a Command Set with
-/// `commands! { ...; events = MyEvents; }`.
+/// care about, or [`handle`](Self::handle) to see every event. Registered on an App with
+/// `#[app(.., events = MyEvents)]`.
 ///
 /// Events are acknowledged before they are handled, so errors are only logged, and Discord does
 /// not retry them. Futures are `Send` so they can run on any thread (ADR 0012).
@@ -210,28 +210,4 @@ pub fn spawn_event<S: super::Platform, H: EventHandler<S> + Send + 'static>(
     }
     .instrument(span.clone());
     span.in_scope(|| state.spawn(Box::pin(work)));
-}
-
-/// Implements [`EventHandler`] for a Command Set: delegating to `$events`, or ignoring every
-/// event. Used by [`commands!`](crate::commands).
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __command_set_events {
-    ($name:ident) => {
-        impl<S: ::core::marker::Sync> $crate::command::EventHandler<S> for $name {}
-    };
-    ($name:ident, $events:path) => {
-        impl<S: ::core::marker::Sync> $crate::command::EventHandler<S> for $name
-        where
-            $events: $crate::command::EventHandler<S>,
-        {
-            async fn handle(
-                &self,
-                ctx: $crate::command::EventCtx<'_, S>,
-                event: $crate::types::Event,
-            ) -> ::core::result::Result<(), $crate::command::HandlerError> {
-                $crate::command::EventHandler::<S>::handle(&$events, ctx, event).await
-            }
-        }
-    };
 }

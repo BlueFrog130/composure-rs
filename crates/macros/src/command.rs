@@ -307,6 +307,8 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
         }
     });
 
+    let route = crate::app::command_route(&ident);
+
     // A braced struct lives only in the type namespace, so the function keeps its name
     Ok(quote! {
         #function
@@ -357,6 +359,8 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
 
             #autocomplete
         }
+
+        #route
     })
 }
 

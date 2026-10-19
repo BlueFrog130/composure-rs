@@ -1,13 +1,13 @@
 //! Component and Modal Handlers defined with the macros: custom_id round trips and routing.
 
 use composure::{
-    Ctx, Modal,
+    Ctx, Modal, app,
     command::{
         ComponentCtx, Ephemeral, HandlerError, Modal as _, ModalCtx, Update,
         custom_id::{CustomIdError, split},
         dispatch,
     },
-    commands, component, modal,
+    component, modal,
     types::{Interaction, InteractionResponse},
 };
 use futures::executor::block_on;
@@ -89,20 +89,15 @@ impl composure::command::EventHandler<u32> for Events {
     }
 }
 
-commands! {
-    pub struct Bot = [edit, noop];
-    components = [count, step, plain];
-    modals = [rename];
-    events = Events;
-}
+#[app(handlers(edit, noop, count, step, plain, rename), events = Events)]
+pub struct Bot;
 
 /// No `events`: every event is ignored
 mod quiet {
     use super::*;
 
-    commands! {
-        pub struct Quiet = [noop];
-    }
+    #[app(handlers(noop))]
+    pub struct Quiet;
 }
 
 fn interaction(t: u8, data: Value) -> Interaction {

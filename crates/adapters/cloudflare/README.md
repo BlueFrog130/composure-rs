@@ -4,12 +4,12 @@ Runs a Composure bot on Cloudflare Workers. The adapter verifies the request sig
 
 ## Usage
 
-Based on the `worker-rust` template (`npm create cloudflare@latest -- --template=cloudflare/workers-sdk/templates/experimental/worker-rust`). Enable `composure`'s `macros` feature (and `tier1` for REST), define commands with `#[command]`, and hand the Command Set to the bot:
+Based on the `worker-rust` template (`npm create cloudflare@latest -- --template=cloudflare/workers-sdk/templates/experimental/worker-rust`). Enable `composure`'s `macros` feature (and `tier1` for REST), define commands with `#[command]`, list them in an `#[app]`, and hand it to the bot:
 
 ```rust,no_run
 use std::time::Duration;
 
-use composure::{Ctx, command, command::{Deferred, HandlerError}, commands};
+use composure::{Ctx, app, command, command::{Deferred, HandlerError}};
 use composure_adapter_cloudflare::{CloudflareInteractionBot, Worker};
 use worker::*;
 
@@ -41,9 +41,8 @@ fn slow(ctx: Ctx<Worker>) -> Deferred {
     })
 }
 
-commands! {
-    pub struct Bot = [hello, greeting, slow];
-}
+#[app(handlers(hello, greeting, slow))]
+pub struct Bot;
 
 #[event(fetch)]
 async fn fetch(req: Request, env: Env, ctx: Context) -> Result<Response> {
@@ -55,7 +54,7 @@ async fn fetch(req: Request, env: Env, ctx: Context) -> Result<Response> {
 # fn main() {}
 ```
 
-`Bot.with_fallback(handler)` sends components, modals, autocomplete, and commands not in the set to any `InteractionHandler`. Implement `InteractionHandler<Worker>` directly instead of using a Command Set for full control.
+`Bot.with_fallback(handler)` sends components, modals, autocomplete, and commands the App does not handle to any `InteractionHandler`. Implement `InteractionHandler<Worker>` directly instead of using an App for full control.
 
 ## State and REST
 
@@ -69,7 +68,7 @@ Requests go through `FetchTransport` (Workers `fetch`). A response carrying file
 
 ## Webhook Events
 
-Requests to `/events` (change with `.with_events_path(..)`) are Webhook Events: verified like Interactions, acknowledged with 204 at once, then handed to the handler's `EventHandler` as Background Work. Register one on the Command Set with `commands! { ...; events = MyEvents; }` and set the app's Webhook Events URL to `https://<worker>/events`. Unknown events reach `EventHandler::unknown` with their raw JSON. `handle_event(..)` runs the same steps without the Workers runtime for tests.
+Requests to `/events` (change with `.with_events_path(..)`) are Webhook Events: verified like Interactions, acknowledged with 204 at once, then handed to the handler's `EventHandler` as Background Work. Register one on the App with `#[app(.., events = MyEvents)]` and set the app's Webhook Events URL to `https://<worker>/events`. Unknown events reach `EventHandler::unknown` with their raw JSON. `handle_event(..)` runs the same steps without the Workers runtime for tests.
 
 ## Outside Interactions
 
@@ -83,11 +82,11 @@ async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
 }
 ```
 
-`Ctx<Worker>` ties a Command (and its Command Set) to Workers. To run it in host tests, take `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) and implement it for a stand-in; see `examples/bot/tests/offline.rs`.
+`Ctx<Worker>` ties a Command (and the App listing it) to Workers. To run it in host tests, take `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) and implement it for a stand-in; see `examples/bot/tests/offline.rs`.
 
 Handler futures must be `Send` (ADR 0012, so the same bot also runs on a multi-threaded server), although a Worker runs on one thread: `Worker` and `FetchTransport` wrap their JS handles in `worker::send::SendWrapper` / `SendFuture` for you. A handler that awaits a JS future itself (KV, D1, `worker::Fetch`) wraps it the same way: `SendFuture::new(kv.get("key").text()).await`, and holds JS values across `.await` in a `SendWrapper`. Handlers are still dispatched statically, so no `async_trait` or boxing.
 
-Sync the Command Set with Discord from a host-only bin; see `examples/bot/` for a complete bot with a `sync` bin, served by `examples/cloudflare/`.
+Sync the App's Commands with Discord from a host-only bin; see `examples/bot/` for a complete bot with a `sync` bin, served by `examples/cloudflare/`.
 
 ## Logging
 

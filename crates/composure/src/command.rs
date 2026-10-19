@@ -1,8 +1,9 @@
 //! Commands defined once with `#[command]`, from which both their handler and their Command
-//! Definition derive, collected into a Command Set with [`commands!`](crate::commands).
+//! Definition derive, collected with the handlers for components, modals and Views into an App
+//! with `#[app]`.
 //!
 //! ```ignore
-//! use composure::{command, commands};
+//! use composure::{app, command};
 //!
 //! /// Repeat some text
 //! #[command]
@@ -13,9 +14,8 @@
 //!     text.repeat(times.unwrap_or(1).into())
 //! }
 //!
-//! commands! {
-//!     pub struct Bot = [echo];
-//! }
+//! #[app(handlers(echo))]
+//! pub struct Bot;
 //! ```
 
 mod autocomplete;
@@ -30,6 +30,7 @@ mod option;
 #[cfg(feature = "rest")]
 mod platform;
 mod response;
+mod route;
 mod set;
 mod theme;
 mod view;
@@ -45,278 +46,7 @@ pub use option::*;
 #[cfg(feature = "rest")]
 pub use platform::*;
 pub use response::*;
+pub use route::*;
 pub use set::*;
 pub use theme::*;
 pub use view::*;
-
-/// Declares a Command Set: a unit struct that dispatches to the listed Commands and Groups (and
-/// optionally Component and Modal Handlers) and yields their Definitions for Sync.
-///
-/// ```ignore
-/// commands! {
-///     /// Everything the bot serves
-///     pub struct Bot = [ping, echo, Admin];
-///     components = [counter_click];
-///     modals = [on_feedback];
-///     views = [Card];
-///     theme = THEME;
-///     events = MyEvents;
-/// }
-/// ```
-///
-/// The struct implements [`InteractionHandler`] for every State its Commands accept; an
-/// Interaction for a Command not in the set is answered with an "Unknown command" message.
-/// Autocomplete goes to the invoked Command's Autocomplete Handler for the focused Option.
-/// Message responses and errors are styled with `theme` (a [`Theme`] constant), if set.
-/// Webhook Events go to `events` (a unit struct implementing [`EventHandler`]), or are ignored.
-/// Components and modals are routed by the `custom_id` prefix, to the handlers and to the inline
-/// handlers of `views` (`#[view]`s with handlers, including every one another listed View
-/// places); unmatched ones get a "not handled" message. Two Commands with the same name and type, two handlers with the same
-/// prefix, or more Commands than Discord allows in one Scope fail to compile.
-/// `Bot.with_fallback(handler)` sends components, modals, autocomplete, and unknown commands to
-/// `handler` instead.
-#[macro_export]
-macro_rules! commands {
-    (
-        $(#[$attr:meta])* $vis:vis struct $name:ident = [$($command:path),* $(,)?];
-        $(components = [$($component:path),* $(,)?];)?
-        $(modals = [$($modal:path),* $(,)?];)?
-        $(views = [$($view:path),* $(,)?];)?
-        $(theme = $theme:expr;)?
-        $(events = $events:path;)?
-    ) => {
-        $(#[$attr])*
-        #[derive(Debug, Clone, Copy, Default)]
-        $vis struct $name;
-
-        const _: () = $crate::command::check_commands(&[$((
-            <$command as $crate::command::CommandDefinition>::NAME,
-            <$command as $crate::command::CommandDefinition>::KIND,
-            <$command as $crate::command::CommandDefinition>::SCOPE,
-        )),*]);
-
-        const _: () = $crate::command::check_prefixes(&[$($(
-            <$component as $crate::command::ComponentDefinition>::PREFIX,
-        )*)? $($(
-            <$view as $crate::command::ViewDefinition>::INFO.prefix,
-        )*)?]);
-        const _: () = $crate::command::check_prefixes(&[$($(
-            <$modal as $crate::command::ModalDefinition>::PREFIX,
-        )*)? $($(
-            <$view as $crate::command::ViewDefinition>::INFO.prefix,
-        )*)?]);
-        const _: () = $crate::command::check_views(&[$($(
-            <$view as $crate::command::ViewDefinition>::INFO,
-        )*)?]);
-
-        impl $name {
-            /// Sends components, modals, autocomplete, and commands not in this set to `fallback`
-            pub fn with_fallback<F>(self, fallback: F) -> $crate::command::WithFallback<Self, F> {
-                $crate::command::WithFallback::new(self, fallback)
-            }
-        }
-
-        impl<S: ::core::marker::Sync> $crate::command::CommandSet<S> for $name
-        where
-            $($command: $crate::command::Command<S>,)*
-            $($($component: $crate::command::ComponentHandler<S>,)*)?
-            $($($modal: $crate::command::ModalHandler<S>,)*)?
-            $($($view: $crate::command::ViewHandler<S>,)*)?
-        {
-            $(
-                const THEME: ::core::option::Option<&'static $crate::command::Theme> =
-                    ::core::option::Option::Some(&$theme);
-            )?
-
-            async fn dispatch(
-                &self,
-                interaction: &::std::sync::Arc<$crate::types::ApplicationCommandInteraction>,
-                state: &S,
-            ) -> ::core::option::Option<
-                ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
-            > {
-                let data = &interaction.data;
-                $(
-                    if data.name == <$command as $crate::command::CommandDefinition>::NAME
-                        && data.t == <$command as $crate::command::CommandDefinition>::KIND
-                    {
-                        return ::core::option::Option::Some(
-                            <$command as $crate::command::Command<S>>::invoke(
-                                $crate::command::Invocation::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
-                            )
-                            .await,
-                        );
-                    }
-                )*
-                ::core::option::Option::None
-            }
-
-            async fn dispatch_autocomplete(
-                &self,
-                interaction: &::std::sync::Arc<$crate::types::ApplicationCommandInteraction>,
-                state: &S,
-            ) -> ::core::option::Option<
-                ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
-            > {
-                let data = &interaction.data;
-                $(
-                    if data.name == <$command as $crate::command::CommandDefinition>::NAME
-                        && data.t == <$command as $crate::command::CommandDefinition>::KIND
-                    {
-                        return <$command as $crate::command::Command<S>>::autocomplete(
-                            $crate::command::Invocation::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
-                        )
-                        .await;
-                    }
-                )*
-                ::core::option::Option::None
-            }
-
-            #[allow(unused_variables)]
-            async fn dispatch_component(
-                &self,
-                interaction: &::std::sync::Arc<$crate::types::MessageComponentInteraction>,
-                state: &S,
-            ) -> ::core::option::Option<
-                ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
-            > {
-                let (prefix, fields) = $crate::command::custom_id::split(&interaction.data.custom_id);
-                $($(
-                    if prefix == <$component as $crate::command::ComponentDefinition>::PREFIX {
-                        return ::core::option::Option::Some(
-                            <$component as $crate::command::ComponentHandler<S>>::invoke(
-                                $crate::command::Ctx::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
-                                fields,
-                            )
-                            .await,
-                        );
-                    }
-                )*)?
-                $($(
-                    if prefix == <$view as $crate::command::ViewDefinition>::INFO.prefix {
-                        return <$view as $crate::command::ViewHandler<S>>::component(
-                            $crate::command::Ctx::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
-                            fields,
-                        )
-                        .await;
-                    }
-                )*)?
-                ::core::option::Option::None
-            }
-
-            #[allow(unused_variables)]
-            async fn dispatch_modal(
-                &self,
-                interaction: &::std::sync::Arc<$crate::types::ModalSubmitInteraction>,
-                state: &S,
-            ) -> ::core::option::Option<
-                ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError>,
-            > {
-                let (prefix, fields) = $crate::command::custom_id::split(&interaction.data.custom_id);
-                $($(
-                    if prefix == <$modal as $crate::command::ModalDefinition>::PREFIX {
-                        return ::core::option::Option::Some(
-                            <$modal as $crate::command::ModalHandler<S>>::invoke(
-                                $crate::command::Ctx::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
-                                fields,
-                            )
-                            .await,
-                        );
-                    }
-                )*)?
-                $($(
-                    if prefix == <$view as $crate::command::ViewDefinition>::INFO.prefix {
-                        return <$view as $crate::command::ViewHandler<S>>::modal(
-                            $crate::command::Ctx::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
-                            fields,
-                        )
-                        .await;
-                    }
-                )*)?
-                ::core::option::Option::None
-            }
-        }
-
-        impl<S: ::core::marker::Sync> $crate::command::InteractionHandler<S> for $name
-        where
-            $name: $crate::command::CommandSet<S>,
-        {
-            fn theme(&self) -> ::core::option::Option<&'static $crate::command::Theme> {
-                <Self as $crate::command::CommandSet<S>>::THEME
-            }
-
-            async fn command(
-                &self,
-                command: $crate::types::ApplicationCommandInteraction,
-                state: &S,
-            ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
-                let command = ::std::sync::Arc::new(command);
-                match $crate::command::CommandSet::dispatch(self, &command, state).await {
-                    ::core::option::Option::Some(result) => result,
-                    ::core::option::Option::None => ::core::result::Result::Err(
-                        $crate::command::HandlerError::unknown_command(&command.data.name),
-                    ),
-                }
-            }
-
-            async fn autocomplete(
-                &self,
-                autocomplete: $crate::types::ApplicationCommandInteraction,
-                state: &S,
-            ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
-                let autocomplete = ::std::sync::Arc::new(autocomplete);
-                match $crate::command::CommandSet::dispatch_autocomplete(self, &autocomplete, state).await {
-                    ::core::option::Option::Some(result) => result,
-                    ::core::option::Option::None => {
-                        $crate::command::InteractionHandler::<S>::autocomplete(
-                            &$crate::command::NoHandler, $crate::command::__unshare(autocomplete), state,
-                        )
-                        .await
-                    }
-                }
-            }
-
-            async fn component(
-                &self,
-                component: $crate::types::MessageComponentInteraction,
-                state: &S,
-            ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
-                let component = ::std::sync::Arc::new(component);
-                match $crate::command::CommandSet::dispatch_component(self, &component, state).await {
-                    ::core::option::Option::Some(result) => result,
-                    ::core::option::Option::None => {
-                        $crate::command::InteractionHandler::<S>::component(
-                            &$crate::command::NoHandler, $crate::command::__unshare(component), state,
-                        )
-                        .await
-                    }
-                }
-            }
-
-            async fn modal_submit(
-                &self,
-                modal: $crate::types::ModalSubmitInteraction,
-                state: &S,
-            ) -> ::core::result::Result<$crate::types::InteractionResponse, $crate::command::HandlerError> {
-                let modal = ::std::sync::Arc::new(modal);
-                match $crate::command::CommandSet::dispatch_modal(self, &modal, state).await {
-                    ::core::option::Option::Some(result) => result,
-                    ::core::option::Option::None => {
-                        $crate::command::InteractionHandler::<S>::modal_submit(
-                            &$crate::command::NoHandler, $crate::command::__unshare(modal), state,
-                        )
-                        .await
-                    }
-                }
-            }
-        }
-
-        $crate::__command_set_events!($name $(, $events)?);
-
-        impl $crate::command::CommandSetDefinition for $name {
-            fn definitions() -> ::std::vec::Vec<$crate::command::ScopedDefinition> {
-                ::std::vec![$($crate::command::ScopedDefinition::of::<$command>()),*]
-            }
-        }
-    };
-}

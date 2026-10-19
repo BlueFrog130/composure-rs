@@ -2,8 +2,9 @@
 
 use crate::types::{Embed, EmbedAuthor, EmbedFooter, InteractionResponse};
 
-/// A bot's colors and branding, set once on the Command Set with `theme = THEME;` in
-/// [`commands!`](crate::commands) and read with `ctx.theme()`.
+/// A bot's colors and branding, set on an App with `#[app(.., theme = THEME)]` and read with
+/// `ctx.theme()`. An App listed in another uses its own Theme, if set, and fills in the rest from
+/// the outer one; errors are rendered with the outermost App's.
 ///
 /// ```
 /// use composure::command::Theme;
@@ -17,7 +18,7 @@ use crate::types::{Embed, EmbedAuthor, EmbedFooter, InteractionResponse};
 /// assert_eq!(saved.color, Some(THEME.success));
 /// ```
 ///
-/// Message responses (and deferred edits) of a themed Command Set are filled in where unset:
+/// Message responses (and deferred edits) of a themed App are filled in where unset:
 /// every embed gets `primary`, the first the author, the last the footer; top-level
 /// [`Container`](crate::types::Container)s get `primary` as accent color. Errors become an
 /// `error`-colored embed. Wrap a response in [`Unthemed`](super::Unthemed) to send it as is.

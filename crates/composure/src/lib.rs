@@ -13,7 +13,7 @@ pub mod types;
 pub use command::Ctx;
 #[cfg(feature = "macros")]
 pub use composure_macros::{
-    Choice, Modal, autocomplete, command, component, group, modal, rsx, view,
+    Choice, Modal, app, autocomplete, command, component, group, modal, rsx, view,
 };
 
 pub trait Mentionable {

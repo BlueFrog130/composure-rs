@@ -1,8 +1,8 @@
 # Composure Sync
 
-Makes Discord's stored command definitions match a Command Set, at deploy time. Requests go through core's `BotClient` (`composure::rest`) over the blocking `reqwest` Transport, driven by `pollster`.
+Makes Discord's stored command definitions match an App's Commands, at deploy time. Requests go through core's `BotClient` (`composure::rest`) over the blocking `reqwest` Transport, driven by `pollster`.
 
-`sync_from_env(&Bot)` makes Discord's commands match a Command Set: it prints a Sync Plan (creates, updates, deletes per target) and applies it after confirmation. Call it from a host-only bin:
+`sync_from_env(&Bot)` makes Discord's commands match an App's: it prints a Sync Plan (creates, updates, deletes per target) and applies it after confirmation. Call it from a host-only bin:
 
 ```rust,ignore
 // src/bin/sync.rs

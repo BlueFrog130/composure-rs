@@ -5,16 +5,16 @@
 
 pub mod notes;
 
-use composure::types::Snowflake;
+use composure::{app, types::Snowflake};
 use composure_adapter_cloudflare::{CloudflareInteractionBot, bot_client};
+use composure_example_bot::{Bot, THEME};
 use notes::Note;
 use tracing::{Instrument, level_filters::LevelFilter};
 use worker::{Context, Env, Request, Response, ScheduleContext, ScheduledEvent, event};
 
-composure_example_bot::example_bot! {
-    /// Every command the bot serves on Workers, synced by `src/bin/sync.rs`
-    pub struct CloudflareBot = [Note];
-}
+/// Every command the bot serves on Workers, synced by `src/bin/sync.rs`
+#[app(handlers(Bot, Note), theme = THEME)]
+pub struct CloudflareBot;
 
 /// Runs once per isolate: logs go to the Workers console as objects Workers Logs indexes, with
 /// the Interaction's id, type, name, guild and user on every line logged while handling it

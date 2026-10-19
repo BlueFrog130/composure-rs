@@ -12,7 +12,7 @@ pub trait ComponentDefinition {
 }
 
 /// Answers clicks and selections on components whose `custom_id` starts with its prefix.
-/// Implemented by `#[component]`; listed in `commands!` under `components = [...]`.
+/// Implemented by `#[component]`; listed in an `#[app]`.
 pub trait ComponentHandler<S>: ComponentDefinition {
     /// `fields` is the `custom_id` after `prefix:`, `None` when there is no `:`
     fn invoke(
@@ -27,7 +27,7 @@ pub trait ModalDefinition {
 }
 
 /// Answers submits of modals whose `custom_id` starts with its prefix. Implemented by
-/// `#[modal]`; listed in `commands!` under `modals = [...]`.
+/// `#[modal]`; listed in an `#[app]`.
 pub trait ModalHandler<S>: ModalDefinition {
     fn invoke(
         ctx: ModalCtx<'_, S>,
@@ -42,21 +42,4 @@ pub fn decode_state<T: DeserializeOwned>(
     fields: Option<&str>,
 ) -> Result<T, HandlerError> {
     custom_id::decode(fields).map_err(|e| HandlerError::new(format!("`{prefix}` {e}")))
-}
-
-/// Compile-time check that no two handlers in one list share a prefix. Used by
-/// [`commands!`](crate::commands).
-#[doc(hidden)]
-pub const fn check_prefixes(prefixes: &[&str]) {
-    let mut i = 0;
-    while i < prefixes.len() {
-        let mut j = i + 1;
-        while j < prefixes.len() {
-            if super::set::str_eq(prefixes[i], prefixes[j]) {
-                panic!("two handlers have the same custom_id prefix");
-            }
-            j += 1;
-        }
-        i += 1;
-    }
 }

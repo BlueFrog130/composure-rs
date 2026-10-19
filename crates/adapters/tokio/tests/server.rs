@@ -8,9 +8,8 @@ use std::{
 };
 
 use composure::{
-    Ctx, command,
+    Ctx, app, command,
     command::{EventCtx, EventHandler, HandlerError},
-    commands,
     types::Snowflake,
 };
 use composure_adapter_tokio::{Host, MAX_BODY, TokioInteractionBot};
@@ -68,10 +67,8 @@ impl EventHandler<Host<Seen>> for Events {
     }
 }
 
-commands! {
-    struct Bot = [ping, boom, slow, seen];
-    events = Events;
-}
+#[app(handlers(ping, boom, slow, seen), events = Events)]
+struct Bot;
 
 struct Server {
     url: String,

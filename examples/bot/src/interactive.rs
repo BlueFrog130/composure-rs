@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use composure::{
-    Choice, Modal, command,
+    Choice, Modal, app, command,
     command::{
         ComponentCtx, DeferredUpdate, Ephemeral, HandlerError, Platform, Update,
         custom_id::CustomIdError,
@@ -166,3 +166,16 @@ pub fn on_feedback(form: FeedbackForm) -> Ephemeral<String> {
         form.screenshots.len(),
     ))
 }
+
+/// Each Command next to the handler for what it sends, listed in [`Bot`](crate::Bot)
+#[app(handlers(
+    counter,
+    counter_click,
+    roll,
+    reroll,
+    colors,
+    pick_colors,
+    feedback,
+    on_feedback
+))]
+pub struct Interactive;

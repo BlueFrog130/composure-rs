@@ -23,7 +23,7 @@ pub enum ErrorKind {
     /// An error meant for the invoking user, shown to them as is
     User,
 
-    /// No Command in the Command Set matches the invoked name and type
+    /// No Command in the App matches the invoked name and type
     UnknownCommand,
 
     /// An Option was missing, of the wrong type, or could not be resolved
