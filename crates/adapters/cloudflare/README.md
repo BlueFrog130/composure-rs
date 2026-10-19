@@ -89,6 +89,25 @@ Workers futures are not `Send`; handlers are dispatched statically, so no `Send`
 
 Sync the Command Set with Discord from a host-only bin; see `examples/cloudflare/` for a complete bot with a `sync` bin.
 
+## Logging
+
+Turn on the `tracing` feature to log through [`tracing`](https://docs.rs/tracing) (it also enables `composure/tracing`) and install the Workers subscriber once per isolate:
+
+```toml
+composure_adapter_cloudflare = { version = "0.1.0", features = ["tracing"] }
+```
+
+```rust,ignore
+#[event(start)]
+fn start() {
+    composure_adapter_cloudflare::tracing::init(); // or init_with_level(LevelFilter::DEBUG)
+}
+```
+
+Every event becomes one `console.error`/`warn`/`log`/`debug` call with an object, so Workers Logs indexes its fields: `level`, `target`, `message`, `spans`, plus the fields of the enclosing spans. Composure's `interaction` span adds `interaction_id`, `interaction_type`, `name` (the command, or the `custom_id` prefix), `guild_id` and `user_id` to everything logged while handling an Interaction, Background Work included; `event` adds `event_type`; `rest` adds `method` and `route` (the template, never the token-bearing URL). Log from handlers with `tracing::info!(..)` and the line carries all of that. `tracing::ConsoleLayer` composes with other `tracing-subscriber` layers.
+
+Handler errors are logged at ERROR, unknown commands and invalid Options at WARN, `HandlerError::user` at DEBUG. Without the feature the adapter writes the same messages straight to the console and nothing else is compiled in; with it the example bot grows by about 96 KB of wasm (about 36 KB of that is Composure's instrumentation, the rest the subscriber).
+
 ## Signature validation
 
 Signatures are checked with Workers' built-in Web Crypto (Ed25519, the default `web-crypto` feature), so no crypto code is compiled into the worker. The public key is parsed and imported once per isolate and reused: about 61 µs per verify of a 1 KB body on workerd, against 84 µs importing it each time and 97-132 µs with dalek (`bench/`).
@@ -111,4 +130,4 @@ opt-level = 3
 
 ## Size and speed
 
-The example bot (`examples/cloudflare`) builds to about 1.16 MB of wasm (344 KB gzipped). Parsing, dispatching and answering an interaction takes a few microseconds and 20-45 small allocations; `examples/cloudflare/tests/perf.rs` measures each path and fails if one allocates more than its budget. `FetchTransport` keeps only the rate limit headers and `content-type` of REST responses (`composure::rest::DISCORD_HEADERS`).
+The example bot (`examples/cloudflare`) builds to about 1.25 MB of wasm (373 KB gzipped) with `tracing`, 1.16 MB (344 KB) without. Parsing, dispatching and answering an interaction takes a few microseconds and 20-45 small allocations; `examples/cloudflare/tests/perf.rs` measures each path and fails if one allocates more than its budget. `FetchTransport` keeps only the rate limit headers and `content-type` of REST responses (`composure::rest::DISCORD_HEADERS`).

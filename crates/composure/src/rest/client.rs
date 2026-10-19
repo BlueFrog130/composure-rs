@@ -2,7 +2,10 @@ use std::{borrow::Cow, fmt::Display, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::File;
+use crate::{
+    trace::{Instrument, Span},
+    types::File,
+};
 
 use super::{
     ApiError, Error, Method, RateLimited, RawResponse, Request, Response, Result, Route, Transport,
@@ -124,15 +127,30 @@ impl<T: Transport> Rest<T> {
         let mut attempt = 0;
         loop {
             let response = self.transport.send(request).await?;
+            debug!(status = response.status, "response");
             match response.status {
                 429 => {
                     let limited = rate_limited(&response);
                     if attempt >= MAX_RATE_LIMIT_RETRIES
                         || limited.retry_after > self.max_rate_limit_wait.as_secs_f64()
                     {
+                        warn!(
+                            retry_after = limited.retry_after,
+                            global = limited.global,
+                            bucket = limited.bucket.as_deref(),
+                            attempt,
+                            "rate limited; giving up",
+                        );
                         return Err(Error::RateLimited(limited));
                     }
                     attempt += 1;
+                    debug!(
+                        retry_after = limited.retry_after,
+                        global = limited.global,
+                        bucket = limited.bucket.as_deref(),
+                        attempt,
+                        "rate limited; waiting",
+                    );
                     let wait = Duration::from_secs_f64(limited.retry_after.max(0.0));
                     self.transport.sleep(wait).await;
                 }
@@ -158,7 +176,10 @@ impl<T: Transport> Rest<T> {
         reason: Option<&str>,
     ) -> Result<Response<R>> {
         let request = self.request(route.method, url, body, reason)?;
-        self.send(&request).await.map(Response::new)
+        self.send(&request)
+            .instrument(span(route))
+            .await
+            .map(Response::new)
     }
 
     /// For 204 Endpoints
@@ -170,8 +191,14 @@ impl<T: Transport> Rest<T> {
         reason: Option<&str>,
     ) -> Result<()> {
         let request = self.request(route.method, url, body, reason)?;
-        self.send(&request).await.map(drop)
+        self.send(&request).instrument(span(route)).await.map(drop)
     }
+}
+
+/// The `rest` span: the route template, not the URL (Interaction Endpoints carry the token)
+#[cfg_attr(not(feature = "tracing"), allow(unused_variables))]
+fn span(route: Route) -> Span {
+    debug_span!("rest", method = route.method.as_str(), route = route.path)
 }
 
 /// Audit log reasons are sent URL-encoded so non-ASCII survives the header

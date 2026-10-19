@@ -22,6 +22,7 @@ serde_repr = "0.1.21"
 strum = { version = "0.28.0", features = ["derive"] }
 composure_macros = { path = "../macros", version = "0.1.0", optional = true }
 reqwest = { version = "0.13.5", optional = true, features = ["blocking"] }
+tracing = { version = "0.1.44", default-features = false, features = ["std"], optional = true }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 js-sys = { version = "0.3.106", optional = true }
@@ -81,6 +82,9 @@ rest-application = ["rest"]
 tier1 = ["rest", "rest-commands", "rest-messages", "rest-users", "rest-channels", "rest-guilds", "rest-members", "rest-roles"]
 ## Every Endpoint
 full = ["tier1", "rest-bans", "rest-threads", "rest-invites", "rest-emojis", "rest-stickers", "rest-scheduled-events", "rest-automod", "rest-audit-log", "rest-webhooks", "rest-monetization", "rest-polls", "rest-soundboard", "rest-application"]
+## Spans and events through `tracing` (`interaction`, `background_work`, `event`, `rest`). No
+## subscriber is installed; the Adapter or application chooses one.
+tracing = ["dep:tracing"]
 ## Native blocking Transport for deploy-time tools (not for wasm)
 reqwest = ["rest", "dep:reqwest"]
 

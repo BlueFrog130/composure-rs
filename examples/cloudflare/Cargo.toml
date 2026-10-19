@@ -12,7 +12,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 composure = { path = "../../crates/composure", features = ["macros", "tier1"] }
-composure_adapter_cloudflare = { path = "../../crates/adapters/cloudflare" }
+composure_adapter_cloudflare = { path = "../../crates/adapters/cloudflare", features = ["tracing"] }
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 worker = "0.8.7"
 
 # Sync runs on the host only; keeps the HTTP client out of the worker bundle

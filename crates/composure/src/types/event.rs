@@ -61,9 +61,12 @@ impl EventBody {
             "LOBBY_MESSAGE_DELETE" => data(self).map(Event::LobbyMessageDelete),
             _ => None,
         };
-        event.unwrap_or_else(|| Event::Unknown {
-            kind: self.kind.clone(),
-            data: self.data.clone(),
+        event.unwrap_or_else(|| {
+            debug!(event_type = %self.kind, "unknown event type, or data not matching its model");
+            Event::Unknown {
+                kind: self.kind.clone(),
+                data: self.data.clone(),
+            }
         })
     }
 }

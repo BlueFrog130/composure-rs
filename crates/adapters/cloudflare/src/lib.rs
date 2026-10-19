@@ -1,6 +1,10 @@
 #![doc = include_str!("../README.md")]
 
+#[macro_use]
+mod log;
 mod state;
+#[cfg(feature = "tracing")]
+pub mod tracing;
 mod transport;
 
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
@@ -16,7 +20,7 @@ use serde::Deserialize;
 use state::log_handler_error;
 pub use state::{Worker, bot_client};
 pub use transport::FetchTransport;
-use worker::{Context, Env, Headers, Request, Response, console_error, console_warn};
+use worker::{Context, Env, Headers, Request, Response};
 
 #[derive(Debug)]
 pub enum Error {
@@ -312,7 +316,7 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
         let bytes = match self.req.bytes().await {
             Ok(bytes) => bytes,
             Err(e) => {
-                console_error!("Failed to read body: {}", e);
+                error!("failed to read body: {e}");
                 return Response::error("Bad request", 400);
             }
         };
@@ -320,11 +324,11 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
         let public_key = match public_key(&self.state).await {
             Ok(key) => key,
             Err(Error::WorkerError(e)) => {
-                console_error!("Missing {} secret: {}", PUBLIC_KEY_SECRET, e);
+                error!("missing {PUBLIC_KEY_SECRET} secret: {e}");
                 return Response::error("Internal error", 500);
             }
             Err(Error::ValidationError) => {
-                console_error!("{} is not a valid public key", PUBLIC_KEY_SECRET);
+                error!("{PUBLIC_KEY_SECRET} is not a valid public key");
                 return Response::error("Validation failed", 401);
             }
         };
@@ -344,11 +348,11 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
             .await;
             return match outcome {
                 EventOutcome::Unauthorized => {
-                    console_warn!("Event validation failed");
+                    warn!("event signature validation failed");
                     Response::error("Validation failed", 401)
                 }
                 EventOutcome::BadRequest(e) => {
-                    console_error!("Failed to parse event: {}", e);
+                    error!("failed to parse event: {e}");
                     Response::error("Bad request", 400)
                 }
                 EventOutcome::Acknowledged => {
@@ -371,11 +375,11 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
 
         match outcome {
             InteractionOutcome::Unauthorized => {
-                console_warn!("Validation failed");
+                warn!("interaction signature validation failed");
                 Response::error("Validation failed", 401)
             }
             InteractionOutcome::BadRequest(e) => {
-                console_error!("Failed to parse interaction: {}", e);
+                error!("failed to parse interaction: {e}");
                 Response::error("Bad request", 400)
             }
             InteractionOutcome::Respond(response) => reply(&bytes, &response).await,
@@ -394,13 +398,13 @@ async fn reply(body: &[u8], response: &InteractionResponse) -> worker::Result<Re
         return Response::from_json(response);
     }
     let Some(client) = callback_client(body) else {
-        console_error!("Interaction without id, application_id, or token");
+        error!("interaction without id, application_id, or token");
         return Response::error("Bad request", 400);
     };
     match client.create_response(response, response.files()).await {
         Ok(()) => Ok(Response::empty()?.with_status(202)),
         Err(e) => {
-            console_error!("Failed to send response with files: {}", e);
+            error!("failed to send response with files: {e}");
             Response::error("Internal error", 500)
         }
     }

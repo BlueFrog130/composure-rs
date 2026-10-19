@@ -122,6 +122,8 @@ pub fn report(ctx: Ctx<impl Platform>) -> Ephemeral<Deferred> {
             };
             csv.push_str(&format!("{name},{kind}\n"));
         }
+        // Background Work stays in the Interaction's span: this line has its id, user, ...
+        tracing::info!(count = commands.len(), "exported global commands");
         // Files in a deferred result go out with the edit as multipart
         Ok::<_, HandlerError>(
             InteractionResponse::respond_with_message(format!(

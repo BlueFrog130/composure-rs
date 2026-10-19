@@ -11,6 +11,7 @@ use crate::{
 };
 
 use super::{CommandOutput, Ctx, HandlerError, IntoResponse, Theme};
+use crate::trace::Instrument;
 
 /// Background Work handed to the Adapter: runs after the response is sent; an `Err` is logged
 pub type BackgroundWork = Pin<Box<dyn Future<Output = Result<(), HandlerError>>>>;
@@ -108,7 +109,10 @@ impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
         };
         let client = ctx.client();
         let output = work(ctx);
-        self.state().spawn(Box::pin(async move {
+        // A child of the `interaction` span; entered while spawning so Adapters that instrument
+        // `spawn` with the current span pick it up too
+        let span = info_span!("background_work");
+        let work = async move {
             let (mut response, error) = match output.await.into_result() {
                 Ok(response) => (response, None),
                 Err(error) => (error.response_with(theme), Some(error)),
@@ -131,7 +135,9 @@ impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
                     .map_err(HandlerError::new)?;
             }
             error.map_or(Ok(()), Err)
-        }));
+        }
+        .instrument(span.clone());
+        span.in_scope(|| self.state().spawn(Box::pin(work)));
     }
 }
 
@@ -170,6 +176,7 @@ async fn edit_original<T: Transport>(
     for attempt in 1.. {
         match client.edit_original(message).await {
             Err(Error::Api(error)) if error.status == 404 && attempt < ATTEMPTS => {
+                debug!(attempt, "original response not found yet; retrying");
                 client
                     .transport()
                     .sleep(Duration::from_millis(250 * u64::from(attempt)))

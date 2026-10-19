@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::trace::{Instrument, Span};
 use crate::types::{
     ApplicationCommandInteraction, Interaction, InteractionResponse, MessageComponentInteraction,
     ModalSubmitInteraction,
@@ -73,11 +74,56 @@ pub async fn dispatch<S, H: InteractionHandler<S>>(
     handler: &H,
     state: &S,
 ) -> Result<InteractionResponse, HandlerError> {
-    let mut response = route(interaction, handler, state).await?;
-    if let Some(theme) = handler.theme() {
-        theme.apply(&mut response);
+    let span = span(&interaction);
+    async move {
+        let mut response = route(interaction, handler, state).await?;
+        if let Some(theme) = handler.theme() {
+            theme.apply(&mut response);
+        }
+        Ok(response)
     }
-    Ok(response)
+    .instrument(span)
+    .await
+}
+
+/// The `interaction` span: what was invoked, where, by whom. Components and modals record their
+/// `custom_id` prefix only; the rest is state.
+#[cfg(feature = "tracing")]
+fn span(interaction: &Interaction) -> Span {
+    let (kind, common, name) = match interaction {
+        Interaction::Ping(ping) => ("ping", &ping.common, None),
+        Interaction::ApplicationCommand(command) => {
+            ("command", &command.common, Some(command.data.name.as_str()))
+        }
+        Interaction::ApplicationCommandAutocomplete(autocomplete) => (
+            "autocomplete",
+            &autocomplete.common,
+            Some(autocomplete.data.name.as_str()),
+        ),
+        Interaction::MessageComponent(component) => (
+            "component",
+            &component.common,
+            Some(super::custom_id::split(&component.data.custom_id).0),
+        ),
+        Interaction::ModalSubmit(modal) => (
+            "modal_submit",
+            &modal.common,
+            Some(super::custom_id::split(&modal.data.custom_id).0),
+        ),
+    };
+    info_span!(
+        "interaction",
+        interaction_id = %common.id,
+        interaction_type = kind,
+        name,
+        guild_id = common.guild_id.as_ref().map(tracing::field::display),
+        user_id = common.invoking_user().map(|user| tracing::field::display(&user.id)),
+    )
+}
+
+#[cfg(not(feature = "tracing"))]
+fn span(_interaction: &Interaction) -> Span {
+    Span
 }
 
 async fn route<S, H: InteractionHandler<S>>(

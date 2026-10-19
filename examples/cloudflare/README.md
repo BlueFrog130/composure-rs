@@ -43,6 +43,8 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 |---|---|
 | `APPLICATION_AUTHORIZED` | A user install gets a welcome DM, sent after the 204 with `EventCtx::bot()` |
 
+[`src/lib.rs`](src/lib.rs) `start` installs the adapter's `tracing` subscriber (feature `tracing`): `tracing::info!` in `/report`'s Background Work and the install welcome logs with the Interaction's or event's span fields, viewable with `npx wrangler tail` or in Workers Logs.
+
 [`src/lib.rs`](src/lib.rs) `scheduled`: a cron trigger (`triggers.crons` in `wrangler.jsonc`) posts a daily heartbeat to the `STATUS_CHANNEL_ID` var's channel with `bot_client(&env)`; it needs the `DISCORD_APPLICATION_ID` var.
 
 ## Prerequisites

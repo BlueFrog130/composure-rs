@@ -17,6 +17,11 @@
     // "STATUS_CHANNEL_ID": "<channel id>" enables the daily heartbeat
   },
 
+  // Workers Logs: stores and indexes what the tracing subscriber logs (see src/lib.rs start)
+  "observability": {
+    "enabled": true
+  },
+
   // Runs the scheduled() handler daily at 09:00 UTC
   "triggers": {
     "crons": ["0 9 * * *"]

@@ -19,9 +19,7 @@ use composure::{command::Theme, commands, types::Snowflake};
 use composure_adapter_cloudflare::{CloudflareInteractionBot, bot_client};
 pub use events::*;
 pub use interactive::*;
-use worker::{
-    Context, Env, Request, Response, ScheduleContext, ScheduledEvent, console_error, event,
-};
+use worker::{Context, Env, Request, Response, ScheduleContext, ScheduledEvent, event};
 
 /// Colors and branding filled into every embed the bot answers with, errors included
 pub const THEME: Theme = Theme::new()
@@ -39,6 +37,13 @@ commands! {
     modals = [on_feedback];
     theme = THEME;
     events = Events;
+}
+
+/// Runs once per isolate: logs go to the Workers console as objects Workers Logs indexes, with
+/// the Interaction's id, type, name, guild and user on every line logged while handling it
+#[event(start)]
+fn start() {
+    composure_adapter_cloudflare::tracing::init();
 }
 
 #[event(fetch)]
@@ -60,6 +65,7 @@ async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
     else {
         return;
     };
+    let _span = tracing::info_span!("heartbeat", cron = event.cron()).entered();
     let result = match bot_client(&env) {
         Ok(bot) => bot
             .send_message(channel, &format!("Still running (`{}`)", event.cron()))
@@ -68,7 +74,8 @@ async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
             .map_err(|e| e.to_string()),
         Err(e) => Err(e.to_string()),
     };
-    if let Err(e) = result {
-        console_error!("Heartbeat failed: {}", e);
+    match result {
+        Ok(()) => tracing::info!(%channel, "heartbeat sent"),
+        Err(error) => tracing::error!(%error, "heartbeat failed"),
     }
 }

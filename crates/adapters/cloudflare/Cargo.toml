@@ -18,12 +18,17 @@ composure = { path = "../../composure", version = "0.1.0", features = ["rest"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 futures = { version = "0.3.34", default-features = false }
+tracing = { version = "0.1.44", default-features = false, features = ["std"], optional = true }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["registry", "std"], optional = true }
 
 [features]
 default = ["web-crypto"]
 ## Validate requests with Workers' Web Crypto (Ed25519) instead of ed25519-dalek: faster, smaller
 ## bundle. On by default; without it (`default-features = false`) dalek is compiled in.
 web-crypto = ["composure/web-crypto"]
+## Log through `tracing` (Composure's spans included) and provide a Workers console subscriber,
+## `tracing::init()`. Without it the Adapter logs straight to the console.
+tracing = ["composure/tracing", "dep:tracing", "dep:tracing-subscriber"]
 
 [dev-dependencies]
 composure = { path = "../../composure", features = ["macros", "rest-users"] }

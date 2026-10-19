@@ -5,7 +5,7 @@ use composure::{
     rest::BotClient,
     types::Snowflake,
 };
-use worker::{Context, Env, console_debug, console_error};
+use worker::{Context, Env};
 
 use crate::FetchTransport;
 
@@ -76,11 +76,15 @@ impl Platform for Worker {
     }
 
     fn spawn(&self, work: BackgroundWork) {
-        self.ctx.wait_until(async move {
+        let task = async move {
             if let Err(error) = work.await {
                 log_handler_error(&error);
             }
-        });
+        };
+        // Composure spawns inside the work's span; keep it for the error log too
+        #[cfg(feature = "tracing")]
+        let task = ::tracing::Instrument::in_current_span(task);
+        self.ctx.wait_until(task);
     }
 
     fn bot_token(&self) -> Option<String> {
@@ -92,10 +96,11 @@ impl Platform for Worker {
 }
 
 pub(crate) fn log_handler_error(error: &HandlerError) {
-    // User errors are expected outcomes the user already sees
-    if error.kind() == ErrorKind::User {
-        console_debug!("User error: {}", error);
-    } else {
-        console_error!("Handler error: {}", error);
+    match error.kind() {
+        // Expected outcomes the user already sees
+        ErrorKind::User => debug!("user error: {error}"),
+        // Usually Commands out of sync with Discord
+        ErrorKind::UnknownCommand | ErrorKind::InvalidOption => warn!("{error}"),
+        ErrorKind::Handler => error!("handler failed: {error}"),
     }
 }

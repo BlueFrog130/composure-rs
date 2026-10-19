@@ -189,10 +189,13 @@ pub fn spawn_event<S: super::Platform, H: EventHandler<S> + 'static>(
     application_id: Snowflake,
     body: EventBody,
 ) {
+    use crate::trace::Instrument;
+
     let owned = state.clone();
-    state.spawn(Box::pin(async move {
-        dispatch_event(&handler, &owned, application_id, &body).await
-    }));
+    let span = info_span!("event", event_type = %body.kind);
+    let work = async move { dispatch_event(&handler, &owned, application_id, &body).await }
+        .instrument(span.clone());
+    span.in_scope(|| state.spawn(Box::pin(work)));
 }
 
 /// Implements [`EventHandler`] for a Command Set: delegating to `$events`, or ignoring every

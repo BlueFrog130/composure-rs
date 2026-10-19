@@ -1,3 +1,6 @@
+#[macro_use]
+mod trace;
+
 pub mod auth;
 pub mod command;
 pub mod definition;
