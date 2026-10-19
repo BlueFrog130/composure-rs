@@ -200,7 +200,7 @@ fn card_message() -> Value {
                 "url": "https://discord.com/developers/docs/components/reference" } },
             { "type": 14, "id": 6, "divider": true, "spacing": 1 },
             { "type": 10, "id": 7, "content": "-# 2 likes" },
-            { "type": 1, "id": 8, "components": [button("Like", "like:2", 9)] },
+            { "type": 1, "id": 8, "components": [button("Like", "card:like:2", 9), button("Review", "card:review:2", 10)] },
         ] }]),
     )
 }
@@ -280,8 +280,8 @@ fn cases() -> Vec<Case> {
             32,
         ),
         case(
-            "button like (V2 card message)",
-            click("like:2", 2, None, card_message()),
+            "button like (V2 card View)",
+            click("card:like:2", 2, None, card_message()),
             |r| {
                 assert_eq!(r["type"], 7);
                 assert_eq!(
@@ -289,7 +289,16 @@ fn cases() -> Vec<Case> {
                     "-# 3 likes"
                 );
             },
-            40,
+            46,
+        ),
+        case(
+            "button review (opens a modal View)",
+            click("card:review:2", 2, None, card_message()),
+            |r| {
+                assert_eq!(r["type"], 9);
+                assert_eq!(r["data"]["custom_id"], "review:send:2");
+            },
+            45,
         ),
         case(
             "button roll (deferred update)",

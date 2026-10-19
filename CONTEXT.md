@@ -102,6 +102,14 @@ Code answering a modal submit routed by `custom_id` prefix, receiving the submit
 A typed form shown to the user and read back on submit (`#[derive(Modal)]`): labeled text inputs, selects, radio and checkbox groups, checkboxes, and file uploads.
 _Avoid_: Form (alone), dialog
 
+**View**:
+A reusable piece of message or modal layout, defined as a pure function of its Props; the components it renders and the handlers for their events derive from it. Re-rendering means answering an Interaction with the View rendered from new Props.
+_Avoid_: Template, widget, component (that word is Discord's)
+
+**Props**:
+The inputs a View renders from; the only state its inline handlers see, carried between Interactions as Custom ID State.
+_Avoid_: Signal, store
+
 **Custom ID State**:
 Values a Component or Modal Handler needs, carried in the `custom_id` after its prefix instead of stored anywhere.
 _Avoid_: Session, payload

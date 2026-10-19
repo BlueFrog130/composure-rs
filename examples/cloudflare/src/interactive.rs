@@ -1,5 +1,5 @@
 //! Components and modals: `#[component]` / `#[modal]` handlers routed by `custom_id` prefix, with
-//! their state carried in the `custom_id` itself. `card` lays out a Components V2 message.
+//! their state carried in the `custom_id` itself. [`views`](crate::views) does the same with markup.
 
 use std::time::Duration;
 
@@ -11,8 +11,7 @@ use composure::{
     },
     component, modal,
     types::{
-        Attachment, ButtonComponent, ButtonStyle, Component, Container, InteractionResponse,
-        MessageCallbackData, SelectOption,
+        Attachment, ButtonStyle, Component, InteractionResponse, MessageCallbackData, SelectOption,
     },
 };
 
@@ -73,41 +72,6 @@ fn dice_message(content: &str, rolls: u32) -> Result<MessageCallbackData, Custom
         )])]),
         ..Default::default()
     })
-}
-
-/// A Components V2 card: a container (accent color from the theme) instead of content and embeds
-#[command]
-pub fn card() -> Result<Container, CustomIdError> {
-    card_container(0)
-}
-
-/// Updates the card in place; the like count lives in the custom_id
-#[component("like")]
-pub fn like(likes: u32) -> Result<Update<Container>, CustomIdError> {
-    Ok(Update(card_container(likes + 1)?))
-}
-
-fn card_container(likes: u32) -> Result<Container, CustomIdError> {
-    let docs = ButtonComponent::new(
-        ButtonStyle::Link,
-        Some("Docs".to_string()),
-        None,
-        None,
-        Some("https://discord.com/developers/docs/components/reference".to_string()),
-        None,
-    );
-    Ok(Container::new(vec![
-        Component::section(
-            vec![
-                Component::text("## Components V2"),
-                Component::text("Sections, separators, galleries and files in a container."),
-            ],
-            docs.into(),
-        ),
-        Component::separator(),
-        Component::text(format!("-# {likes} likes")),
-        Component::row(vec![button("Like", like::custom_id(likes)?)]),
-    ]))
 }
 
 fn button(label: &str, custom_id: String) -> Component {

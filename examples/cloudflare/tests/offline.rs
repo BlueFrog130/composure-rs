@@ -462,14 +462,70 @@ fn components_v2_card_is_themed_and_updates_in_place() {
     assert_eq!(container["components"][2]["content"], "-# 0 likes");
     assert_eq!(
         container["components"][3]["components"][0]["custom_id"],
-        "like:0"
+        "card:like:0"
     );
 
-    let (_, response) = send(&Bot, click("like:2", &[]));
+    let (_, response) = send(&Bot, click("card:like:2", &[]));
     assert_eq!(response["type"], 7);
     let container = &response["data"]["components"][0];
     assert_eq!(container["components"][2]["content"], "-# 3 likes");
     assert_eq!(container["accent_color"], THEME.primary);
+    assert_eq!(
+        container["components"][3]["components"][1]["custom_id"],
+        "card:review:3"
+    );
+}
+
+#[test]
+fn view_opens_a_modal_view_and_reads_its_fields() {
+    let (_, response) = send(&Bot, click("card:review:3", &[]));
+    assert_eq!(response["type"], 9);
+    let data = &response["data"];
+    assert_eq!(data["custom_id"], "review:send:3");
+    assert_eq!(
+        data["components"][0]["component"]["options"][1]["label"],
+        "★★"
+    );
+    assert_eq!(data["components"][1]["component"]["required"], false);
+
+    let label = |child: Value| json!({ "type": 18, "id": 1, "component": child });
+    let submit = json!({
+        "id": "1", "application_id": "1", "type": 5, "token": "t", "version": 1,
+        "data": { "custom_id": "review:send:3", "components": [
+            label(json!({ "type": 21, "custom_id": "stars", "value": "Three" })),
+            label(json!({ "type": 4, "custom_id": "comment", "value": "neat" })),
+        ] },
+    });
+    let (_, response) = send(&Bot, submit);
+    assert_eq!(
+        response["data"]["content"],
+        "★★★ for a card with 3 likes: neat"
+    );
+    assert_eq!(response["data"]["flags"], 64);
+}
+
+#[test]
+fn view_handler_defers_and_rerenders_later() {
+    let env = TestEnv::default();
+    let (_, response, _) = send_with(&Bot, &env, click("dice:roll:2", &[]));
+    assert_eq!(response, json!({ "type": 6 }));
+
+    env.run_background().unwrap();
+    let sent = env.sent();
+    assert_eq!((sent[0].0, sent[0].1.as_str()), (Method::Patch, ORIGINAL));
+    let body: Value = serde_json::from_str(&sent[0].3).unwrap();
+    assert_eq!(body["flags"], 1 << 15, "{body}");
+    assert!(
+        body["components"][0]["content"]
+            .as_str()
+            .unwrap()
+            .ends_with("(3 rolls)"),
+        "{body}"
+    );
+    assert_eq!(
+        body["components"][1]["components"][0]["custom_id"],
+        "dice:roll:3"
+    );
 }
 
 #[test]
@@ -690,6 +746,7 @@ fn definitions_for_sync() {
             (None, json!("colors"), json!(1)),
             (None, json!("feedback"), json!(1)),
             (None, json!("card"), json!(1)),
+            (None, json!("dice"), json!(1)),
         ]
     );
 }

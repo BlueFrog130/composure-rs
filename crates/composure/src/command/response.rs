@@ -5,8 +5,14 @@ use crate::types::{Container, Embed, InteractionResponse, MessageFlags};
 use super::HandlerError;
 
 /// A value a Command can answer with
-pub trait IntoResponse {
+pub trait IntoResponse: Sized {
     fn into_response(self) -> InteractionResponse;
+
+    /// The Response, or why it could not be built (a [`View`](super::View) whose `custom_id`
+    /// state is too long); what handlers answer with
+    fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
+        Ok(self.into_response())
+    }
 }
 
 impl IntoResponse for InteractionResponse {
@@ -46,7 +52,12 @@ pub struct Ephemeral<T>(pub T);
 
 impl<T: IntoResponse> IntoResponse for Ephemeral<T> {
     fn into_response(self) -> InteractionResponse {
-        let mut response = self.0.into_response();
+        self.try_into_response()
+            .unwrap_or_else(|error| error.response())
+    }
+
+    fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
+        let mut response = self.0.try_into_response()?;
         match &mut response {
             InteractionResponse::ChannelMessageWithSource(data)
             | InteractionResponse::UpdateMessage(data) => {
@@ -57,7 +68,7 @@ impl<T: IntoResponse> IntoResponse for Ephemeral<T> {
             }
             _ => {}
         }
-        response
+        Ok(response)
     }
 }
 
@@ -68,7 +79,12 @@ pub struct Update<T>(pub T);
 
 impl<T: IntoResponse> IntoResponse for Update<T> {
     fn into_response(self) -> InteractionResponse {
-        match self.0.into_response() {
+        self.try_into_response()
+            .unwrap_or_else(|error| error.response())
+    }
+
+    fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
+        Ok(match self.0.try_into_response()? {
             InteractionResponse::ChannelMessageWithSource(data) => {
                 InteractionResponse::UpdateMessage(data)
             }
@@ -76,7 +92,7 @@ impl<T: IntoResponse> IntoResponse for Update<T> {
                 InteractionResponse::DeferredUpdateMessage
             }
             other => other,
-        }
+        })
     }
 }
 
@@ -87,11 +103,16 @@ pub struct Unthemed<T>(pub T);
 
 impl<T: IntoResponse> IntoResponse for Unthemed<T> {
     fn into_response(self) -> InteractionResponse {
-        let mut response = self.0.into_response();
+        self.try_into_response()
+            .unwrap_or_else(|error| error.response())
+    }
+
+    fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
+        let mut response = self.0.try_into_response()?;
         if let Some(data) = response.message_data_mut() {
             data.unthemed = true;
         }
-        response
+        Ok(response)
     }
 }
 
@@ -105,14 +126,13 @@ pub trait CommandOutput {
 
 impl<T: IntoResponse> CommandOutput for T {
     fn into_result(self) -> Result<InteractionResponse, HandlerError> {
-        Ok(self.into_response())
+        self.try_into_response()
     }
 }
 
 impl<T: IntoResponse, E: Display + 'static> CommandOutput for Result<T, E> {
     fn into_result(self) -> Result<InteractionResponse, HandlerError> {
-        self.map(IntoResponse::into_response)
-            .map_err(into_handler_error)
+        self.map_err(into_handler_error)?.try_into_response()
     }
 }
 

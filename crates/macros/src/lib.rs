@@ -1,5 +1,5 @@
 //! Macros for defining Composure Commands and handlers. Use them through `composure` with the
-//! `macros` feature: `composure::{command, group, component, modal, Choice, Modal}`.
+//! `macros` feature: `composure::{command, group, component, modal, view, rsx, Choice, Modal}`.
 
 use proc_macro::TokenStream;
 
@@ -10,6 +10,7 @@ mod group;
 mod handler;
 mod meta;
 mod modal;
+mod view;
 
 /// Defines a Command from a function. Parameters after an optional leading `ctx: Ctx` become
 /// Options; the doc comment becomes the description.
@@ -197,6 +198,74 @@ pub fn autocomplete(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Choice, attributes(choice))]
 pub fn derive_choice(item: TokenStream) -> TokenStream {
     choice::expand(item.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// Markup for a message or modal layout, as JSX: built-in tags are Discord's components
+/// (`<Container>`, `<Section>`, `<Text>`, `<Thumbnail>`, `<Gallery>`/`<Item>`, `<File>`,
+/// `<Separator>`, `<Row>`, `<Button>`, `<StringSelect>`/`<Option>`, `<UserSelect>`, ...; in a
+/// `<Modal>`: `<Label>`, `<TextInput>`, `<RadioGroup>`, `<CheckboxGroup>`, `<Checkbox>`,
+/// `<FileUpload>`), PascalCase tags are `#[view]`s. Evaluates to a `View`, or a `ModalView` for a
+/// `<Modal>` root.
+///
+/// ```ignore
+/// rsx! {
+///     <Container accent_color=0x5865F2>
+///         "## " {title.as_str()}
+///         <Section>
+///             "Adjacent text and `{..}` join into one text display"
+///             <Thumbnail url=avatar/>
+///         </Section>
+///         <Row>
+///             <Button primary on:click=vote(poll, true)>"Up"</Button>
+///             <Button url="https://discord.com">"Docs"</Button>
+///         </Row>
+///     </Container>
+/// }
+/// ```
+///
+/// Attributes set the component's fields (`accent_color`, `spoiler`, `disabled`, `id`, ...);
+/// a bare attribute is `true`. `{..}` children are text, components, Views, Props, or `Option`s,
+/// `Vec`s and iterators of them. `on:click=handler(state..)` / `on:select=..` / `on:submit=..`
+/// point at a `#[component]` or `#[modal]` handler; inline handlers (`on:click:name=|ctx| ..`)
+/// need the markup to be in a `#[view]`. A `<Section>`'s `<Button>` or `<Thumbnail>` child is
+/// its accessory. Wrap attribute values that use `<..>` in braces.
+#[proc_macro]
+pub fn rsx(input: TokenStream) -> TokenStream {
+    view::expand_macro(input.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// Defines a View: a layout rendered from its Props (the parameters, owned values), whose
+/// `rsx!`s may hold inline handlers.
+///
+/// ```ignore
+/// #[view]
+/// pub fn Counter(count: u32, #[prop(default = 1)] step: u32, note: Option<String>) -> View {
+///     rsx! {
+///         <Text>"Clicked " {count} " times"</Text>
+///         <Row>
+///             <Button primary on:click:add=move |_| Counter { count: count + step, step, note }>
+///                 "+" {step}
+///             </Button>
+///         </Row>
+///     }
+/// }
+/// ```
+///
+/// Adds a same-named Props struct: return it (or the View) from a Command to send the View, from
+/// an inline handler to re-render the message, or place it in markup as `<Counter count=0/>`
+/// (`Option` and `#[prop(default = ..)]` Props may be left out; a `children: View` Prop takes the
+/// tag's children). An inline handler `on:click:name=move |ctx| ..` (`on:select:name=|ctx,
+/// values: Vec<Choice>| ..`, `on:submit:name=|ctx, field: Type, ..| ..` on a `<Modal>`) becomes a
+/// handler routed by `custom_id` `prefix:name:state`; the Props it names are its state. The
+/// prefix defaults to the name in `snake_case` (`#[view(prefix = "c")]`). List Views with
+/// handlers in `commands!` under `views = [...]`.
+#[proc_macro_attribute]
+pub fn view(args: TokenStream, item: TokenStream) -> TokenStream {
+    view::expand_attr(args.into(), item.into())
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

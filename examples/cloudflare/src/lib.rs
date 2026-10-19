@@ -4,14 +4,15 @@
 //! - [`basics`]: answering with text, embeds, Options, Choices, State, Groups, context menus,
 //!   themed embeds
 //! - [`api`]: REST calls with the bot token, Deferred Responses, follow-ups, file uploads
-//! - [`interactive`]: buttons, select menus, and modals with `#[component]` / `#[modal]`, and a
-//!   Components V2 card
+//! - [`interactive`]: buttons, select menus, and modals with `#[component]` / `#[modal]`
+//! - [`views`]: Components V2 layouts and modals as `rsx!` markup with inline handlers (`#[view]`)
 //! - [`events`]: Webhook Events (app installs)
 
 pub mod api;
 pub mod basics;
 pub mod events;
 pub mod interactive;
+pub mod views;
 
 pub use api::*;
 pub use basics::*;
@@ -19,6 +20,7 @@ use composure::{command::Theme, commands, types::Snowflake};
 use composure_adapter_cloudflare::{CloudflareInteractionBot, bot_client};
 pub use events::*;
 pub use interactive::*;
+pub use views::*;
 use worker::{Context, Env, Request, Response, ScheduleContext, ScheduledEvent, event};
 
 /// Colors and branding filled into every embed the bot answers with, errors included
@@ -31,10 +33,11 @@ commands! {
     pub struct Bot = [
         hello, echo, ice_cream, fruit, greet, Mod, avatar, word_count,
         whoami, remind, countdown, announce, thumbs_up, dm_me, report, command_info, export,
-        counter, roll, colors, feedback, card,
+        counter, roll, colors, feedback, card, dice,
     ];
-    components = [counter_click, reroll, pick_colors, like];
+    components = [counter_click, reroll, pick_colors];
     modals = [on_feedback];
+    views = [Card, Review, Dice];
     theme = THEME;
     events = Events;
 }

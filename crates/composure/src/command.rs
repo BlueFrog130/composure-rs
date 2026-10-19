@@ -32,6 +32,7 @@ mod platform;
 mod response;
 mod set;
 mod theme;
+mod view;
 
 pub use autocomplete::*;
 pub use component::*;
@@ -46,6 +47,7 @@ pub use platform::*;
 pub use response::*;
 pub use set::*;
 pub use theme::*;
+pub use view::*;
 
 /// Declares a Command Set: a unit struct that dispatches to the listed Commands and Groups (and
 /// optionally Component and Modal Handlers) and yields their Definitions for Sync.
@@ -56,6 +58,7 @@ pub use theme::*;
 ///     pub struct Bot = [ping, echo, Admin];
 ///     components = [counter_click];
 ///     modals = [on_feedback];
+///     views = [Card];
 ///     theme = THEME;
 ///     events = MyEvents;
 /// }
@@ -66,8 +69,9 @@ pub use theme::*;
 /// Autocomplete goes to the invoked Command's Autocomplete Handler for the focused Option.
 /// Message responses and errors are styled with `theme` (a [`Theme`] constant), if set.
 /// Webhook Events go to `events` (a unit struct implementing [`EventHandler`]), or are ignored.
-/// Components and modals are routed by the `custom_id` prefix; unmatched ones get a "not
-/// handled" message. Two Commands with the same name and type, two handlers with the same
+/// Components and modals are routed by the `custom_id` prefix, to the handlers and to the inline
+/// handlers of `views` (`#[view]`s with handlers, including every one another listed View
+/// places); unmatched ones get a "not handled" message. Two Commands with the same name and type, two handlers with the same
 /// prefix, or more Commands than Discord allows in one Scope fail to compile.
 /// `Bot.with_fallback(handler)` sends components, modals, autocomplete, and unknown commands to
 /// `handler` instead.
@@ -77,6 +81,7 @@ macro_rules! commands {
         $(#[$attr:meta])* $vis:vis struct $name:ident = [$($command:path),* $(,)?];
         $(components = [$($component:path),* $(,)?];)?
         $(modals = [$($modal:path),* $(,)?];)?
+        $(views = [$($view:path),* $(,)?];)?
         $(theme = $theme:expr;)?
         $(events = $events:path;)?
     ) => {
@@ -92,9 +97,16 @@ macro_rules! commands {
 
         const _: () = $crate::command::check_prefixes(&[$($(
             <$component as $crate::command::ComponentDefinition>::PREFIX,
+        )*)? $($(
+            <$view as $crate::command::ViewDefinition>::INFO.prefix,
         )*)?]);
         const _: () = $crate::command::check_prefixes(&[$($(
             <$modal as $crate::command::ModalDefinition>::PREFIX,
+        )*)? $($(
+            <$view as $crate::command::ViewDefinition>::INFO.prefix,
+        )*)?]);
+        const _: () = $crate::command::check_views(&[$($(
+            <$view as $crate::command::ViewDefinition>::INFO,
         )*)?]);
 
         impl $name {
@@ -109,6 +121,7 @@ macro_rules! commands {
             $($command: $crate::command::Command<S>,)*
             $($($component: $crate::command::ComponentHandler<S>,)*)?
             $($($modal: $crate::command::ModalHandler<S>,)*)?
+            $($($view: $crate::command::ViewHandler<S>,)*)?
         {
             $(
                 const THEME: ::core::option::Option<&'static $crate::command::Theme> =
@@ -179,6 +192,15 @@ macro_rules! commands {
                         );
                     }
                 )*)?
+                $($(
+                    if prefix == <$view as $crate::command::ViewDefinition>::INFO.prefix {
+                        return <$view as $crate::command::ViewHandler<S>>::component(
+                            $crate::command::Ctx::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
+                            fields,
+                        )
+                        .await;
+                    }
+                )*)?
                 ::core::option::Option::None
             }
 
@@ -200,6 +222,15 @@ macro_rules! commands {
                             )
                             .await,
                         );
+                    }
+                )*)?
+                $($(
+                    if prefix == <$view as $crate::command::ViewDefinition>::INFO.prefix {
+                        return <$view as $crate::command::ViewHandler<S>>::modal(
+                            $crate::command::Ctx::new(interaction, state).with_theme(<Self as $crate::command::CommandSet<S>>::THEME),
+                            fields,
+                        )
+                        .await;
                     }
                 )*)?
                 ::core::option::Option::None
