@@ -7,7 +7,6 @@ use composure::{
     group,
     types::{Embed, Message, User},
 };
-use composure_adapter_cloudflare::Worker;
 
 /// Say hello
 #[command(
@@ -77,25 +76,20 @@ pub fn fruit(#[option("Fruit", autocomplete = fruit_names)] name: &str) -> Strin
     format!("You picked {name}")
 }
 
-/// What `/greet` needs from the State: [`Worker`] on Workers, a stand-in in tests
+/// What `/greet` needs from the State: implemented for each Adapter's State in the crate root
+/// (`Worker` reads wrangler.jsonc vars, `Host` the process environment), a stand-in in tests
 pub trait Vars {
     fn var(&self, name: &str) -> Option<String>;
 }
 
-impl Vars for Worker {
-    fn var(&self, name: &str) -> Option<String> {
-        self.env().var(name).ok().map(|var| var.to_string())
-    }
-}
-
-/// Greet with the GREETING var from wrangler.jsonc
+/// Greet with the GREETING var
 #[command]
 pub fn greet(ctx: Ctx<impl Vars>) -> Result<String, HandlerError> {
     let greeting = ctx
         .state()
         .var("GREETING")
         .ok_or_else(|| HandlerError::new("GREETING is not set"))?;
-    Ok(format!("{greeting} from the worker!"))
+    Ok(format!("{greeting} from Composure!"))
 }
 
 /// Ban a member

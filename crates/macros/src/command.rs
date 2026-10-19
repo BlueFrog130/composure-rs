@@ -232,11 +232,9 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             .iter()
             .map(|(_, handler)| quote!(#handler: ::composure::command::Autocomplete<#state>)),
     );
-    let where_clause = if predicates.is_empty() {
-        quote!()
-    } else {
-        quote!(where #(#predicates),*)
-    };
+    // Command futures are `Send`, and they hold the Invocation (so `&State`) across `.await`
+    predicates.push(quote!(#state: ::core::marker::Sync));
+    let where_clause = quote!(where #(#predicates),*);
     let impl_generics = if generic {
         let (impl_generics, _, _) = function.sig.generics.split_for_impl();
         quote!(#impl_generics)

@@ -68,110 +68,115 @@ impl<S: super::Platform> EventCtx<'_, S> {
 /// `commands! { ...; events = MyEvents; }`.
 ///
 /// Events are acknowledged before they are handled, so errors are only logged, and Discord does
-/// not retry them.
-#[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
-pub trait EventHandler<S> {
+/// not retry them. Futures are `Send` so they can run on any thread (ADR 0012).
+pub trait EventHandler<S: Sync>: Sync {
     /// Routes `event` to its method
-    async fn handle(&self, ctx: EventCtx<'_, S>, event: Event) -> Result<(), HandlerError> {
-        match event {
-            Event::ApplicationAuthorized(e) => self.application_authorized(ctx, e).await,
-            Event::ApplicationDeauthorized(e) => self.application_deauthorized(ctx, e).await,
-            Event::EntitlementCreate(e) => self.entitlement_create(ctx, e).await,
-            Event::EntitlementUpdate(e) => self.entitlement_update(ctx, e).await,
-            Event::EntitlementDelete(e) => self.entitlement_delete(ctx, e).await,
-            Event::LobbyMessageCreate(e) => self.lobby_message_create(ctx, e).await,
-            Event::LobbyMessageUpdate(e) => self.lobby_message_update(ctx, e).await,
-            Event::LobbyMessageDelete(e) => self.lobby_message_delete(ctx, e).await,
-            Event::Unknown { kind, data } => self.unknown(ctx, &kind, data.as_deref()).await,
+    fn handle(
+        &self,
+        ctx: EventCtx<'_, S>,
+        event: Event,
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async move {
+            match event {
+                Event::ApplicationAuthorized(e) => self.application_authorized(ctx, e).await,
+                Event::ApplicationDeauthorized(e) => self.application_deauthorized(ctx, e).await,
+                Event::EntitlementCreate(e) => self.entitlement_create(ctx, e).await,
+                Event::EntitlementUpdate(e) => self.entitlement_update(ctx, e).await,
+                Event::EntitlementDelete(e) => self.entitlement_delete(ctx, e).await,
+                Event::LobbyMessageCreate(e) => self.lobby_message_create(ctx, e).await,
+                Event::LobbyMessageUpdate(e) => self.lobby_message_update(ctx, e).await,
+                Event::LobbyMessageDelete(e) => self.lobby_message_delete(ctx, e).await,
+                Event::Unknown { kind, data } => self.unknown(ctx, &kind, data.as_deref()).await,
+            }
         }
     }
 
-    async fn application_authorized(
+    fn application_authorized(
         &self,
         _ctx: EventCtx<'_, S>,
         _event: ApplicationAuthorized,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 
-    async fn application_deauthorized(
+    fn application_deauthorized(
         &self,
         _ctx: EventCtx<'_, S>,
         _event: ApplicationDeauthorized,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 
-    async fn entitlement_create(
+    fn entitlement_create(
         &self,
         _ctx: EventCtx<'_, S>,
         _entitlement: Entitlement,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 
-    async fn entitlement_update(
+    fn entitlement_update(
         &self,
         _ctx: EventCtx<'_, S>,
         _entitlement: Entitlement,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 
-    async fn entitlement_delete(
+    fn entitlement_delete(
         &self,
         _ctx: EventCtx<'_, S>,
         _entitlement: Entitlement,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 
-    async fn lobby_message_create(
+    fn lobby_message_create(
         &self,
         _ctx: EventCtx<'_, S>,
         _message: LobbyMessage,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 
-    async fn lobby_message_update(
+    fn lobby_message_update(
         &self,
         _ctx: EventCtx<'_, S>,
         _message: LobbyMessage,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 
-    async fn lobby_message_delete(
+    fn lobby_message_delete(
         &self,
         _ctx: EventCtx<'_, S>,
         _message: LobbyMessageDelete,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 
     /// Event types without a method (game DMs, quests, ones added later), or whose data did not
     /// match its model; `data` is the raw JSON
-    async fn unknown(
+    fn unknown(
         &self,
         _ctx: EventCtx<'_, S>,
         _kind: &str,
         _data: Option<&RawValue>,
-    ) -> Result<(), HandlerError> {
-        Ok(())
+    ) -> impl Future<Output = Result<(), HandlerError>> + Send {
+        async { Ok(()) }
     }
 }
 
-impl<S> EventHandler<S> for NoHandler {}
+impl<S: Sync> EventHandler<S> for NoHandler {}
 
-impl<S, C: EventHandler<S>, F> EventHandler<S> for WithFallback<C, F> {
+impl<S: Sync, C: EventHandler<S>, F: Sync> EventHandler<S> for WithFallback<C, F> {
     async fn handle(&self, ctx: EventCtx<'_, S>, event: Event) -> Result<(), HandlerError> {
         self.commands().handle(ctx, event).await
     }
 }
 
 /// Parses and handles one event
-pub async fn dispatch_event<S, H: EventHandler<S>>(
+pub async fn dispatch_event<S: Sync, H: EventHandler<S>>(
     handler: &H,
     state: &S,
     application_id: Snowflake,
@@ -183,7 +188,7 @@ pub async fn dispatch_event<S, H: EventHandler<S>>(
 
 /// Hands one event to `handler` as Background Work, so the Adapter can acknowledge it at once
 #[cfg(feature = "rest")]
-pub fn spawn_event<S: super::Platform, H: EventHandler<S> + 'static>(
+pub fn spawn_event<S: super::Platform, H: EventHandler<S> + Send + 'static>(
     handler: H,
     state: &S,
     application_id: Snowflake,
@@ -213,10 +218,10 @@ pub fn spawn_event<S: super::Platform, H: EventHandler<S> + 'static>(
 #[macro_export]
 macro_rules! __command_set_events {
     ($name:ident) => {
-        impl<S> $crate::command::EventHandler<S> for $name {}
+        impl<S: ::core::marker::Sync> $crate::command::EventHandler<S> for $name {}
     };
     ($name:ident, $events:path) => {
-        impl<S> $crate::command::EventHandler<S> for $name
+        impl<S: ::core::marker::Sync> $crate::command::EventHandler<S> for $name
         where
             $events: $crate::command::EventHandler<S>,
         {

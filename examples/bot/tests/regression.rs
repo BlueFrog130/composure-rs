@@ -6,7 +6,7 @@
 mod common;
 
 use common::RegressionBot;
-use composure_adapter_cloudflare::handle_interaction;
+use composure::adapter::handle_interaction;
 use futures::executor::block_on;
 
 #[test]

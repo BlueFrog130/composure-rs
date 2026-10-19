@@ -2290,7 +2290,7 @@ fn view_handler(name: &Ident, prefix: &LitStr, handlers: &[Handler]) -> syn::Res
     );
     let modal = method(&[Event::Submit], quote!(modal), quote!(ModalCtx));
     Ok(quote! {
-        impl #generics #c::ViewHandler<#state> for #name {
+        impl #generics #c::ViewHandler<#state> for #name where #state: ::core::marker::Sync {
             #component
             #modal
         }

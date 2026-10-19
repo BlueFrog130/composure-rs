@@ -1,6 +1,6 @@
 # Composure
 
-Framework for Discord bots that only receive HTTP interactions (no gateway) and run on edge/serverless platforms.
+Framework for Discord bots that only receive HTTP interactions (no gateway) and run on edge/serverless platforms or a hosted server.
 
 ## Language
 
@@ -30,11 +30,11 @@ A Response that only acknowledges the Interaction (Discord shows a loading state
 _Avoid_: Async response, delayed reply
 
 **Platform**:
-What an Adapter's State offers Commands beyond its own resources: a Transport for REST, the bot token, and a way to run Background Work (`Worker` on Cloudflare).
+What an Adapter's State offers Commands beyond its own resources: a Transport for REST, the bot token, and a way to run Background Work (`Worker` on Cloudflare, `Host` on a hosted server).
 _Avoid_: Runtime, environment
 
 **Background Work**:
-Work an Adapter runs after it has answered the platform request (`wait_until` on Cloudflare), bounded by the platform's post-response time limit.
+Work an Adapter runs after it has answered the platform request (`wait_until` on Cloudflare), bounded by the platform's post-response time limit or, on a hosted server, by the shutdown grace period.
 _Avoid_: Task, job, spawn
 
 **Webhook Event**:

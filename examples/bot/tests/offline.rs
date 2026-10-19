@@ -1,15 +1,18 @@
 //! Signed interactions through `handle_interaction` on the host, and the Definitions Sync would
-//! publish. `TestEnv` stands in for the Cloudflare `Worker` State: vars, a recording Transport,
+//! publish. `TestEnv` stands in for an Adapter's State (`Worker`, `Host`): vars, a recording Transport,
 //! and Background Work run on demand.
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
+use composure::adapter::{handle_event, handle_interaction};
 use composure::{
     command::{BackgroundWork, CommandSetDefinition, HandlerError, InteractionHandler, Platform},
     rest::{Method, RawResponse, Request, Transport, TransportError},
 };
-use composure_adapter_cloudflare::{handle_event, handle_interaction};
-use composure_example_commands::{Bot, THEME, Vars};
+use composure_example_bot::{Bot, THEME, Vars};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
 use serde_json::{Value, json};
@@ -17,12 +20,12 @@ use serde_json::{Value, json};
 /// Records requests and answers the few that are read with canned bodies
 #[derive(Default)]
 struct Discord {
-    requests: RefCell<Vec<Request>>,
+    requests: Mutex<Vec<Request>>,
 }
 
 impl Transport for Discord {
     async fn send(&self, request: &Request) -> Result<RawResponse, TransportError> {
-        self.requests.borrow_mut().push(request.clone());
+        self.requests.lock().unwrap().push(request.clone());
         let path = request.url.rsplit("/v10").next().unwrap();
         let body = match (request.method, path) {
             (Method::Get, "/users/@me") => json!({
@@ -48,8 +51,8 @@ impl Transport for Discord {
 
 #[derive(Clone, Default)]
 struct TestEnv {
-    discord: Rc<Discord>,
-    work: Rc<RefCell<Vec<BackgroundWork>>>,
+    discord: Arc<Discord>,
+    work: Arc<Mutex<Vec<BackgroundWork>>>,
 }
 
 impl Vars for TestEnv {
@@ -59,14 +62,14 @@ impl Vars for TestEnv {
 }
 
 impl Platform for TestEnv {
-    type Transport = Rc<Discord>;
+    type Transport = Arc<Discord>;
 
-    fn transport(&self) -> Rc<Discord> {
+    fn transport(&self) -> Arc<Discord> {
         self.discord.clone()
     }
 
     fn spawn(&self, work: BackgroundWork) {
-        self.work.borrow_mut().push(work);
+        self.work.lock().unwrap().push(work);
     }
 
     fn bot_token(&self) -> Option<String> {
@@ -77,7 +80,7 @@ impl Platform for TestEnv {
 impl TestEnv {
     /// Runs the Background Work spawned so far, as `wait_until` would after the response
     fn run_background(&self) -> Result<(), HandlerError> {
-        let work: Vec<_> = self.work.borrow_mut().drain(..).collect();
+        let work: Vec<_> = self.work.lock().unwrap().drain(..).collect();
         work.into_iter().try_for_each(block_on)
     }
 
@@ -85,7 +88,8 @@ impl TestEnv {
     fn sent(&self) -> Vec<(Method, String, String, String)> {
         self.discord
             .requests
-            .borrow()
+            .lock()
+            .unwrap()
             .iter()
             .map(|r| {
                 (
@@ -192,7 +196,7 @@ fn chat_input_commands() {
 
     assert_eq!(
         content(command(json!({ "id": "1", "name": "greet", "type": 1 }))),
-        "Howdy from the worker!"
+        "Howdy from Composure!"
     );
 }
 
@@ -243,11 +247,8 @@ fn inline_rest_with_the_bot_token() {
         &env,
         command(json!({ "id": "1", "name": "whoami", "type": 1 })),
     );
-    assert_eq!(
-        response["data"]["content"],
-        "I'm Composure, answering from a Worker."
-    );
-    let request = env.discord.requests.borrow()[0].clone();
+    assert_eq!(response["data"]["content"], "I'm Composure.");
+    let request = env.discord.requests.lock().unwrap()[0].clone();
     assert_eq!(request.header("authorization"), Some("Bot bot-token"));
 
     let env = TestEnv::default();
@@ -671,7 +672,7 @@ fn send_event(env: &TestEnv, payload: Value, tamper: bool) -> (u16, usize) {
         Bot,
         env,
     ));
-    (outcome.status(), env.work.borrow().len())
+    (outcome.status(), env.work.lock().unwrap().len())
 }
 
 fn authorized(integration_type: u8) -> Value {

@@ -1,47 +1,12 @@
-# Composure commands example (Cloudflare)
+# Composure example bot on Cloudflare Workers
 
-A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[derive(Choice)]` and collected with `commands!`. The same `Bot` serves interactions on Workers and is synced with Discord by `src/bin/sync.rs`.
+Serves the [example bot](../bot)'s shared commands from a Worker with `CloudflareInteractionBot`, plus what only Workers has, and a cron trigger using the Bot Client outside Interactions. `src/lib.rs` declares the set with `example_bot! { pub struct CloudflareBot = [Note]; }`.
 
-[`src/basics.rs`](src/basics.rs): answering directly
-
-| Command | Shows |
-|---|---|
-| `/hello` | `Ctx` (invoking user/member), user-install contexts |
-| `/echo` | Options with constraints, optional Option, borrowed `&str` |
-| `/ice-cream` | `#[derive(Choice)]` and its `name()`, `name` override, `Embed` response |
-| `/fruit` | `#[autocomplete]` handler attached with `#[option(.., autocomplete = fruit_names)]` |
-| `/greet` | `Ctx<impl Vars>`: a bounded State, `Worker` on Workers and a stand-in in tests |
-| `/mod ban`, `/mod kick` | `#[group]` with `scope = "dev"` and permissions, `Ephemeral` replies, `HandlerError::user` |
-| Avatar (user), Word count (message) | Context-menu commands |
-
-[`src/api.rs`](src/api.rs): Discord's REST API, through `Ctx<impl Platform>`
+[`src/notes.rs`](src/notes.rs): Workers KV
 
 | Command | Shows |
 |---|---|
-| `/whoami` | `ctx.bot()` inline (bot token): Get Current User, `Response::model()` |
-| `/remind` | `Ephemeral(ctx.defer(..))`, `DeferredCtx::sleep`, a follow-up message, result edits the original |
-| `/countdown` | Editing the original response repeatedly from Background Work |
-| `/announce` | Create Message as the bot (dev guild, `ManageMessages`); the response body is never parsed |
-| Thumbs up (message) | Create Reaction on the target message |
-| `/dm-me` | Create DM + Create Message; a REST failure turned into a `HandlerError::user` |
-| `/report` | Bot Client in Background Work (Get Commands), a CSV file uploaded with the edit (multipart) |
-| `/command-info` | Async autocomplete with `Ctx<impl Platform>`: suggestions fetched with the bot token |
-| `/export` | A file in the initial response (the Adapter answers through the callback endpoint) |
-
-[`src/interactive.rs`](src/interactive.rs): `#[component]` / `#[modal]` handlers, listed in `commands!` under `components` / `modals`
-
-| Command | Shows |
-|---|---|
-| `/counter` | `#[component("counter")]` with the count as `custom_id` state (`counter_click::custom_id(n)`); `Update(..)` edits the clicked message |
-| `/roll` | `ctx.defer_update(..)`: acknowledge without a loading message, edit the message from Background Work |
-| `/colors` | A string select; `ComponentCtx::values()` |
-| `/feedback` | `#[derive(Modal)]` form (text inputs, a Choice-backed radio group, file upload, checkbox) opened with `on_feedback::show()`, submitted to `#[modal("feedback")]` typed |
-
-[`src/events.rs`](src/events.rs): Webhook Events (`commands! { ..; events = Events; }`), served on `/events`
-
-| Event | Shows |
-|---|---|
-| `APPLICATION_AUTHORIZED` | A user install gets a welcome DM, sent after the 204 with `EventCtx::bot()` |
+| `/note save`, `/note show`, `/note forget` | A per-user note in the `NOTES` KV namespace with a 30-day TTL; `Ctx<Worker>`; KV futures made `Send` with `#[worker::send]` helpers that take the `Worker` State (ADR 0012) |
 
 [`src/lib.rs`](src/lib.rs) `start` installs the adapter's `tracing` subscriber (feature `tracing`): `tracing::info!` in `/report`'s Background Work and the install welcome logs with the Interaction's or event's span fields, viewable with `npx wrangler tail` or in Workers Logs.
 
@@ -52,7 +17,7 @@ A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[d
 - Node (for `npx wrangler`) and `cargo install worker-build@0.8.7`
 - A Discord application with a bot; note its **Application ID**, **Public Key**, and **Bot Token**
 
-Worker config is `wrangler.jsonc`.
+Worker config is `wrangler.jsonc`. `/note` needs a KV namespace: `npx wrangler kv namespace create NOTES`, then put its id in `kv_namespaces` (`wrangler dev` simulates it locally without one).
 
 ## Run locally
 
@@ -67,19 +32,19 @@ Discord needs a public HTTPS URL, so expose it with a tunnel (e.g. `cloudflared 
 
 ## Sync
 
-The `sync` bin loads `.env` from this directory (copy `.env.example`; variables already set in the environment win):
+The `sync-cloudflare` bin publishes the shared commands plus `/note`. It loads `.env` from this directory (copy `.env.example`; variables already set in the environment win):
 
 ```sh
 cp .env.example .env   # fill in DISCORD_TOKEN, DISCORD_APPLICATION_ID, COMPOSURE_SCOPE_DEV (where /mod goes)
-cargo run -p composure_example_commands --bin sync -- --dry-run # show the plan
-cargo run -p composure_example_commands --bin sync              # apply after confirming
-cargo run -p composure_example_commands --bin sync -- --yes     # apply without asking (CI)
-cargo run -p composure_example_commands --bin sync -- --guild <guild id>  # everything to one guild, for testing
+cargo run -p composure_example_cloudflare --bin sync-cloudflare -- --dry-run # show the plan
+cargo run -p composure_example_cloudflare --bin sync-cloudflare              # apply after confirming
+cargo run -p composure_example_cloudflare --bin sync-cloudflare -- --yes     # apply without asking (CI)
+cargo run -p composure_example_cloudflare --bin sync-cloudflare -- --guild <guild id>  # everything to one guild, for testing
 ```
 
 `--help` lists every flag; outside a terminal it only applies with `--yes`. See the [`composure_sync` README](../../crates/sync/README.md).
 
-`composure_sync` is a non-wasm dependency only, so it never reaches the worker bundle.
+`composure_sync` is a non-wasm dependency only, so it never reaches the Workers bundle.
 
 ## Deploy
 
@@ -93,4 +58,4 @@ Set the Interactions Endpoint URL to `https://composure-commands-example.<subdom
 
 ## Test
 
-`cargo test -p composure_example_commands` sends signed interactions through `handle_interaction` on the host. The stand-in State implements `Platform` with a recording Transport, so REST calls are asserted without Discord, and runs Background Work on demand, as `wait_until` would after the response.
+`cargo test -p composure_example_cloudflare` checks what Sync publishes. The shared commands are tested in [`examples/bot`](../bot); KV needs the Workers runtime, so `/note` is exercised with `npx wrangler dev`.

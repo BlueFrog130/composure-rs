@@ -13,13 +13,12 @@ pub trait ComponentDefinition {
 
 /// Answers clicks and selections on components whose `custom_id` starts with its prefix.
 /// Implemented by `#[component]`; listed in `commands!` under `components = [...]`.
-#[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
 pub trait ComponentHandler<S>: ComponentDefinition {
     /// `fields` is the `custom_id` after `prefix:`, `None` when there is no `:`
-    async fn invoke(
+    fn invoke(
         ctx: ComponentCtx<'_, S>,
         fields: Option<&str>,
-    ) -> Result<InteractionResponse, HandlerError>;
+    ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send;
 }
 
 /// The `custom_id` prefix a Modal Handler answers. Implemented by `#[modal]`.
@@ -29,12 +28,11 @@ pub trait ModalDefinition {
 
 /// Answers submits of modals whose `custom_id` starts with its prefix. Implemented by
 /// `#[modal]`; listed in `commands!` under `modals = [...]`.
-#[allow(async_fn_in_trait)]
 pub trait ModalHandler<S>: ModalDefinition {
-    async fn invoke(
+    fn invoke(
         ctx: ModalCtx<'_, S>,
         fields: Option<&str>,
-    ) -> Result<InteractionResponse, HandlerError>;
+    ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send;
 }
 
 /// Decodes a handler's `custom_id` state; used by `#[component]` and `#[modal]`

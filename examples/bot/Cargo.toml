@@ -1,0 +1,26 @@
+[package]
+name = "composure_example_bot"
+version = "0.1.0"
+edition.workspace = true
+rust-version = "1.91"
+description = "The example Composure bot's shared commands, served by the Cloudflare and tokio examples"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+composure = { path = "../../crates/composure", features = ["macros", "tier1"] }
+composure_adapter_cloudflare = { path = "../../crates/adapters/cloudflare", optional = true }
+composure_adapter_tokio = { path = "../../crates/adapters/tokio", optional = true }
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+
+[features]
+## `Vars` for the Cloudflare `Worker` State
+cloudflare = ["dep:composure_adapter_cloudflare"]
+## `Vars` for the tokio `Host` State
+tokio = ["dep:composure_adapter_tokio"]
+
+[dev-dependencies]
+ed25519-dalek = "3.0.0"
+futures = { version = "0.3.34", default-features = false, features = ["executor"] }
+hex = "0.4.3"
+serde_json = "1.0.154"

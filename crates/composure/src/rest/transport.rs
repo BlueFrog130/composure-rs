@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt, rc::Rc, time::Duration};
+use std::{borrow::Cow, fmt, sync::Arc, time::Duration};
 
 /// The Adapter-provided way to send one HTTP request and to sleep; the REST client's only contact
 /// with the platform (`worker::Fetch` on Cloudflare, `reqwest` natively).
@@ -6,12 +6,17 @@ use std::{borrow::Cow, fmt, rc::Rc, time::Duration};
 /// Implementations send exactly the given request: no retries, no redirects to follow for Discord,
 /// no status handling. Non-2xx statuses are a normal [`RawResponse`], only failures to get any
 /// response at all are a [`TransportError`].
-#[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
-pub trait Transport {
-    async fn send(&self, request: &Request) -> Result<RawResponse, TransportError>;
+///
+/// Futures are `Send` so REST calls can run on any thread (ADR 0012); single-threaded platforms
+/// wrap theirs (`worker::send::SendFuture` on Cloudflare).
+pub trait Transport: Send + Sync {
+    fn send(
+        &self,
+        request: &Request,
+    ) -> impl Future<Output = Result<RawResponse, TransportError>> + Send;
 
     /// Waits out a rate limit
-    async fn sleep(&self, duration: Duration);
+    fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
 }
 
 impl<T: Transport + ?Sized> Transport for &T {
@@ -24,7 +29,7 @@ impl<T: Transport + ?Sized> Transport for &T {
     }
 }
 
-impl<T: Transport + ?Sized> Transport for Rc<T> {
+impl<T: Transport + ?Sized> Transport for Arc<T> {
     async fn send(&self, request: &Request) -> Result<RawResponse, TransportError> {
         (**self).send(request).await
     }

@@ -1,4 +1,5 @@
-//! Syncs the bot's commands with Discord: `cargo run -p composure_example_commands --bin sync`.
+//! Syncs the Workers bot's commands (the shared ones plus `/note`) with Discord:
+//! `cargo run -p composure_example_cloudflare --bin sync-cloudflare`.
 //! Reads `.env` next to this crate's Cargo.toml; see the crate README for the vars and flags.
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -14,7 +15,7 @@ fn main() -> std::process::ExitCode {
         }
     }
 
-    composure_sync::sync_from_env(&composure_example_commands::Bot)
+    composure_sync::sync_from_env(&composure_example_cloudflare::CloudflareBot)
 }
 
 #[cfg(target_arch = "wasm32")]

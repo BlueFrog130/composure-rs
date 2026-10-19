@@ -149,7 +149,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             }
         }
 
-        impl<__S> ::composure::command::Command<__S> for #ident
+        impl<__S: ::core::marker::Sync> ::composure::command::Command<__S> for #ident
         where
             #(#subcommands: ::composure::command::Command<__S>,)*
         {

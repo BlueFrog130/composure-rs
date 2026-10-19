@@ -410,7 +410,7 @@ fn context_menu_commands() {
 
 struct Components;
 
-impl<S> InteractionHandler<S> for Components {
+impl<S: Sync> InteractionHandler<S> for Components {
     async fn component(
         &self,
         component: composure::types::MessageComponentInteraction,
@@ -459,7 +459,7 @@ fn functions_stay_callable() {
     assert_eq!(ping(), "pong");
     assert_eq!(
         block_on(echo(
-            Ctx::new(&std::rc::Rc::new(dummy_command()), &()),
+            Ctx::new(&std::sync::Arc::new(dummy_command()), &()),
             "a",
             Some(2)
         )),

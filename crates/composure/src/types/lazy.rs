@@ -1,4 +1,4 @@
-use std::{cell::OnceCell, fmt};
+use std::{fmt, sync::OnceLock};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::value::RawValue;
@@ -9,7 +9,7 @@ use serde_json::value::RawValue;
 pub struct Lazy<T> {
     raw: Box<RawValue>,
     /// Boxed so an unread Lazy stays small whatever `T` is
-    parsed: OnceCell<Option<Box<T>>>,
+    parsed: OnceLock<Option<Box<T>>>,
 }
 
 impl<T: DeserializeOwned> Lazy<T> {
@@ -31,7 +31,7 @@ impl<T: Serialize> Lazy<T> {
     pub fn new(value: T) -> serde_json::Result<Self> {
         Ok(Self {
             raw: serde_json::value::to_raw_value(&value)?,
-            parsed: OnceCell::from(Some(Box::new(value))),
+            parsed: OnceLock::from(Some(Box::new(value))),
         })
     }
 }
@@ -48,7 +48,7 @@ impl<T> Clone for Lazy<T> {
     fn clone(&self) -> Self {
         Self {
             raw: self.raw.clone(),
-            parsed: OnceCell::new(),
+            parsed: OnceLock::new(),
         }
     }
 }
@@ -63,7 +63,7 @@ impl<'de, T> Deserialize<'de> for Lazy<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Ok(Self {
             raw: Box::<RawValue>::deserialize(deserializer)?,
-            parsed: OnceCell::new(),
+            parsed: OnceLock::new(),
         })
     }
 }

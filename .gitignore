@@ -2,3 +2,5 @@ target/
 .env.*
 !.env.example
 *.stderr
+.env
+.wrangler/

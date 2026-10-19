@@ -1,46 +1,19 @@
-//! Example bot: every command defined once with `#[command]`, collected into a Command Set, and
-//! served on Cloudflare Workers. `src/bin/sync.rs` syncs the same Command Set with Discord.
+//! The example bot served on Cloudflare Workers: the shared commands (`examples/bot`) plus what
+//! only Workers has, and a cron trigger using the Bot Client outside Interactions.
 //!
-//! - [`basics`]: answering with text, embeds, Options, Choices, State, Groups, context menus,
-//!   themed embeds
-//! - [`api`]: REST calls with the bot token, Deferred Responses, follow-ups, file uploads
-//! - [`interactive`]: buttons, select menus, and modals with `#[component]` / `#[modal]`
-//! - [`views`]: Components V2 layouts and modals as `rsx!` markup with inline handlers (`#[view]`)
-//! - [`events`]: Webhook Events (app installs)
+//! - [`notes`]: `/note save|show|forget`, a per-user note in Workers KV
 
-pub mod api;
-pub mod basics;
-pub mod events;
-pub mod interactive;
-pub mod views;
+pub mod notes;
 
-pub use api::*;
-pub use basics::*;
-use composure::{command::Theme, commands, types::Snowflake};
+use composure::types::Snowflake;
 use composure_adapter_cloudflare::{CloudflareInteractionBot, bot_client};
-pub use events::*;
-pub use interactive::*;
+use notes::Note;
 use tracing::{Instrument, level_filters::LevelFilter};
-pub use views::*;
 use worker::{Context, Env, Request, Response, ScheduleContext, ScheduledEvent, event};
 
-/// Colors and branding filled into every embed the bot answers with, errors included
-pub const THEME: Theme = Theme::new()
-    .with_primary(0xf5c2e7)
-    .with_footer("composure example", None);
-
-commands! {
-    /// Every command this bot serves
-    pub struct Bot = [
-        hello, echo, ice_cream, fruit, greet, Mod, avatar, word_count,
-        whoami, remind, countdown, announce, thumbs_up, dm_me, report, command_info, export,
-        counter, roll, colors, feedback, card, dice,
-    ];
-    components = [counter_click, reroll, pick_colors];
-    modals = [on_feedback];
-    views = [Card, Review, Dice];
-    theme = THEME;
-    events = Events;
+composure_example_bot::example_bot! {
+    /// Every command the bot serves on Workers, synced by `src/bin/sync.rs`
+    pub struct CloudflareBot = [Note];
 }
 
 /// Runs once per isolate: logs go to the Workers console as objects Workers Logs indexes, with
@@ -53,7 +26,7 @@ fn start() {
 #[event(fetch)]
 async fn fetch(req: Request, env: Env, ctx: Context) -> worker::Result<Response> {
     CloudflareInteractionBot::new(req, env, ctx)
-        .with_handler(Bot)
+        .with_handler(CloudflareBot)
         .process()
         .await
 }

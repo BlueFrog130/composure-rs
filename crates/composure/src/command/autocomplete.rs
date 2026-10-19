@@ -13,10 +13,12 @@ pub const MAX_CHOICES: usize = 25;
 
 /// Suggests Choices for an Option. Implemented by `#[autocomplete]`; attached to an Option with
 /// `#[option("...", autocomplete = handler)]`.
-#[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
 pub trait Autocomplete<S> {
     /// `input` is what the user has typed so far
-    async fn complete(ctx: Ctx<'_, S>, input: &str) -> Result<InteractionResponse, HandlerError>;
+    fn complete(
+        ctx: Ctx<'_, S>,
+        input: &str,
+    ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send;
 }
 
 /// What an Autocomplete Handler may return: a `Vec` of suggestions, or a `Result` of one

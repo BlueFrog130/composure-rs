@@ -272,14 +272,22 @@ pub(crate) fn resolve_state(
         segment.arguments = PathArguments::AngleBracketed(parse_quote!(<'_, #state>));
     }
     let generic = has_ctx && function.sig.generics.type_params().next().is_some();
-    let (impl_generics, where_clause) = if generic {
-        let (impl_generics, _, where_clause) = function.sig.generics.split_for_impl();
-        (quote!(#impl_generics), quote!(#where_clause))
+    let impl_generics = if generic {
+        let (impl_generics, _, _) = function.sig.generics.split_for_impl();
+        quote!(#impl_generics)
     } else if has_ctx {
-        (quote!(), quote!())
+        quote!()
     } else {
-        (quote!(<__S>), quote!())
+        quote!(<__S>)
     };
+    // Handler futures are `Send`, and they hold the Ctx (so `&State`) across `.await`
+    let predicates = function
+        .sig
+        .generics
+        .where_clause
+        .iter()
+        .flat_map(|clause| clause.predicates.iter());
+    let where_clause = quote!(where #(#predicates,)* #state: ::core::marker::Sync);
     Ok((state, impl_generics, where_clause))
 }
 

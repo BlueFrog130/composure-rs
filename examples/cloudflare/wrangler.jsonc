@@ -17,6 +17,12 @@
     // "STATUS_CHANNEL_ID": "<channel id>" enables the daily heartbeat
   },
 
+  // /note keeps notes here: `npx wrangler kv namespace create NOTES`, then paste the id.
+  // `wrangler dev` simulates it locally whatever the id.
+  "kv_namespaces": [
+    { "binding": "NOTES", "id": "<NOTES namespace id>" }
+  ],
+
   // Workers Logs: stores and indexes what the tracing subscriber logs (see src/lib.rs start)
   "observability": {
     "enabled": true

@@ -1,6 +1,6 @@
 //! REST and Background Work for handlers, when the Adapter's State provides them (ADR 0006).
 
-use std::{future::Future, pin::Pin, rc::Rc, time::Duration};
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::{
     rest::{BotClient, EditMessage, Error, InteractionClient, Transport},
@@ -13,20 +13,21 @@ use crate::{
 use super::{CommandOutput, Ctx, HandlerError, IntoResponse, Theme};
 use crate::trace::Instrument;
 
-/// Background Work handed to the Adapter: runs after the response is sent; an `Err` is logged
-pub type BackgroundWork = Pin<Box<dyn Future<Output = Result<(), HandlerError>>>>;
+/// Background Work handed to the Adapter: runs after the response is sent; an `Err` is logged.
+/// `Send`, so Adapters can run it on any thread (ADR 0012).
+pub type BackgroundWork = Pin<Box<dyn Future<Output = Result<(), HandlerError>> + Send>>;
 
 /// What an Adapter's State offers beyond its own resources: a [`Transport`] for REST, a way to run
 /// Background Work, and the bot token when configured. Implemented by each Adapter's State
-/// (`composure_adapter_cloudflare::Worker`); enables [`Ctx::client`], [`Ctx::bot`] and
-/// [`Ctx::defer`].
-pub trait Platform: Clone + 'static {
+/// (`composure_adapter_cloudflare::Worker`, `composure_adapter_tokio::Host`); enables
+/// [`Ctx::client`], [`Ctx::bot`] and [`Ctx::defer`].
+pub trait Platform: Clone + Send + Sync + 'static {
     type Transport: Transport + Clone + 'static;
 
     fn transport(&self) -> Self::Transport;
 
-    /// Runs `work` after the response is sent (`wait_until` on Cloudflare), within the
-    /// platform's post-response time limit
+    /// Runs `work` after the response is sent (`wait_until` on Cloudflare, `tokio::spawn` on a
+    /// hosted server), within the platform's post-response time limit
     fn spawn(&self, work: BackgroundWork);
 
     /// The bot token (`DISCORD_TOKEN`), without the `Bot ` prefix
@@ -59,7 +60,7 @@ fn bot_client<S: Platform>(
     ))
 }
 
-impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
+impl<'a, S: Platform, D: Clone + Send + Sync + 'static> Ctx<'a, S, D> {
     /// Follow-ups and the original response of this Interaction. Before the handler returns,
     /// only Endpoints that do not depend on the initial response work; use [`defer`](Self::defer)
     /// to act after it.
@@ -89,7 +90,7 @@ impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
     pub fn defer<F, Fut>(&self, work: F) -> Deferred
     where
         F: FnOnce(DeferredCtx<S, D>) -> Fut,
-        Fut: Future<Output: CommandOutput> + 'static,
+        Fut: Future<Output: CommandOutput> + Send + 'static,
     {
         self.spawn_completion(work);
         Deferred(())
@@ -99,11 +100,11 @@ impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
     fn spawn_completion<F, Fut>(&self, work: F)
     where
         F: FnOnce(DeferredCtx<S, D>) -> Fut,
-        Fut: Future<Output: CommandOutput> + 'static,
+        Fut: Future<Output: CommandOutput> + Send + 'static,
     {
         let theme = self.configured_theme();
         let ctx = DeferredCtx {
-            interaction: Rc::clone(self.shared_interaction()),
+            interaction: Arc::clone(self.shared_interaction()),
             state: self.state().clone(),
             theme,
         };
@@ -131,7 +132,7 @@ impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
 /// (an error as its message). A failed edit, else the handler's error, is the result.
 async fn complete<T: Transport>(
     client: InteractionClient<T>,
-    output: impl Future<Output: CommandOutput>,
+    output: impl Future<Output: CommandOutput> + Send,
     theme: Option<&'static Theme>,
 ) -> Result<(), HandlerError> {
     let (mut response, error) = match output.await.into_result() {
@@ -172,13 +173,13 @@ mod private {
     impl Sealed for crate::types::ModalSubmitData {}
 }
 
-impl<'a, S: Platform, D: Updatable + Clone + 'static> Ctx<'a, S, D> {
+impl<'a, S: Platform, D: Updatable + Clone + Send + Sync + 'static> Ctx<'a, S, D> {
     /// Acknowledges without a loading message (Discord type 6) and runs `work` as Background
     /// Work; its output then replaces the message the component is on
     pub fn defer_update<F, Fut>(&self, work: F) -> DeferredUpdate
     where
         F: FnOnce(DeferredCtx<S, D>) -> Fut,
-        Fut: Future<Output: CommandOutput> + 'static,
+        Fut: Future<Output: CommandOutput> + Send + 'static,
     {
         self.spawn_completion(work);
         DeferredUpdate(())
@@ -232,7 +233,7 @@ impl IntoResponse for DeferredUpdate {
 
 /// What deferred Background Work sees: an owned, `'static` copy of the Interaction and State
 pub struct DeferredCtx<S, D = ApplicationCommandInteractionData> {
-    interaction: Rc<DataInteraction<D>>,
+    interaction: Arc<DataInteraction<D>>,
     state: S,
     theme: Option<&'static Theme>,
 }
@@ -299,7 +300,7 @@ impl<S: Platform, D> DeferredCtx<S, D> {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
+    use std::sync::Mutex;
 
     use futures::executor::block_on;
     use serde_json::json;
@@ -313,19 +314,19 @@ mod tests {
 
     #[derive(Clone, Default)]
     struct TestPlatform {
-        transport: Rc<MockTransport>,
-        work: Rc<RefCell<Vec<BackgroundWork>>>,
+        transport: Arc<MockTransport>,
+        work: Arc<Mutex<Vec<BackgroundWork>>>,
     }
 
     impl Platform for TestPlatform {
-        type Transport = Rc<MockTransport>;
+        type Transport = Arc<MockTransport>;
 
         fn transport(&self) -> Self::Transport {
             self.transport.clone()
         }
 
         fn spawn(&self, work: BackgroundWork) {
-            self.work.borrow_mut().push(work);
+            self.work.lock().unwrap().push(work);
         }
 
         fn bot_token(&self) -> Option<String> {
@@ -335,7 +336,7 @@ mod tests {
 
     impl TestPlatform {
         fn run(&self) -> Result<(), HandlerError> {
-            let work = self.work.borrow_mut().pop().expect("work was spawned");
+            let work = self.work.lock().unwrap().pop().expect("work was spawned");
             block_on(work)
         }
 
@@ -352,14 +353,14 @@ mod tests {
         }
     }
 
-    fn interaction() -> Rc<ApplicationCommandInteraction> {
+    fn interaction() -> Arc<ApplicationCommandInteraction> {
         let payload = json!({
             "id": "2", "application_id": "1", "type": 2, "token": "tok", "version": 1,
             "user": { "id": "3", "username": "a", "discriminator": "0", "global_name": null, "avatar": null },
             "data": { "id": "4", "name": "slow", "type": 1 },
         });
         match serde_json::from_value(payload).unwrap() {
-            Interaction::ApplicationCommand(interaction) => Rc::new(interaction),
+            Interaction::ApplicationCommand(interaction) => Arc::new(interaction),
             _ => unreachable!(),
         }
     }
@@ -418,7 +419,7 @@ mod tests {
             .respond(404, r#"{"code":10015,"message":"Unknown Webhook"}"#)
             .respond(200, "{}");
         let platform = TestPlatform {
-            transport: Rc::new(transport),
+            transport: Arc::new(transport),
             ..Default::default()
         };
         let interaction = interaction();

@@ -1,5 +1,5 @@
 //! Commands that call Discord's REST API: inline with the bot token, and as Background Work after
-//! a Deferred Response. `Ctx<impl Platform>` keeps them testable off Workers.
+//! a Deferred Response. `Ctx<impl Platform>` keeps them testable off any platform.
 
 use std::time::Duration;
 
@@ -16,10 +16,7 @@ use composure::{
 pub async fn whoami(ctx: Ctx<impl Platform>) -> Result<String, HandlerError> {
     // Inline REST: fine while it stays well inside Discord's 3 seconds
     let me = ctx.bot()?.get_current_user().await?.model()?;
-    Ok(format!(
-        "I'm {}, answering from a Worker.",
-        me.display_name()
-    ))
+    Ok(format!("I'm {}.", me.display_name()))
 }
 
 /// Remind you about something in a few seconds

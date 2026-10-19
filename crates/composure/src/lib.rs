@@ -1,6 +1,8 @@
 #[macro_use]
 mod trace;
 
+#[cfg(feature = "rest")]
+pub mod adapter;
 pub mod auth;
 pub mod command;
 pub mod definition;

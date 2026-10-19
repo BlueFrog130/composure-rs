@@ -7,7 +7,10 @@ members = [
     "crates/sync",
     "crates/adapters/cloudflare",
     "crates/adapters/cloudflare/bench",
+    "crates/adapters/tokio",
+    "examples/bot",
     "examples/cloudflare",
+    "examples/tokio",
 ]
 
 [workspace.package]

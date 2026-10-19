@@ -1,16 +1,14 @@
-use std::{ops::Deref, rc::Rc};
+use std::{ops::Deref, sync::Arc};
 
 use composure::{
+    adapter::{APPLICATION_ID_VAR as APPLICATION_ID, BOT_TOKEN_VAR as BOT_TOKEN_SECRET},
     command::{BackgroundWork, HandlerError, Platform},
     rest::BotClient,
     types::Snowflake,
 };
-use worker::{Context, Env};
+use worker::{Context, Env, send::SendWrapper};
 
 use crate::FetchTransport;
-
-const BOT_TOKEN_SECRET: &str = "DISCORD_TOKEN";
-const APPLICATION_ID: &str = "DISCORD_APPLICATION_ID";
 
 /// A Bot Client outside Interactions (cron triggers, queues, ...): the `DISCORD_TOKEN` secret and
 /// the `DISCORD_APPLICATION_ID` var (or secret), over [`FetchTransport`].
@@ -37,17 +35,20 @@ pub fn bot_client(env: &Env) -> worker::Result<BotClient<FetchTransport>> {
 /// The State Commands get on Workers: the worker's [`Env`] (also via `Deref`) plus its
 /// [`Context`], which runs Background Work with `wait_until`. Implements [`Platform`], so
 /// `ctx.client()`, `ctx.bot()` (with a `DISCORD_TOKEN` secret) and `ctx.defer(..)` work.
+///
+/// `Send + Sync` like every Platform (ADR 0012): the JS handles are in a [`SendWrapper`], which
+/// is sound because a Workers isolate runs on one thread.
 #[derive(Clone)]
 pub struct Worker {
-    env: Env,
-    ctx: Rc<Context>,
+    env: SendWrapper<Env>,
+    ctx: Arc<SendWrapper<Context>>,
 }
 
 impl Worker {
     pub fn new(env: Env, ctx: Context) -> Self {
         Self {
-            env,
-            ctx: Rc::new(ctx),
+            env: SendWrapper::new(env),
+            ctx: Arc::new(SendWrapper::new(ctx)),
         }
     }
 

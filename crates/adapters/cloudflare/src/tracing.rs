@@ -322,7 +322,7 @@ mod tests {
 
     struct Logging;
 
-    impl<S> InteractionHandler<S> for Logging {
+    impl<S: Sync> InteractionHandler<S> for Logging {
         async fn command(
             &self,
             _command: ApplicationCommandInteraction,
@@ -375,7 +375,7 @@ mod tests {
 
     struct Failing;
 
-    impl<S> InteractionHandler<S> for Failing {
+    impl<S: Sync> InteractionHandler<S> for Failing {
         async fn command(
             &self,
             _command: ApplicationCommandInteraction,

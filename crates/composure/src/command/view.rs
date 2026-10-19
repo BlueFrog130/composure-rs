@@ -547,21 +547,20 @@ pub trait ViewDefinition {
 
 /// Runs a View's inline handlers; `None` when the handler named in the `custom_id` is not one of
 /// them. Implemented by `#[view]`; listed in `commands!` under `views = [...]`.
-#[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
 pub trait ViewHandler<S>: ViewDefinition {
     /// `fields` is the `custom_id` after `prefix:`: the handler name, then its captured Props
-    async fn component(
+    fn component(
         _ctx: ComponentCtx<'_, S>,
         _fields: Option<&str>,
-    ) -> Option<Result<InteractionResponse, HandlerError>> {
-        None
+    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
+        async { None }
     }
 
-    async fn modal(
+    fn modal(
         _ctx: ModalCtx<'_, S>,
         _fields: Option<&str>,
-    ) -> Option<Result<InteractionResponse, HandlerError>> {
-        None
+    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
+        async { None }
     }
 }
 

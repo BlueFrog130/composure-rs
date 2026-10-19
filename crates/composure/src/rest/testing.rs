@@ -1,13 +1,31 @@
-use std::{cell::RefCell, collections::VecDeque, time::Duration};
+use std::{
+    collections::VecDeque,
+    sync::{Mutex, MutexGuard},
+    time::Duration,
+};
 
 use super::{Method, RawResponse, Request, Transport, TransportError};
 
 /// Records requests and answers them from a queue (200 `{}` once empty)
 #[derive(Default)]
 pub(crate) struct MockTransport {
-    pub(crate) requests: RefCell<Vec<Request>>,
-    pub(crate) responses: RefCell<VecDeque<RawResponse>>,
-    pub(crate) sleeps: RefCell<Vec<Duration>>,
+    pub(crate) requests: Recorded<Vec<Request>>,
+    pub(crate) responses: Recorded<VecDeque<RawResponse>>,
+    pub(crate) sleeps: Recorded<Vec<Duration>>,
+}
+
+/// A `RefCell`-like `Mutex`, so `MockTransport` is `Sync` like every Transport
+#[derive(Default)]
+pub(crate) struct Recorded<T>(Mutex<T>);
+
+impl<T> Recorded<T> {
+    pub(crate) fn borrow(&self) -> MutexGuard<'_, T> {
+        self.0.lock().unwrap()
+    }
+
+    pub(crate) fn borrow_mut(&self) -> MutexGuard<'_, T> {
+        self.0.lock().unwrap()
+    }
 }
 
 impl MockTransport {

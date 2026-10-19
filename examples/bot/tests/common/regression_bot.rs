@@ -2,18 +2,22 @@
 //! parsed (option values, resolved users/channels/roles/attachments, component values, modal
 //! inputs), so the fixtures can assert on exactly what the types produced.
 
+use composure::command::{EventHandler, HandlerError, InteractionHandler};
 use composure::types::{
     ApplicationCommandInteraction, ApplicationCommandInteractionData,
     ApplicationCommandInteractionDataOption, ApplicationCommandOptionChoice,
     ApplicationCommandOptionChoiceValue, ApplicationCommandType, InteractionResponse,
     MessageComponentInteraction, ModalSubmitInteraction, OptionList,
 };
-use composure_adapter_cloudflare::{HandlerError, InteractionHandler};
 
 /// Describes every interaction it receives
+#[derive(Clone, Copy)]
 pub struct RegressionBot;
 
-impl<S> InteractionHandler<S> for RegressionBot {
+/// Ignores Webhook Events, so Adapters that also serve events can serve it
+impl<S: Sync> EventHandler<S> for RegressionBot {}
+
+impl<S: Sync> InteractionHandler<S> for RegressionBot {
     async fn command(
         &self,
         command: ApplicationCommandInteraction,

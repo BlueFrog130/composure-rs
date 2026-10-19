@@ -4,7 +4,7 @@
 //! message a component is attached to.
 //!
 //! `paths_respond_within_budget` runs offline and fails if a path allocates more than its budget.
-//! For timings: `cargo test -p composure_example_commands --release --test perf -- --ignored --nocapture`
+//! For timings: `cargo test -p composure_example_bot --release --test perf -- --ignored --nocapture`
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -14,12 +14,15 @@ use std::{
 };
 
 use composure::{
+    adapter::{handle_interaction, handle_interaction_with_key},
+    auth::PublicKey,
+};
+use composure::{
     command::{BackgroundWork, Platform, dispatch},
     rest::{RawResponse, Request, Transport, TransportError},
     types::Interaction,
 };
-use composure_adapter_cloudflare::{PublicKey, handle_interaction, handle_interaction_with_key};
-use composure_example_commands::{Bot, Vars};
+use composure_example_bot::{Bot, Vars};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
 use serde_json::{Value, json};
@@ -242,7 +245,7 @@ fn cases() -> Vec<Case> {
         case(
             "command /greet (State)",
             command("greet", json!([])),
-            |r| assert_eq!(r["data"]["content"], "Howdy from the worker!"),
+            |r| assert_eq!(r["data"]["content"], "Howdy from Composure!"),
             23,
         ),
         case(

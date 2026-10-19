@@ -83,11 +83,11 @@ async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
 }
 ```
 
-`Ctx<Worker>` ties a Command (and its Command Set) to Workers. To run it in host tests, take `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) and implement it for a stand-in; see `examples/cloudflare/tests/offline.rs`.
+`Ctx<Worker>` ties a Command (and its Command Set) to Workers. To run it in host tests, take `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) and implement it for a stand-in; see `examples/bot/tests/offline.rs`.
 
-Workers futures are not `Send`; handlers are dispatched statically, so no `Send` bounds or `async_trait` are needed.
+Handler futures must be `Send` (ADR 0012, so the same bot also runs on a multi-threaded server), although a Worker runs on one thread: `Worker` and `FetchTransport` wrap their JS handles in `worker::send::SendWrapper` / `SendFuture` for you. A handler that awaits a JS future itself (KV, D1, `worker::Fetch`) wraps it the same way: `SendFuture::new(kv.get("key").text()).await`, and holds JS values across `.await` in a `SendWrapper`. Handlers are still dispatched statically, so no `async_trait` or boxing.
 
-Sync the Command Set with Discord from a host-only bin; see `examples/cloudflare/` for a complete bot with a `sync` bin.
+Sync the Command Set with Discord from a host-only bin; see `examples/bot/` for a complete bot with a `sync` bin, served by `examples/cloudflare/`.
 
 ## Logging
 
@@ -126,8 +126,8 @@ opt-level = 3
 
 ## Testing a handler
 
-`handle_interaction(public_key, signature, timestamp, body, &handler, &state)` runs the same verify, parse, and dispatch steps as `process` without the Workers runtime. It returns an `InteractionOutcome` with the HTTP status and response, so a handler can be tested with signed payloads in plain `cargo test`. Commands generic over State (`ctx: Ctx`) can be tested with `&()` as the state. `handle_interaction_with_key` / `handle_event_with_key` take a parsed `PublicKey` instead, as `process` does. See `examples/cloudflare/tests/offline.rs`, and `examples/cloudflare/tests/regression.rs` for signed fixtures covering every interaction shape.
+`handle_interaction(public_key, signature, timestamp, body, &handler, &state)` runs the same verify, parse, and dispatch steps as `process` without the Workers runtime. It returns an `InteractionOutcome` with the HTTP status and response, so a handler can be tested with signed payloads in plain `cargo test`. Commands generic over State (`ctx: Ctx`) can be tested with `&()` as the state. `handle_interaction_with_key` / `handle_event_with_key` take a parsed `PublicKey` instead, as `process` does. These are re-exported from `composure::adapter`, which every Adapter runs, so answers match across platforms. See `examples/bot/tests/offline.rs`, and `examples/bot/tests/regression.rs` for signed fixtures covering every interaction shape.
 
 ## Size and speed
 
-The example bot (`examples/cloudflare`) builds to about 1.25 MB of wasm (373 KB gzipped) with `tracing`, 1.16 MB (344 KB) without. Parsing, dispatching and answering an interaction takes a few microseconds and 20-45 small allocations; `examples/cloudflare/tests/perf.rs` measures each path and fails if one allocates more than its budget. `FetchTransport` keeps only the rate limit headers and `content-type` of REST responses (`composure::rest::DISCORD_HEADERS`).
+The example bot (`examples/cloudflare`) builds to about 1.25 MB of wasm (373 KB gzipped) with `tracing`, 1.16 MB (344 KB) without. Parsing, dispatching and answering an interaction takes a few microseconds and 20-45 small allocations; `examples/bot/tests/perf.rs` measures each path and fails if one allocates more than its budget. `FetchTransport` keeps only the rate limit headers and `content-type` of REST responses (`composure::rest::DISCORD_HEADERS`).

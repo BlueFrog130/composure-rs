@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::trace::{Instrument, Span};
 use crate::types::{
@@ -13,46 +13,50 @@ use super::{__unshare, CommandSet, CommandSetDefinition, HandlerError, ScopedDef
 /// A Command Set implements this for commands. Implement it directly for components, modals,
 /// autocomplete, or full control. Every method has a default: unknown command, a "not handled"
 /// ephemeral message, or no autocomplete choices.
-#[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
+///
+/// Futures are `Send` so Adapters can run each Interaction on any thread (ADR 0012); `async fn`
+/// in impls works as long as what it holds across `.await` is `Send`.
 pub trait InteractionHandler<S> {
     /// Colors and branding filled into message responses and errors; none by default
     fn theme(&self) -> Option<&'static Theme> {
         None
     }
 
-    async fn command(
+    fn command(
         &self,
         command: ApplicationCommandInteraction,
         _state: &S,
-    ) -> Result<InteractionResponse, HandlerError> {
-        Err(HandlerError::unknown_command(&command.data.name))
+    ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send {
+        async move { Err(HandlerError::unknown_command(&command.data.name)) }
     }
 
-    async fn component(
+    fn component(
         &self,
         _component: MessageComponentInteraction,
         _state: &S,
-    ) -> Result<InteractionResponse, HandlerError> {
-        Ok(not_handled("This bot does not handle components."))
+    ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send {
+        async { Ok(not_handled("This bot does not handle components.")) }
     }
 
     /// Autocomplete for command options. Defaults to no choices.
-    async fn autocomplete(
+    fn autocomplete(
         &self,
         _autocomplete: ApplicationCommandInteraction,
         _state: &S,
-    ) -> Result<InteractionResponse, HandlerError> {
-        Ok(InteractionResponse::respond_with_autocomplete_choices(
-            Vec::new(),
-        ))
+    ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send {
+        async {
+            Ok(InteractionResponse::respond_with_autocomplete_choices(
+                Vec::new(),
+            ))
+        }
     }
 
-    async fn modal_submit(
+    fn modal_submit(
         &self,
         _modal: ModalSubmitInteraction,
         _state: &S,
-    ) -> Result<InteractionResponse, HandlerError> {
-        Ok(not_handled("This bot does not handle modal submissions."))
+    ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send {
+        async { Ok(not_handled("This bot does not handle modal submissions.")) }
     }
 }
 
@@ -184,7 +188,9 @@ impl<C, F> WithFallback<C, F> {
     }
 }
 
-impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for WithFallback<C, F> {
+impl<S: Sync, C: CommandSet<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHandler<S>
+    for WithFallback<C, F>
+{
     fn theme(&self) -> Option<&'static Theme> {
         C::THEME
     }
@@ -194,7 +200,7 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         command: ApplicationCommandInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
-        let command = Rc::new(command);
+        let command = Arc::new(command);
         match self.commands.dispatch(&command, state).await {
             Some(result) => result,
             None => self.fallback.command(__unshare(command), state).await,
@@ -206,7 +212,7 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         component: MessageComponentInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
-        let component = Rc::new(component);
+        let component = Arc::new(component);
         match self.commands.dispatch_component(&component, state).await {
             Some(result) => result,
             None => self.fallback.component(__unshare(component), state).await,
@@ -218,7 +224,7 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         autocomplete: ApplicationCommandInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
-        let autocomplete = Rc::new(autocomplete);
+        let autocomplete = Arc::new(autocomplete);
         match self
             .commands
             .dispatch_autocomplete(&autocomplete, state)
@@ -238,7 +244,7 @@ impl<S, C: CommandSet<S>, F: InteractionHandler<S>> InteractionHandler<S> for Wi
         modal: ModalSubmitInteraction,
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
-        let modal = Rc::new(modal);
+        let modal = Arc::new(modal);
         match self.commands.dispatch_modal(&modal, state).await {
             Some(result) => result,
             None => self.fallback.modal_submit(__unshare(modal), state).await,

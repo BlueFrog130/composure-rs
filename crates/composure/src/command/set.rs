@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::{
     definition::{
@@ -38,15 +38,16 @@ pub trait SubcommandDefinition: CommandDefinition {
 
 /// Runs a Command for an Interaction. Implemented by `#[command]` and `#[group]`; Groups route to
 /// the subcommand that was invoked.
-#[allow(async_fn_in_trait)] // dispatch is static and Workers futures are not Send
 pub trait Command<S>: CommandDefinition {
-    async fn invoke(invocation: Invocation<'_, S>) -> Result<InteractionResponse, HandlerError>;
+    fn invoke(
+        invocation: Invocation<'_, S>,
+    ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send;
 
     /// Suggestions for the Option being typed, or `None` if it has no Autocomplete Handler
-    async fn autocomplete(
+    fn autocomplete(
         _invocation: Invocation<'_, S>,
-    ) -> Option<Result<InteractionResponse, HandlerError>> {
-        None
+    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
+        async { None }
     }
 }
 
@@ -55,7 +56,7 @@ static NO_OPTIONS: OptionList = OptionList::empty();
 /// One Command (or subcommand) being invoked: the Interaction, the State, and the Options at
 /// this level of the subcommand tree.
 pub struct Invocation<'a, S> {
-    interaction: &'a Rc<ApplicationCommandInteraction>,
+    interaction: &'a Arc<ApplicationCommandInteraction>,
     state: &'a S,
     options: &'a OptionList,
     /// Set when routed into a subcommand group: the subcommand chosen inside it
@@ -64,7 +65,7 @@ pub struct Invocation<'a, S> {
 }
 
 impl<'a, S> Invocation<'a, S> {
-    pub fn new(interaction: &'a Rc<ApplicationCommandInteraction>, state: &'a S) -> Self {
+    pub fn new(interaction: &'a Arc<ApplicationCommandInteraction>, state: &'a S) -> Self {
         Self {
             interaction,
             state,
@@ -242,51 +243,50 @@ impl ScopedDefinition {
 }
 
 /// The Commands a bot serves. Implemented by [`commands!`](crate::commands).
-#[allow(async_fn_in_trait)]
 pub trait CommandSet<S> {
     /// Colors and branding of the set's responses, from `theme = ...;` in `commands!`
     const THEME: Option<&'static Theme> = None;
 
     /// Runs the matching Command, or `None` if no Command has the invoked name and type
-    async fn dispatch(
+    fn dispatch(
         &self,
-        interaction: &Rc<ApplicationCommandInteraction>,
+        interaction: &Arc<ApplicationCommandInteraction>,
         state: &S,
-    ) -> Option<Result<InteractionResponse, HandlerError>>;
+    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send;
 
     /// Runs the matching Command's Autocomplete Handler for the focused Option, or `None`
-    async fn dispatch_autocomplete(
+    fn dispatch_autocomplete(
         &self,
-        _interaction: &Rc<ApplicationCommandInteraction>,
+        _interaction: &Arc<ApplicationCommandInteraction>,
         _state: &S,
-    ) -> Option<Result<InteractionResponse, HandlerError>> {
-        None
+    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
+        async { None }
     }
 
     /// Runs the Component Handler whose prefix the `custom_id` starts with, or `None`
-    async fn dispatch_component(
+    fn dispatch_component(
         &self,
-        _interaction: &Rc<MessageComponentInteraction>,
+        _interaction: &Arc<MessageComponentInteraction>,
         _state: &S,
-    ) -> Option<Result<InteractionResponse, HandlerError>> {
-        None
+    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
+        async { None }
     }
 
     /// Runs the Modal Handler whose prefix the `custom_id` starts with, or `None`
-    async fn dispatch_modal(
+    fn dispatch_modal(
         &self,
-        _interaction: &Rc<ModalSubmitInteraction>,
+        _interaction: &Arc<ModalSubmitInteraction>,
         _state: &S,
-    ) -> Option<Result<InteractionResponse, HandlerError>> {
-        None
+    ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
+        async { None }
     }
 }
 
-/// The Interaction back from the [`Rc`] it was dispatched in, for handlers that take it by value.
+/// The Interaction back from the [`Arc`] it was dispatched in, for handlers that take it by value.
 /// Nothing else holds it once dispatch found no handler, so this does not copy.
 #[doc(hidden)]
-pub fn __unshare<T: Clone>(interaction: Rc<T>) -> T {
-    Rc::try_unwrap(interaction).unwrap_or_else(|shared| (*shared).clone())
+pub fn __unshare<T: Clone>(interaction: Arc<T>) -> T {
+    Arc::try_unwrap(interaction).unwrap_or_else(|shared| (*shared).clone())
 }
 
 /// The Command Definitions of a Command Set, for Sync
