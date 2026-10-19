@@ -76,14 +76,36 @@ pub async fn dispatch<S, H: InteractionHandler<S>>(
 ) -> Result<InteractionResponse, HandlerError> {
     let span = span(&interaction);
     async move {
-        let mut response = route(interaction, handler, state).await?;
+        debug!("interaction received");
+        let mut response = match route(interaction, handler, state).await {
+            Ok(response) => response,
+            Err(error) => {
+                error.trace("interaction failed");
+                return Err(error);
+            }
+        };
         if let Some(theme) = handler.theme() {
             theme.apply(&mut response);
         }
+        debug!(response = response_kind(&response), "interaction answered");
         Ok(response)
     }
     .instrument(span)
     .await
+}
+
+/// The response's Discord type, as logged by [`dispatch`]
+#[cfg(feature = "tracing")]
+fn response_kind(response: &InteractionResponse) -> &'static str {
+    match response {
+        InteractionResponse::Pong => "pong",
+        InteractionResponse::ChannelMessageWithSource(_) => "message",
+        InteractionResponse::DeferredChannelMessageWithSource(_) => "deferred_message",
+        InteractionResponse::DeferredUpdateMessage => "deferred_update",
+        InteractionResponse::UpdateMessage(_) => "update",
+        InteractionResponse::ApplicationCommandAutocompleteResult(_) => "autocomplete",
+        InteractionResponse::Modal(_) => "modal",
+    }
 }
 
 /// The `interaction` span: what was invoked, where, by whom. Components and modals record their
@@ -117,6 +139,7 @@ fn span(interaction: &Interaction) -> Span {
         interaction_type = kind,
         name,
         guild_id = common.guild_id.as_ref().map(tracing::field::display),
+        channel_id = common.channel_id.as_ref().map(tracing::field::display),
         user_id = common.invoking_user().map(|user| tracing::field::display(&user.id)),
     )
 }

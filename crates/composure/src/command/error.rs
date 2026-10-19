@@ -64,6 +64,27 @@ impl HandlerError {
         self.kind
     }
 
+    /// Logs the error as `message` in the current span: DEBUG for user errors (the user already
+    /// sees them), WARN for unknown commands and invalid Options (usually Commands out of sync
+    /// with Discord), ERROR for handler failures
+    #[cfg_attr(not(feature = "tracing"), allow(unused_variables))]
+    pub(crate) fn trace(&self, message: &'static str) {
+        match self.kind {
+            ErrorKind::User => {
+                debug!(error = %self, error_kind = "user", "{message}");
+            }
+            ErrorKind::UnknownCommand => {
+                warn!(error = %self, error_kind = "unknown_command", "{message}");
+            }
+            ErrorKind::InvalidOption => {
+                warn!(error = %self, error_kind = "invalid_option", "{message}");
+            }
+            ErrorKind::Handler => {
+                error!(error = %self, error_kind = "handler", "{message}");
+            }
+        }
+    }
+
     /// The ephemeral message the invoking user sees instead of Discord's "interaction failed"
     pub fn response(&self) -> InteractionResponse {
         self.response_with(None)

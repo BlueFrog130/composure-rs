@@ -4,9 +4,11 @@
 //! `spans` (names, outermost first), then the fields of each enclosing span and of the event
 //! (`message` included), inner ones winning.
 //!
-//! Composure's spans put `interaction_id`, `interaction_type`, `name`, `guild_id` and `user_id`
-//! on everything logged while handling an Interaction (its Background Work included),
-//! `event_type` while handling a Webhook Event, and `method` / `route` during REST calls.
+//! Composure's spans put `interaction_id`, `interaction_type`, `name`, `guild_id`, `channel_id`
+//! and `user_id` on everything logged while handling an Interaction (its Background Work
+//! included), `event_type` while handling a Webhook Event, and `method` / `route` during REST
+//! calls. Handler errors are logged inside those spans with `error` and `error_kind` fields
+//! (ERROR for failures, WARN for unknown commands and invalid Options, DEBUG for user errors).
 //!
 //! Install it once per isolate, from `#[event(start)]`:
 //!
@@ -272,6 +274,18 @@ mod tests {
             .map(|(_, value)| value)
     }
 
+    /// The one line logged with `message`
+    fn message<'a>(lines: &'a [Line], message: &str) -> &'a Line {
+        let [line] = &lines
+            .iter()
+            .filter(|line| field(line, "message") == str(message).as_ref())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("{lines:?}")
+        };
+        line
+    }
+
     fn str(s: &str) -> Option<Value> {
         Some(Value::Str(s.to_owned()))
     }
@@ -344,9 +358,8 @@ mod tests {
             block_on(dispatch(interaction, &Logging, &())).unwrap();
         });
 
-        let [line] = &lines[..] else {
-            panic!("{lines:?}")
-        };
+        // Composure's own DEBUG "received" / "answered" lines frame the handler's
+        let line = message(&lines, "handled");
         assert_eq!(line.spans, ["interaction"]);
         assert_eq!(
             field(line, "interaction_id").cloned(),
@@ -358,5 +371,47 @@ mod tests {
         assert_eq!(field(line, "user_id").cloned(), str("1052322265397739525"));
         // The token is never recorded
         assert!(!line.to_string().contains("token"));
+    }
+
+    struct Failing;
+
+    impl<S> InteractionHandler<S> for Failing {
+        async fn command(
+            &self,
+            _command: ApplicationCommandInteraction,
+            _state: &S,
+        ) -> Result<InteractionResponse, HandlerError> {
+            Err(HandlerError::new("boom"))
+        }
+    }
+
+    #[test]
+    fn handler_errors_are_logged_in_the_interaction_span() {
+        let interaction: Interaction = serde_json::from_value(json!({
+            "id": "1100173248714518568",
+            "application_id": "1052322265397739523",
+            "type": 2,
+            "token": "token",
+            "version": 1,
+            "channel_id": "1052322265397739526",
+            "data": { "id": "1052358444704862218", "name": "ping", "type": 1 },
+        }))
+        .unwrap();
+
+        let lines = lines(|| {
+            block_on(dispatch(interaction, &Failing, &())).unwrap_err();
+        });
+
+        let line = message(&lines, "interaction failed");
+        assert_eq!(line.level, Level::ERROR);
+        assert_eq!(line.spans, ["interaction"]);
+        assert_eq!(field(line, "name").cloned(), str("ping"));
+        assert_eq!(
+            field(line, "channel_id").cloned(),
+            str("1052322265397739526")
+        );
+        assert_eq!(field(line, "error").cloned(), str("boom"));
+        assert_eq!(field(line, "error_kind").cloned(), str("handler"));
+        assert_eq!(field(line, "message").cloned(), str("interaction failed"));
     }
 }

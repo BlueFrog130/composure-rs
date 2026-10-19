@@ -104,9 +104,9 @@ fn start() {
 }
 ```
 
-Every event becomes one `console.error`/`warn`/`log`/`debug` call with an object, so Workers Logs indexes its fields: `level`, `target`, `message`, `spans`, plus the fields of the enclosing spans. Composure's `interaction` span adds `interaction_id`, `interaction_type`, `name` (the command, or the `custom_id` prefix), `guild_id` and `user_id` to everything logged while handling an Interaction, Background Work included; `event` adds `event_type`; `rest` adds `method` and `route` (the template, never the token-bearing URL). Log from handlers with `tracing::info!(..)` and the line carries all of that. `tracing::ConsoleLayer` composes with other `tracing-subscriber` layers.
+Every event becomes one `console.error`/`warn`/`log`/`debug` call with an object, so Workers Logs indexes its fields: `level`, `target`, `message`, `spans`, plus the fields of the enclosing spans. Composure's `interaction` span adds `interaction_id`, `interaction_type`, `name` (the command, or the `custom_id` prefix), `guild_id`, `channel_id` and `user_id` to everything logged while handling an Interaction, Background Work included; `event` adds `event_type`; `rest` adds `method` and `route` (the template, never the token-bearing URL). Log from handlers with `tracing::info!(..)` and the line carries all of that. `tracing::ConsoleLayer` composes with other `tracing-subscriber` layers.
 
-Handler errors are logged at ERROR, unknown commands and invalid Options at WARN, `HandlerError::user` at DEBUG. Without the feature the adapter writes the same messages straight to the console and nothing else is compiled in; with it the example bot grows by about 96 KB of wasm (about 36 KB of that is Composure's instrumentation, the rest the subscriber).
+Handler errors are logged at ERROR, unknown commands and invalid Options at WARN, `HandlerError::user` at DEBUG, inside the span they happened in (with `error` and `error_kind` fields), so the line carries the Interaction's or event's context. Without the feature the adapter writes the same messages straight to the console and nothing else is compiled in; with it the example bot grows by about 96 KB of wasm (about 36 KB of that is Composure's instrumentation, the rest the subscriber).
 
 ## Signature validation
 

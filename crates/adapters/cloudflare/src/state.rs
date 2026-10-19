@@ -1,7 +1,7 @@
 use std::{ops::Deref, rc::Rc};
 
 use composure::{
-    command::{BackgroundWork, ErrorKind, HandlerError, Platform},
+    command::{BackgroundWork, HandlerError, Platform},
     rest::BotClient,
     types::Snowflake,
 };
@@ -76,15 +76,11 @@ impl Platform for Worker {
     }
 
     fn spawn(&self, work: BackgroundWork) {
-        let task = async move {
+        self.ctx.wait_until(async move {
             if let Err(error) = work.await {
                 log_handler_error(&error);
             }
-        };
-        // Composure spawns inside the work's span; keep it for the error log too
-        #[cfg(feature = "tracing")]
-        let task = ::tracing::Instrument::in_current_span(task);
-        self.ctx.wait_until(task);
+        });
     }
 
     fn bot_token(&self) -> Option<String> {
@@ -95,12 +91,23 @@ impl Platform for Worker {
     }
 }
 
+/// Without `tracing`, logs a handler's error to the console. With it Composure has already logged
+/// it inside the Interaction's (or Background Work's, or event's) span, at the level its kind
+/// deserves, so this does nothing.
+#[cfg(not(feature = "tracing"))]
 pub(crate) fn log_handler_error(error: &HandlerError) {
+    use composure::command::ErrorKind;
+
     match error.kind() {
         // Expected outcomes the user already sees
-        ErrorKind::User => debug!("user error: {error}"),
+        ErrorKind::User => debug!("user error", error = error),
         // Usually Commands out of sync with Discord
-        ErrorKind::UnknownCommand | ErrorKind::InvalidOption => warn!("{error}"),
-        ErrorKind::Handler => error!("handler failed: {error}"),
+        ErrorKind::UnknownCommand | ErrorKind::InvalidOption => {
+            warn!("interaction failed", error = error)
+        }
+        ErrorKind::Handler => error!("handler failed", error = error),
     }
 }
+
+#[cfg(feature = "tracing")]
+pub(crate) fn log_handler_error(_error: &HandlerError) {}

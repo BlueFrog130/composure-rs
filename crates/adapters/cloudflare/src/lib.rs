@@ -316,7 +316,7 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
         let bytes = match self.req.bytes().await {
             Ok(bytes) => bytes,
             Err(e) => {
-                error!("failed to read body: {e}");
+                error!("failed to read request body", error = e);
                 return Response::error("Bad request", 400);
             }
         };
@@ -324,11 +324,11 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
         let public_key = match public_key(&self.state).await {
             Ok(key) => key,
             Err(Error::WorkerError(e)) => {
-                error!("missing {PUBLIC_KEY_SECRET} secret: {e}");
+                error!("missing DISCORD_PUBLIC_KEY secret", error = e);
                 return Response::error("Internal error", 500);
             }
             Err(Error::ValidationError) => {
-                error!("{PUBLIC_KEY_SECRET} is not a valid public key");
+                error!("DISCORD_PUBLIC_KEY secret is not a valid public key");
                 return Response::error("Validation failed", 401);
             }
         };
@@ -352,7 +352,7 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
                     Response::error("Validation failed", 401)
                 }
                 EventOutcome::BadRequest(e) => {
-                    error!("failed to parse event: {e}");
+                    error!("failed to parse event", error = e);
                     Response::error("Bad request", 400)
                 }
                 EventOutcome::Acknowledged => {
@@ -379,7 +379,7 @@ impl<H: InteractionHandler<Worker> + EventHandler<Worker> + 'static> CloudflareI
                 Response::error("Validation failed", 401)
             }
             InteractionOutcome::BadRequest(e) => {
-                error!("failed to parse interaction: {e}");
+                error!("failed to parse interaction", error = e);
                 Response::error("Bad request", 400)
             }
             InteractionOutcome::Respond(response) => reply(&bytes, &response).await,
@@ -404,7 +404,7 @@ async fn reply(body: &[u8], response: &InteractionResponse) -> worker::Result<Re
     match client.create_response(response, response.files()).await {
         Ok(()) => Ok(Response::empty()?.with_status(202)),
         Err(e) => {
-            error!("failed to send response with files: {e}");
+            error!("failed to send response with files", error = e);
             Response::error("Internal error", 500)
         }
     }

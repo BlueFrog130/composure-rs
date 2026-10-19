@@ -193,8 +193,17 @@ pub fn spawn_event<S: super::Platform, H: EventHandler<S> + 'static>(
 
     let owned = state.clone();
     let span = info_span!("event", event_type = %body.kind);
-    let work = async move { dispatch_event(&handler, &owned, application_id, &body).await }
-        .instrument(span.clone());
+    let work = async move {
+        debug!("event received");
+        let result = dispatch_event(&handler, &owned, application_id, &body).await;
+        #[cfg(feature = "tracing")]
+        match &result {
+            Ok(()) => debug!("event handled"),
+            Err(error) => error.trace("event failed"),
+        }
+        result
+    }
+    .instrument(span.clone());
     span.in_scope(|| state.spawn(Box::pin(work)));
 }
 

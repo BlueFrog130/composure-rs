@@ -113,32 +113,51 @@ impl<'a, S: Platform, D: Clone + 'static> Ctx<'a, S, D> {
         // `spawn` with the current span pick it up too
         let span = info_span!("background_work");
         let work = async move {
-            let (mut response, error) = match output.await.into_result() {
-                Ok(response) => (response, None),
-                Err(error) => (error.response_with(theme), Some(error)),
-            };
-            if let Some(theme) = theme {
-                theme.apply(&mut response);
+            debug!("background work started");
+            let result = complete(client, output, theme).await;
+            #[cfg(feature = "tracing")]
+            match &result {
+                Ok(()) => debug!("background work done"),
+                Err(error) => error.trace("background work failed"),
             }
-            if let Some(data) = response.into_message_data() {
-                // Ephemerality was fixed by the deferred reply; edits cannot change it
-                let flags = data
-                    .flags
-                    .map(|flags| flags - MessageFlags::Ephemeral)
-                    .filter(|flags| !flags.is_empty());
-                let edit = EditMessage {
-                    flags,
-                    ..EditMessage::from(&data)
-                };
-                edit_original(&client, &edit)
-                    .await
-                    .map_err(HandlerError::new)?;
-            }
-            error.map_or(Ok(()), Err)
+            result
         }
         .instrument(span.clone());
         span.in_scope(|| self.state().spawn(Box::pin(work)));
     }
+}
+
+/// Background Work's body: awaits the handler's output, then edits the original response with it
+/// (an error as its message). A failed edit, else the handler's error, is the result.
+async fn complete<T: Transport>(
+    client: InteractionClient<T>,
+    output: impl Future<Output: CommandOutput>,
+    theme: Option<&'static Theme>,
+) -> Result<(), HandlerError> {
+    let (mut response, error) = match output.await.into_result() {
+        Ok(response) => (response, None),
+        Err(error) => (error.response_with(theme), Some(error)),
+    };
+    if let Some(theme) = theme {
+        theme.apply(&mut response);
+    }
+    if let Some(data) = response.into_message_data() {
+        // Ephemerality was fixed by the deferred reply; edits cannot change it
+        let flags = data
+            .flags
+            .map(|flags| flags - MessageFlags::Ephemeral)
+            .filter(|flags| !flags.is_empty());
+        let edit = EditMessage {
+            flags,
+            ..EditMessage::from(&data)
+        };
+        edit_original(&client, &edit).await.map_err(|error| {
+            HandlerError::new(format_args!(
+                "editing the original response failed: {error}"
+            ))
+        })?;
+    }
+    error.map_or(Ok(()), Err)
 }
 
 /// Interaction data whose original response is a message that can be updated in place

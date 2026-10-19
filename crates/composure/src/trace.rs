@@ -4,7 +4,11 @@
 //!
 //! Spans: `interaction` (every [`dispatch`](crate::command::dispatch)), `background_work`
 //! (Deferred Responses), `event` (Webhook Events), `rest` (one per Endpoint call; the route
-//! template, never the URL, which can hold an Interaction token).
+//! template, never the URL, which can hold an Interaction token). The first three log DEBUG
+//! events when they start and finish (`interaction answered` with the `response` type), so a
+//! DEBUG subscriber shows one trail per Interaction. Their `.. failed` events carry the `error`
+//! inside the span, at the level its [`ErrorKind`](crate::command::ErrorKind) deserves (see
+//! [`HandlerError::trace`](crate::command::HandlerError)), so Adapters need not log it again.
 
 // Most call sites are behind `rest`
 #![allow(unused_macros, dead_code)]
@@ -20,6 +24,11 @@ macro_rules! debug {
 #[cfg(feature = "tracing")]
 macro_rules! warn {
     ($($t:tt)*) => { ::tracing::warn!($($t)*) };
+}
+
+#[cfg(feature = "tracing")]
+macro_rules! error {
+    ($($t:tt)*) => { ::tracing::error!($($t)*) };
 }
 
 #[cfg(feature = "tracing")]
@@ -62,6 +71,11 @@ macro_rules! debug {
 
 #[cfg(not(feature = "tracing"))]
 macro_rules! warn {
+    ($($t:tt)*) => {};
+}
+
+#[cfg(not(feature = "tracing"))]
+macro_rules! error {
     ($($t:tt)*) => {};
 }
 

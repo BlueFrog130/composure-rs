@@ -1,33 +1,45 @@
 //! The Adapter's own logging: `tracing` events with the `tracing` feature (shown once a
 //! subscriber such as [`crate::tracing::init`] is installed), otherwise straight to the console.
-//! Messages are format strings so both work.
+//! A literal message plus `name = value` fields (Display): separate indexed fields with
+//! `tracing`, appended as `name=value` to the console line without it.
 
 #[cfg(feature = "tracing")]
 macro_rules! error {
-    ($($t:tt)*) => { ::tracing::error!($($t)*) };
+    ($msg:literal $(, $name:ident = $value:expr)* $(,)?) => {
+        ::tracing::error!($($name = %$value,)* $msg)
+    };
 }
 
 #[cfg(feature = "tracing")]
 macro_rules! warn {
-    ($($t:tt)*) => { ::tracing::warn!($($t)*) };
-}
-
-#[cfg(feature = "tracing")]
-macro_rules! debug {
-    ($($t:tt)*) => { ::tracing::debug!($($t)*) };
+    ($msg:literal $(, $name:ident = $value:expr)* $(,)?) => {
+        ::tracing::warn!($($name = %$value,)* $msg)
+    };
 }
 
 #[cfg(not(feature = "tracing"))]
 macro_rules! error {
-    ($($t:tt)*) => { ::worker::console_error!($($t)*) };
+    ($msg:literal $(, $name:ident = $value:expr)* $(,)?) => {
+        ::worker::console_error!(
+            concat!($msg $(, " ", stringify!($name), "={}")*) $(, $value)*
+        )
+    };
 }
 
 #[cfg(not(feature = "tracing"))]
 macro_rules! warn {
-    ($($t:tt)*) => { ::worker::console_warn!($($t)*) };
+    ($msg:literal $(, $name:ident = $value:expr)* $(,)?) => {
+        ::worker::console_warn!(
+            concat!($msg $(, " ", stringify!($name), "={}")*) $(, $value)*
+        )
+    };
 }
 
 #[cfg(not(feature = "tracing"))]
 macro_rules! debug {
-    ($($t:tt)*) => { ::worker::console_debug!($($t)*) };
+    ($msg:literal $(, $name:ident = $value:expr)* $(,)?) => {
+        ::worker::console_debug!(
+            concat!($msg $(, " ", stringify!($name), "={}")*) $(, $value)*
+        )
+    };
 }
