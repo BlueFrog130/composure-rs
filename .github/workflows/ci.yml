@@ -11,6 +11,16 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
+  package:
+    name: Package (publish dry run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Packages and builds each published crate as crates.io would, in dependency order
+      - run: cargo publish --workspace --dry-run
+
   check:
     name: fmt, clippy, build, test
     runs-on: ubuntu-latest

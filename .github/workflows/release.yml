@@ -1,0 +1,110 @@
+name: Release
+
+# Releases are driven by change files in .changeset/ (see CONTRIBUTING.md):
+# - every push to main with pending change files opens or updates the release PR
+#   (knope bumps the shared version and writes CHANGELOG.md)
+# - when main holds a version without a `v<version>` tag (the release PR was merged), the crates
+#   are published to crates.io, then knope tags the commit and creates the GitHub release
+#
+# Secrets: CARGO_REGISTRY_TOKEN (crates.io token with publish-new and publish-update scopes).
+# Optional: RELEASE_TOKEN, a token with contents and pull-requests write access, so the release PR
+# triggers CI (pull requests opened with the default GITHUB_TOKEN do not).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  KNOPE_VERSION: 0.23.1
+
+jobs:
+  prepare-release:
+    name: Open release PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+      - name: Look for change files
+        id: changes
+        run: |
+          if compgen -G ".changeset/*.md" > /dev/null; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No change files: nothing to release"
+          fi
+      - name: Configure Git
+        if: steps.changes.outputs.pending == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - uses: knope-dev/action@v2.1.2
+        if: steps.changes.outputs.pending == 'true'
+        with:
+          version: ${{ env.KNOPE_VERSION }}
+      - name: Prepare the release PR
+        if: steps.changes.outputs.pending == 'true'
+        run: knope prepare-release --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+  release:
+    name: Publish and tag
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Is this version released?
+        id: version
+        run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\(.*\)"/\1/p}' Cargo.toml)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse --verify --quiet "refs/tags/v$version" > /dev/null; then
+            echo "v$version is already released"
+          else
+            echo "unreleased=true" >> "$GITHUB_OUTPUT"
+            echo "Releasing $version"
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.version.outputs.unreleased == 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.version.outputs.unreleased == 'true'
+      - name: Publish to crates.io
+        if: steps.version.outputs.unreleased == 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        # In dependency order; crates already at this version are skipped, so a failed run can be
+        # re-run. `cargo publish` waits for each crate to be in the index before the next.
+        run: |
+          for crate in composure_macros composure composure_commands composure_sync composure_adapter_cloudflare composure_adapter_tokio; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' -A "composure-release (github.com/BlueFrog130/composure-rs)" \
+              "https://crates.io/api/v1/crates/$crate/$VERSION")
+            if [ "$status" = "200" ]; then
+              echo "$crate $VERSION is already published"
+            else
+              cargo publish -p "$crate"
+            fi
+          done
+      - uses: knope-dev/action@v2.1.2
+        if: steps.version.outputs.unreleased == 'true'
+        with:
+          version: ${{ env.KNOPE_VERSION }}
+      - name: Tag and create the GitHub release
+        if: steps.version.outputs.unreleased == 'true'
+        run: knope release --verbose
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

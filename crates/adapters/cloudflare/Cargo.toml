@@ -1,6 +1,6 @@
 [package]
 name = "composure_adapter_cloudflare"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version = "1.91"
 description = "Serve Composure Discord bots on Cloudflare Workers: Web Crypto signatures, wait_until Background Work, Workers Logs tracing"
@@ -15,7 +15,7 @@ exclude = ["bench"]
 
 [dependencies]
 worker = "0.8.7"
-composure = { path = "../../composure", version = "0.1.0", features = ["rest"] }
+composure = { workspace = true, features = ["rest"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 futures = { version = "0.3.34", default-features = false }

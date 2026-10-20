@@ -223,11 +223,10 @@ uploads). Issues and pull requests are welcome.
 
 ## Contributing
 
-```sh
-cargo test --workspace                  # offline; live Discord API tests are #[ignore]d
-cargo clippy --workspace --all-targets
-cargo fmt --all
-```
+See [CONTRIBUTING.md](https://github.com/BlueFrog130/composure-rs/blob/main/CONTRIBUTING.md) for
+the development setup and how releases work: each pull request adds a change file
+(`knope document-change`), and merging the generated release PR publishes every crate. Every
+version is in the [changelog](https://github.com/BlueFrog130/composure-rs/blob/main/CHANGELOG.md).
 
 ## License
 

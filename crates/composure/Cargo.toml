@@ -1,6 +1,6 @@
 [package]
 name = "composure"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "Discord bots over HTTP Interactions, no gateway: slash commands, components, modals and JSX-like views, on Cloudflare Workers (WASM) or any server"
@@ -20,7 +20,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["raw_value"] }
 serde_repr = "0.1.21"
 strum = { version = "0.28.0", features = ["derive"] }
-composure_macros = { path = "../macros", version = "0.1.0", optional = true }
+composure_macros = { workspace = true, optional = true }
 reqwest = { version = "0.13.5", optional = true, features = ["blocking"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"], optional = true }
 

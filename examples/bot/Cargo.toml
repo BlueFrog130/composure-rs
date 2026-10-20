@@ -8,9 +8,9 @@ license.workspace = true
 publish = false
 
 [dependencies]
-composure = { path = "../../crates/composure", features = ["macros", "tier1"] }
-composure_adapter_cloudflare = { path = "../../crates/adapters/cloudflare", optional = true }
-composure_adapter_tokio = { path = "../../crates/adapters/tokio", optional = true }
+composure = { workspace = true, features = ["macros", "tier1"] }
+composure_adapter_cloudflare = { workspace = true, optional = true }
+composure_adapter_tokio = { workspace = true, optional = true }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 
 [features]

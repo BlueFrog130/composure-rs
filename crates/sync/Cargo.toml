@@ -1,6 +1,6 @@
 [package]
 name = "composure_sync"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "Deploy-time CLI that syncs a Composure bot's slash commands with Discord: plan, confirm, apply, CI drift checks"
@@ -11,7 +11,7 @@ keywords = ["discord", "bot", "slash-commands", "deploy", "cli"]
 categories = ["command-line-utilities", "api-bindings", "development-tools"]
 
 [dependencies]
-composure = { path = "../composure", version = "0.1.0", features = ["rest-commands", "reqwest"] }
+composure = { workspace = true, features = ["rest-commands", "reqwest"] }
 pollster = "0.4.0"
 serde_json = "1.0.154"
 clap = { version = "4.6.7", features = ["derive"], optional = true }
@@ -24,7 +24,7 @@ default = ["cli"]
 cli = ["dep:clap", "dep:cliclack", "dep:console"]
 
 [dev-dependencies]
-composure_commands = { path = "../commands", version = "0.1.0" }
+composure_commands.workspace = true
 dotenvy = "0.15.7"
 
 [package.metadata.docs.rs]

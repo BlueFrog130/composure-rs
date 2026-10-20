@@ -16,15 +16,15 @@ name = "sync-cloudflare"
 path = "src/bin/sync.rs"
 
 [dependencies]
-composure = { path = "../../crates/composure", features = ["macros"] }
-composure_adapter_cloudflare = { path = "../../crates/adapters/cloudflare", features = ["tracing"] }
+composure = { workspace = true, features = ["macros"] }
+composure_adapter_cloudflare = { workspace = true, features = ["tracing"] }
 composure_example_bot = { path = "../bot", features = ["cloudflare"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 worker = "0.8.7"
 
 # Sync runs on the host only; keeps the HTTP client out of the worker bundle
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-composure_sync = { path = "../../crates/sync" }
+composure_sync.workspace = true
 dotenvy = "0.15.7"
 
 [dev-dependencies]

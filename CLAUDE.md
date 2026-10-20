@@ -71,7 +71,7 @@ Adapters are the integration layer; new platforms go under `crates/adapters/<nam
 
 - Docs: the user guide is `composure::guide` (`crates/composure/src/guide.rs`, one markdown chapter per module in `src/guide/`, doc-only, needs `macros` + `rest`; its examples are doctests run by `cargo test --workspace`). The Views chapter's tag reference lists every `rsx!` tag and attribute: update it (and the table on `rsx!` in `crates/macros/src/lib.rs`) when tags or component fields change. Every crate has `#![warn(missing_docs)]`; CI builds docs like docs.rs (`RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo +nightly doc --no-deps --all-features -p <crates>`).
 - Glossary in `CONTEXT.md` (Command, App, Route, Option, Scope, Sync, ...); decisions in `docs/adr/`.
-- All crates share version `0.1.0`; bump together (path deps also pin `version`).
+- The published crates share one version: `[workspace.package] version` and their `[workspace.dependencies]` entries in the root `Cargo.toml` (crates use `version.workspace = true` / `composure.workspace = true`). Never bump by hand: add a change file (`knope document-change`, `.changeset/`); `.github/workflows/release.yml` opens the release PR and publishes on merge (`knope.toml`, `CONTRIBUTING.md`). Dev-dependencies on `composure` stay path-only, so publishing has no cycle.
 - Regenerate trybuild expectations after changing macro errors: `TRYBUILD=overwrite cargo test -p composure_macros --test commands`, then review the `.stderr` diffs.
 
 ## Agent skills

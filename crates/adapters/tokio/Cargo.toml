@@ -1,6 +1,6 @@
 [package]
 name = "composure_adapter_tokio"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version = "1.91"
 description = "Serve Composure Discord bots from a hosted server on tokio and hyper, with graceful shutdown and health checks"
@@ -11,7 +11,7 @@ keywords = ["discord", "bot", "tokio", "server", "interactions"]
 categories = ["web-programming::http-server", "asynchronous", "api-bindings"]
 
 [dependencies]
-composure = { path = "../../composure", version = "0.1.0", features = [
+composure = { workspace = true, features = [
 	"rest",
 	"tracing",
 ] }

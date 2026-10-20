@@ -1,0 +1,72 @@
+# Releases with knope (https://knope.tech): every change worth a release note gets a change file
+# in .changeset/ (`knope document-change`). On main, CI turns pending change files into a release
+# PR (version bump, CHANGELOG.md); merging it tags, creates the GitHub release, and publishes the
+# crates. See CONTRIBUTING.md.
+#
+# The published crates share one version: [workspace.package] version in Cargo.toml, their
+# entries in [workspace.dependencies], and their Cargo.lock entries move together.
+
+[package]
+versioned_files = [
+    "Cargo.toml",
+    { path = "Cargo.toml", dependency = "composure" },
+    { path = "Cargo.toml", dependency = "composure_macros" },
+    { path = "Cargo.toml", dependency = "composure_commands" },
+    { path = "Cargo.toml", dependency = "composure_sync" },
+    { path = "Cargo.toml", dependency = "composure_adapter_cloudflare" },
+    { path = "Cargo.toml", dependency = "composure_adapter_tokio" },
+    { path = "Cargo.lock", dependency = "composure" },
+    { path = "Cargo.lock", dependency = "composure_macros" },
+    { path = "Cargo.lock", dependency = "composure_commands" },
+    { path = "Cargo.lock", dependency = "composure_sync" },
+    { path = "Cargo.lock", dependency = "composure_adapter_cloudflare" },
+    { path = "Cargo.lock", dependency = "composure_adapter_tokio" },
+]
+changelog = "CHANGELOG.md"
+
+# `knope document-change`: write a change file for the current work
+[[workflows]]
+name = "document-change"
+
+[[workflows.steps]]
+type = "CreateChangeFile"
+
+# CI, on every push to main with pending change files: open (or update) the release PR
+[[workflows]]
+name = "prepare-release"
+
+[[workflows.steps]]
+type = "Command"
+command = "git switch -c release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Command"
+command = "git commit -m \"chore: prepare release $version\""
+
+[[workflows.steps]]
+type = "Command"
+command = "git push --force --set-upstream origin release"
+
+[[workflows.steps]]
+type = "CreatePullRequest"
+base = "main"
+
+[workflows.steps.title]
+template = "chore: prepare release $version"
+
+[workflows.steps.body]
+template = "Merging this PR releases $version: it tags `v$version`, creates the GitHub release and publishes every crate to crates.io.\n\n$changelog"
+
+# CI, when the release PR is merged: tag and create the GitHub release
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "Release"
+
+[github]
+owner = "BlueFrog130"
+repo = "composure-rs"

@@ -13,10 +13,10 @@ name = "sync-tokio"
 path = "src/bin/sync.rs"
 
 [dependencies]
-composure = { path = "../../crates/composure", features = ["macros"] }
-composure_adapter_tokio = { path = "../../crates/adapters/tokio" }
+composure = { workspace = true, features = ["macros"] }
+composure_adapter_tokio.workspace = true
 composure_example_bot = { path = "../bot", features = ["tokio"] }
-composure_sync = { path = "../../crates/sync" }
+composure_sync.workspace = true
 dotenvy = "0.15.7"
 tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "fs"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
