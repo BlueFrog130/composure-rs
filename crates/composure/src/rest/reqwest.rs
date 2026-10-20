@@ -11,10 +11,12 @@ pub struct ReqwestTransport {
 }
 
 impl ReqwestTransport {
+    /// A Transport with a default `reqwest` client
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// A Transport over `client`
     pub fn with_client(client: reqwest::blocking::Client) -> Self {
         Self { client }
     }

@@ -10,12 +10,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommand {
+    /// A slash Command (type 1)
     ChatInputCommand(ChatInputCommand<1>),
+    /// A user context menu Command (type 2)
     UserCommand(CommandDetails<2>),
+    /// A message context menu Command (type 3)
     MessageCommand(CommandDetails<3>),
 }
 
 impl ApplicationCommand {
+    /// The slash Command, if it is one
     pub fn as_chat_input_command(&self) -> Option<&ChatInputCommand<1>> {
         if let Self::ChatInputCommand(v) = self {
             Some(v)
@@ -24,6 +28,7 @@ impl ApplicationCommand {
         }
     }
 
+    /// The user Command, if it is one
     pub fn as_user_command(&self) -> Option<&CommandDetails<2>> {
         if let Self::UserCommand(v) = self {
             Some(v)
@@ -32,6 +37,7 @@ impl ApplicationCommand {
         }
     }
 
+    /// The message Command, if it is one
     pub fn as_message_command(&self) -> Option<&CommandDetails<3>> {
         if let Self::MessageCommand(v) = self {
             Some(v)
@@ -41,8 +47,11 @@ impl ApplicationCommand {
     }
 }
 
+/// What every Command Definition has: name, permissions, contexts, ... `T` is the Command type;
+/// user and message Commands are only this
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandDetails<const T: u8> {
+    /// The Command type, `T`
     #[serde(rename = "type")]
     pub t: TypeField<T>,
 
@@ -96,8 +105,10 @@ pub struct CommandDetails<const T: u8> {
     pub version: Option<Snowflake>,
 }
 
+/// A slash Command's Definition: [`CommandDetails`] plus a description and Options
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatInputCommand<const T: u8> {
+    /// Name, permissions, contexts, ...
     #[serde(flatten)]
     pub details: CommandDetails<T>,
 
@@ -113,26 +124,42 @@ pub struct ChatInputCommand<const T: u8> {
     pub options: Option<Vec<ApplicationCommandOption>>,
 }
 
+/// A boolean Option's Definition
 pub type BooleanOption = BaseOption<5>;
+/// A user Option's Definition
 pub type UserOption = BaseOption<6>;
+/// A role Option's Definition
 pub type RoleOption = BaseOption<8>;
+/// A mentionable (user or role) Option's Definition
 pub type MentionableOption = BaseOption<9>;
+/// An attachment Option's Definition
 pub type AttachmentOption = BaseOption<11>;
 
 /// [Application Command Option Structure](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-structure)
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommandOption {
+    /// A subcommand
     Subcommand(SubcommandOption),
+    /// A group of subcommands
     SubcommandGroup(SubcommandGroupOption),
+    /// A string Option
     String(StringOption),
+    /// An integer Option
     Integer(IntegerOption),
+    /// A boolean Option
     Boolean(BooleanOption),
+    /// A user Option
     User(UserOption),
+    /// A channel Option
     Channel(ChannelOption),
+    /// A role Option
     Role(RoleOption),
+    /// A mentionable Option
     Mentionable(MentionableOption),
+    /// A number Option
     Number(NumberOption),
+    /// An attachment Option
     Attachment(AttachmentOption),
 }
 
@@ -140,19 +167,30 @@ pub enum ApplicationCommandOption {
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum SubcommandCommandOption {
+    /// A string Option
     String(StringOption),
+    /// An integer Option
     Integer(IntegerOption),
+    /// A boolean Option
     Boolean(BooleanOption),
+    /// A user Option
     User(UserOption),
+    /// A channel Option
     Channel(ChannelOption),
+    /// A role Option
     Role(RoleOption),
+    /// A mentionable Option
     Mentionable(MentionableOption),
+    /// A number Option
     Number(NumberOption),
+    /// An attachment Option
     Attachment(AttachmentOption),
 }
 
+/// A subcommand's Definition: a name, description and Options of its own
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubcommandOption {
+    /// The Option type, always `1`
     #[serde(rename = "type")]
     pub t: TypeField<1>,
 
@@ -175,8 +213,10 @@ pub struct SubcommandOption {
     pub options: Option<Vec<SubcommandCommandOption>>,
 }
 
+/// A subcommand group's Definition: subcommands under one name
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubcommandGroupOption {
+    /// The Option type, always `2`
     #[serde(rename = "type")]
     pub t: TypeField<2>,
 
@@ -199,8 +239,10 @@ pub struct SubcommandGroupOption {
     pub options: Option<Vec<SubcommandOption>>,
 }
 
+/// A string Option's Definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StringOption {
+    /// The Option type, always `3`
     #[serde(rename = "type")]
     pub t: TypeField<3>,
 
@@ -239,8 +281,10 @@ pub struct StringOption {
     pub autocomplete: Option<bool>,
 }
 
+/// An integer Option's Definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntegerOption {
+    /// The Option type, always `4`
     #[serde(rename = "type")]
     pub t: TypeField<4>,
 
@@ -279,8 +323,10 @@ pub struct IntegerOption {
     pub autocomplete: Option<bool>,
 }
 
+/// A number (`f64`) Option's Definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NumberOption {
+    /// The Option type, always `10`
     #[serde(rename = "type")]
     pub t: TypeField<10>,
 
@@ -319,8 +365,11 @@ pub struct NumberOption {
     pub autocomplete: Option<bool>,
 }
 
+/// The Definition of an Option without settings of its own (boolean, user, role, mentionable,
+/// attachment); `T` is the Option type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseOption<const T: u8> {
+    /// The Option type, `T`
     #[serde(rename = "type")]
     pub t: TypeField<T>,
 
@@ -343,8 +392,10 @@ pub struct BaseOption<const T: u8> {
     pub required: Option<bool>,
 }
 
+/// A channel Option's Definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelOption {
+    /// The Option type, always `7`
     #[serde(rename = "type")]
     pub t: TypeField<7>,
 

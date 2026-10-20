@@ -55,7 +55,9 @@ pub enum InteractionOutcome {
 
     /// The handler returned an error; `response` is the ephemeral error message sent instead
     HandlerFailed {
+        /// What went wrong, for the log
         error: HandlerError,
+        /// The ephemeral error message to answer with
         response: InteractionResponse,
     },
 }

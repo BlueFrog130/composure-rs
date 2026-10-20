@@ -17,12 +17,15 @@ use super::{Ctx, HandlerError, Theme};
 
 /// What Discord stores for a top-level Command. Implemented by `#[command]` and `#[group]`.
 pub trait CommandDefinition {
+    /// The Command's name, unique per type within a Scope
     const NAME: &'static str;
+    /// Chat input, user, or message
     const KIND: ApplicationCommandType;
 
     /// Named Scope the Command is synced to; `None` is global
     const SCOPE: Option<&'static str> = None;
 
+    /// The Command Definition Sync sends to Discord
     fn definition() -> ApplicationCommand;
 }
 
@@ -38,6 +41,7 @@ pub trait SubcommandDefinition: CommandDefinition {
 /// Runs a Command for an Interaction. Implemented by `#[command]` and `#[group]`; Groups route to
 /// the subcommand that was invoked.
 pub trait Command<S>: CommandDefinition {
+    /// Reads the Options, runs the handler, and turns its output into the Response
     fn invoke(
         invocation: Invocation<'_, S>,
     ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send;
@@ -64,6 +68,7 @@ pub struct Invocation<'a, S> {
 }
 
 impl<'a, S> Invocation<'a, S> {
+    /// The top level of `interaction`'s Command
     pub fn new(interaction: &'a Arc<ApplicationCommandInteraction>, state: &'a S) -> Self {
         Self {
             interaction,
@@ -80,10 +85,12 @@ impl<'a, S> Invocation<'a, S> {
         self
     }
 
+    /// The [`Ctx`] the handler receives
     pub fn ctx(&self) -> Ctx<'a, S> {
         Ctx::new(self.interaction, self.state).with_theme(self.theme)
     }
 
+    /// The invoked Command's data
     pub fn data(&self) -> &'a ApplicationCommandInteractionData {
         &self.interaction.data
     }
@@ -131,15 +138,22 @@ impl<'a, S> Invocation<'a, S> {
 /// Name, description, and Discord-side settings of a Command or Group, from its attribute
 #[derive(Debug, Clone, Copy)]
 pub struct CommandMeta {
+    /// The name Discord shows and routes by
     pub name: &'static str,
+    /// 1-100 characters; empty for user and message Commands
     pub description: &'static str,
+    /// Permissions a member needs to see the Command, unless a server admin changes it
     pub default_member_permissions: Option<Permissions>,
+    /// Installs that offer it: to servers, to users
     pub integration_types: Option<&'static [ApplicationIntegrationType]>,
+    /// Where it can be used: servers, the bot's DMs, other DMs and group chats
     pub contexts: Option<&'static [InteractionContextType]>,
+    /// Age-restricted
     pub nsfw: Option<bool>,
 }
 
 impl CommandMeta {
+    /// A Command with Discord's defaults for every setting
     pub const fn new(name: &'static str, description: &'static str) -> Self {
         Self {
             name,
@@ -178,10 +192,12 @@ impl CommandMeta {
         })
     }
 
+    /// A user (context menu) Command
     pub fn user(&self) -> ApplicationCommand {
         ApplicationCommand::UserCommand(self.details())
     }
 
+    /// A message (context menu) Command
     pub fn message(&self) -> ApplicationCommand {
         ApplicationCommand::MessageCommand(self.details())
     }
@@ -228,11 +244,14 @@ impl CommandMeta {
 /// A Command Definition and the Scope it syncs to
 #[derive(Debug)]
 pub struct ScopedDefinition {
+    /// The named Scope; `None` is global
     pub scope: Option<&'static str>,
+    /// The Command Definition
     pub command: ApplicationCommand,
 }
 
 impl ScopedDefinition {
+    /// `C`'s definition and Scope
     pub fn of<C: CommandDefinition>() -> Self {
         Self {
             scope: C::SCOPE,
@@ -250,6 +269,7 @@ pub fn __unshare<T: Clone>(interaction: Arc<T>) -> T {
 
 /// The Command Definitions of an App, for Sync. Implemented by `#[app]`.
 pub trait CommandSetDefinition {
+    /// Every Command Definition, with its Scope
     fn definitions() -> Vec<ScopedDefinition>;
 }
 

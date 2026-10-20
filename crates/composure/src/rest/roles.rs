@@ -22,9 +22,11 @@ routes! {
 /// Discord's default (create) or are unchanged (modify); `Some(None)` clears.
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct RoleFields<'a> {
+    /// 1-100 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
+    /// What members with the role may do
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permissions: Option<Permissions>,
 
@@ -40,9 +42,11 @@ pub struct RoleFields<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<Option<&'a str>>,
 
+    /// A unicode emoji shown as the role icon (needs the ROLE_ICONS feature)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unicode_emoji: Option<Option<&'a str>>,
 
+    /// Anyone may mention it
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mentionable: Option<bool>,
 
@@ -54,7 +58,9 @@ pub struct RoleFields<'a> {
 /// One entry of [`BotClient::modify_role_positions`]
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct RolePosition {
+    /// The role
     pub id: Snowflake,
+    /// Its new position
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<i32>,
 }

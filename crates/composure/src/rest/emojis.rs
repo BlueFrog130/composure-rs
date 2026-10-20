@@ -23,6 +23,7 @@ routes! {
 /// Body of [`BotClient::create_guild_emoji`] and [`BotClient::create_application_emoji`]
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct CreateEmoji<'a> {
+    /// 2-32 characters
     pub name: &'a str,
 
     /// Data URI of a 128x128 image (max 256 KiB)
@@ -40,6 +41,7 @@ pub struct CreateEmoji<'a> {
 /// Body of [`BotClient::modify_guild_emoji`] and [`BotClient::modify_application_emoji`]
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ModifyEmoji<'a> {
+    /// 2-32 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
@@ -55,6 +57,7 @@ pub struct ModifyEmoji<'a> {
 /// Application emojis come wrapped
 #[derive(Debug, Clone, Deserialize)]
 pub struct ApplicationEmojis {
+    /// The emojis
     pub items: Vec<Emoji>,
 }
 

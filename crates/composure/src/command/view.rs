@@ -33,7 +33,8 @@ use super::{
 };
 
 /// A rendered message layout: Components V2 components, answered as a new message (or, from an
-/// inline handler, as an update of the message the component is on). Built by `rsx!`.
+/// inline handler, as an update of the message the component is on). Built by
+/// [`rsx!`](crate::rsx); see [Views](crate::guide::views).
 ///
 /// A `custom_id` that could not be built (state past 100 characters) is kept inside and surfaces
 /// as a [`HandlerError`] when the View is answered with.
@@ -45,6 +46,7 @@ pub struct View {
 }
 
 impl View {
+    /// A View of `components`, as built by hand
     pub fn new(components: Vec<Component>) -> Self {
         Self {
             components,
@@ -52,6 +54,7 @@ impl View {
         }
     }
 
+    /// The top-level components
     pub fn components(&self) -> &[Component] {
         &self.components
     }
@@ -94,10 +97,12 @@ pub struct ModalView {
 }
 
 impl ModalView {
+    /// The modal: title, `custom_id`, components
     pub fn data(&self) -> &ModalCallbackData {
         &self.data
     }
 
+    /// The modal, or the error building its `custom_id`
     pub fn into_data(self) -> Result<ModalCallbackData, CustomIdError> {
         match self.error {
             Some(error) => Err(error),
@@ -197,6 +202,7 @@ impl Children {
     note = "use text (&str, String, numbers), a Component, a View, a #[view]'s Props, or an Option, Vec, or iterator of them; collect other iterators into a Vec"
 )]
 pub trait IntoChildren {
+    /// Adds `self` to the markup level being built
     fn push_into(self, children: &mut Children);
 }
 
@@ -245,6 +251,7 @@ into_children_component!(
     note = "use &str, String, a number, or an Option of one; call `.to_string()` on other Display types"
 )]
 pub trait IntoText {
+    /// Appends `self` to the text being built
     fn push_text(self, text: &mut String);
 }
 
@@ -423,6 +430,7 @@ impl<T: IntoChildren> IntoChildren for std::vec::IntoIter<T> {
     note = "the attribute expects `{T}`"
 )]
 pub trait IntoAttr<T> {
+    /// The field value
     fn into_attr(self) -> T;
 }
 
@@ -477,6 +485,7 @@ impl IntoAttr<Option<PartialEmoji>> for &str {
 /// as an update of the message the component is on), or a `Result` of one
 #[diagnostic::on_unimplemented(message = "`{Self}` is not a message View")]
 pub trait Rerender {
+    /// The response updating the component's message with this View
     fn rerender(self) -> Result<InteractionResponse, HandlerError>;
 }
 
@@ -535,20 +544,25 @@ impl<T: CommandOutput> ViaOutput for HandlerOutput<T> {
 /// the Views its markup places, so a forgotten sub-View fails to compile
 #[derive(Debug, Clone, Copy)]
 pub struct ViewInfo {
+    /// The `custom_id` prefix of its inline handlers
     pub prefix: &'static str,
+    /// Whether it has inline handlers, so must be listed in an App
     pub handled: bool,
+    /// The Views its markup places
     pub views: &'static [ViewInfo],
 }
 
 /// Implemented by `#[view]`
 pub trait ViewDefinition {
+    /// What the App listing it checks
     const INFO: ViewInfo;
 }
 
 /// Runs a View's inline handlers; `None` when the handler named in the `custom_id` is not one of
 /// them. Implemented by `#[view]`; Views with handlers are listed in an `#[app]`.
 pub trait ViewHandler<S>: ViewDefinition {
-    /// `fields` is the `custom_id` after `prefix:`: the handler name, then its captured Props
+    /// Runs the `on:click` or `on:select` handler named in the `custom_id`. `fields` is the
+    /// `custom_id` after `prefix:`: the handler name, then its captured Props
     fn component(
         _ctx: ComponentCtx<'_, S>,
         _fields: Option<&str>,
@@ -556,6 +570,7 @@ pub trait ViewHandler<S>: ViewDefinition {
         async { None }
     }
 
+    /// Runs the `on:submit` handler named in the `custom_id`; `fields` as for [`component`](Self::component)
     fn modal(
         _ctx: ModalCtx<'_, S>,
         _fields: Option<&str>,
@@ -575,6 +590,7 @@ pub trait SelectValue: Sized {
     /// Several selections (a `Vec`)
     const MANY: bool = false;
 
+    /// Reads the selected values; an error message when they do not fit the type
     fn extract(data: &MessageComponentData) -> Result<Self, String>;
 }
 

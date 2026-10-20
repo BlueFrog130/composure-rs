@@ -20,7 +20,9 @@ routes! {
 /// Paging of [`BotClient::get_bans`], by user id
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GetBans {
+    /// Bans of users before this id
     pub before: Option<Snowflake>,
+    /// Bans of users after this id
     pub after: Option<Snowflake>,
     /// 1-1000, default 1000
     pub limit: Option<u16>,

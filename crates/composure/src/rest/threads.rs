@@ -35,6 +35,7 @@ pub struct StartThread<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_archive_duration: Option<u32>,
 
+    /// Seconds between messages per user (slowmode), 0-21600
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_per_user: Option<u32>,
 
@@ -54,11 +55,14 @@ pub struct StartThread<'a> {
 /// Body of [`BotClient::start_forum_thread`]: a forum or media post with its first message
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct StartForumThread<'a> {
+    /// 1-100 characters
     pub name: &'a str,
 
+    /// Minutes of inactivity before archiving: 60, 1440, 4320, or 10080
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_archive_duration: Option<u32>,
 
+    /// Seconds between messages per user (slowmode), 0-21600
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_per_user: Option<u32>,
 
@@ -78,7 +82,9 @@ pub struct StartForumThread<'a> {
 /// for joined private threads)
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ArchivedThreads<'a> {
+    /// Threads archived before this
     pub before: Option<&'a str>,
+    /// How many, default all
     pub limit: Option<u8>,
 }
 

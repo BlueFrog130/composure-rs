@@ -7,6 +7,8 @@ use crate::{
     types::{Member, Permissions, Snowflake, User},
 };
 
+/// The channel fields sent in Interactions and resolved data. In Options: `&PartialChannel`. It is
+/// [`Mentionable`] as `<#id>`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PartialChannel {
     /// the id of this channel
@@ -291,10 +293,13 @@ pub struct Overwrite {
     pub deny: Permissions,
 }
 
+/// Whose permissions an [`Overwrite`] changes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum OverwriteType {
+    /// A role's
     Role = 0,
+    /// A member's
     Member = 1,
 }
 
@@ -325,6 +330,7 @@ pub struct ThreadMetadata {
 /// Endpoints
 #[derive(Debug, Clone, Deserialize)]
 pub struct ThreadList {
+    /// The threads
     pub threads: Vec<Channel>,
 
     /// The bot's membership in each thread it joined

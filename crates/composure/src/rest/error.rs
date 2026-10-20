@@ -5,6 +5,7 @@ use serde_json::value::RawValue;
 
 use super::TransportError;
 
+/// A REST call's result
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// A failed REST call
@@ -72,8 +73,11 @@ impl Error {
 /// [Error response](https://discord.com/developers/docs/reference#error-messages) body plus status
 #[derive(Debug)]
 pub struct ApiError {
+    /// The HTTP status
     pub status: u16,
+    /// Discord's error code
     pub code: JsonErrorCode,
+    /// Discord's error message
     pub message: String,
     /// Per-field validation errors, as sent
     pub errors: Option<Box<RawValue>>,
@@ -143,12 +147,15 @@ macro_rules! json_error_codes {
         /// Open: codes not listed here are [`JsonErrorCode::Other`].
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[non_exhaustive]
+        #[allow(missing_docs)] // named after Discord's descriptions
         pub enum JsonErrorCode {
             $($(#[$meta])* $name,)*
+            /// A code not listed here
             Other(u32),
         }
 
         impl JsonErrorCode {
+            /// The code numbered `code`
             pub fn from_u32(code: u32) -> Self {
                 match code {
                     $($code => JsonErrorCode::$name,)*
@@ -156,6 +163,7 @@ macro_rules! json_error_codes {
                 }
             }
 
+            /// The code's number
             pub fn to_u32(self) -> u32 {
                 match self {
                     $(JsonErrorCode::$name => $code,)*

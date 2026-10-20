@@ -14,6 +14,7 @@ pub struct WebhookEventPayload {
     /// Always 1
     pub version: u8,
 
+    /// The application the event is for
     pub application_id: Snowflake,
 
     /// 0 is a Ping (URL verification), 1 an event
@@ -25,6 +26,7 @@ pub struct WebhookEventPayload {
 }
 
 impl WebhookEventPayload {
+    /// Whether this is Discord verifying the events URL
     pub fn is_ping(&self) -> bool {
         self.t == 0
     }
@@ -40,6 +42,7 @@ pub struct EventBody {
     /// When the event happened (ISO 8601)
     pub timestamp: String,
 
+    /// The event's data, parsed by [`EventBody::parse`]
     pub data: Option<Box<RawValue>>,
 }
 
@@ -79,16 +82,24 @@ pub enum Event {
     ApplicationAuthorized(ApplicationAuthorized),
     /// A user removed the app
     ApplicationDeauthorized(ApplicationDeauthorized),
+    /// A user or guild bought a SKU
     EntitlementCreate(Entitlement),
+    /// An entitlement changed, e.g. a subscription renewed or ended
     EntitlementUpdate(Entitlement),
+    /// An entitlement was removed, e.g. refunded
     EntitlementDelete(Entitlement),
+    /// A message was sent in a lobby
     LobbyMessageCreate(LobbyMessage),
+    /// A lobby message was edited
     LobbyMessageUpdate(LobbyMessage),
+    /// A lobby message was deleted
     LobbyMessageDelete(LobbyMessageDelete),
     /// Any other event (game DMs, quests, events added later), or one whose data did not match
     /// its model
     Unknown {
+        /// The event type name
         kind: String,
+        /// The event's data, as sent
         data: Option<Box<RawValue>>,
     },
 }
@@ -112,38 +123,51 @@ pub struct ApplicationAuthorized {
 /// [Application Deauthorized](https://discord.com/developers/docs/events/webhook-events#application-deauthorized)
 #[derive(Debug, Clone, Deserialize)]
 pub struct ApplicationDeauthorized {
+    /// Who removed the app
     pub user: User,
 }
 
 /// [Lobby Message](https://discord.com/developers/docs/events/webhook-events#lobby-message-create)
 #[derive(Debug, Clone, Deserialize)]
 pub struct LobbyMessage {
+    /// The message's id
     pub id: Snowflake,
 
+    /// The message type
     #[serde(rename = "type")]
     pub t: u8,
 
+    /// The text
     pub content: String,
 
+    /// The lobby
     pub lobby_id: Snowflake,
 
+    /// The lobby's channel
     pub channel_id: Snowflake,
 
+    /// Who sent it
     pub author: User,
 
+    /// Key-value data attached by the game
     pub metadata: Option<HashMap<String, String>>,
 
+    /// [Message flags](https://discord.com/developers/docs/resources/message#message-object-message-flags)
     pub flags: Option<u64>,
 
+    /// The application that sent it, for messages sent by apps
     pub application_id: Option<Snowflake>,
 
+    /// When it was edited (ISO 8601)
     pub edited_timestamp: Option<String>,
 }
 
 /// [Lobby Message Delete](https://discord.com/developers/docs/events/webhook-events#lobby-message-delete)
 #[derive(Debug, Clone, Deserialize)]
 pub struct LobbyMessageDelete {
+    /// The deleted message's id
     pub id: Snowflake,
+    /// The lobby
     pub lobby_id: Snowflake,
 }
 

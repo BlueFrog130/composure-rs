@@ -29,18 +29,23 @@ routes! {
 /// nullable one. Images are data URIs (`data:image/png;base64,...`).
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ModifyGuild<'a> {
+    /// New name, 2-100 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
+    /// What members need before they can talk
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification_level: Option<Option<VerificationLevel>>,
 
+    /// Default notifications for members
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_message_notifications: Option<Option<DefaultMessageNotificationLevel>>,
 
+    /// Whose messages are scanned for explicit media
     #[serde(skip_serializing_if = "Option::is_none")]
     pub explicit_content_filter: Option<Option<ExplicitContentFilterLevel>>,
 
+    /// The AFK voice channel
     #[serde(skip_serializing_if = "Option::is_none")]
     pub afk_channel_id: Option<Option<Snowflake>>,
 
@@ -48,33 +53,43 @@ pub struct ModifyGuild<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub afk_timeout: Option<u32>,
 
+    /// Icon, as a data URI (animated for boosted guilds)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<Option<&'a str>>,
 
+    /// Invite background, as a data URI (needs the feature)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub splash: Option<Option<&'a str>>,
 
+    /// Discovery splash, as a data URI (needs the feature)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub discovery_splash: Option<Option<&'a str>>,
 
+    /// Banner, as a data URI (needs the feature)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub banner: Option<Option<&'a str>>,
 
+    /// Where system messages go
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_channel_id: Option<Option<Snowflake>>,
 
+    /// [System channel flags](https://discord.com/developers/docs/resources/guild#guild-object-system-channel-flags): which system messages to suppress
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_channel_flags: Option<u32>,
 
+    /// The rules channel (community guilds)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rules_channel_id: Option<Option<Snowflake>>,
 
+    /// Where Discord's notices to admins go (community guilds)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_updates_channel_id: Option<Option<Snowflake>>,
 
+    /// Where Discord's safety alerts go (community guilds)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub safety_alerts_channel_id: Option<Option<Snowflake>>,
 
+    /// Locale of a community guild
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferred_locale: Option<Option<&'a str>>,
 
@@ -82,9 +97,11 @@ pub struct ModifyGuild<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub features: Option<&'a [&'a str]>,
 
+    /// Description, for discoverable guilds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<Option<&'a str>>,
 
+    /// Whether the boost progress bar is shown
     #[serde(skip_serializing_if = "Option::is_none")]
     pub premium_progress_bar_enabled: Option<bool>,
 
@@ -96,26 +113,34 @@ pub struct ModifyGuild<'a> {
 /// Body of [`BotClient::create_guild_channel`]
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct CreateGuildChannel<'a> {
+    /// 1-100 characters
     pub name: &'a str,
 
+    /// Text by default
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub kind: Option<ChannelType>,
 
+    /// 0-1024 characters (4096 for forums)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub topic: Option<&'a str>,
 
+    /// Voice: bits per second, 8000 or more
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitrate: Option<u32>,
 
+    /// Voice: most users, 0 for no limit
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_limit: Option<u32>,
 
+    /// Seconds between messages per user (slowmode), 0-21600
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_per_user: Option<u32>,
 
+    /// Sorting position
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<i32>,
 
+    /// Permission overwrites
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permission_overwrites: Option<&'a [Overwrite]>,
 
@@ -123,27 +148,35 @@ pub struct CreateGuildChannel<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<Snowflake>,
 
+    /// Age-restricted
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nsfw: Option<bool>,
 
+    /// Voice: region id, automatic when `None`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rtc_region: Option<&'a str>,
 
+    /// Voice: camera video quality
     #[serde(skip_serializing_if = "Option::is_none")]
     pub video_quality_mode: Option<VideoQualityMode>,
 
+    /// Threads: minutes of inactivity before new threads hide (60, 1440, 4320, 10080)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_auto_archive_duration: Option<u32>,
 
+    /// Forums: the default reaction emoji on posts
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_reaction_emoji: Option<&'a DefaultReaction>,
 
+    /// Forums: default post sort order
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_sort_order: Option<SortOrderType>,
 
+    /// Forums: default layout
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_forum_layout: Option<ForumLayoutType>,
 
+    /// Seconds between messages per user in new threads
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_thread_rate_limit_per_user: Option<u32>,
 
@@ -155,8 +188,10 @@ pub struct CreateGuildChannel<'a> {
 /// One entry of [`BotClient::modify_guild_channel_positions`]
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ChannelPosition {
+    /// The channel
     pub id: Snowflake,
 
+    /// Its new position
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Option<i32>>,
 
@@ -164,6 +199,7 @@ pub struct ChannelPosition {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lock_permissions: Option<bool>,
 
+    /// Its new category
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<Option<Snowflake>>,
 }
@@ -171,10 +207,13 @@ pub struct ChannelPosition {
 /// Paging of [`BotClient::get_current_user_guilds`]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GetGuilds {
+    /// Guilds before this id
     pub before: Option<Snowflake>,
+    /// Guilds after this id
     pub after: Option<Snowflake>,
     /// 1-200, default 200
     pub limit: Option<u8>,
+    /// Include approximate member and presence counts
     pub with_counts: bool,
 }
 

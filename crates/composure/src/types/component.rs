@@ -27,25 +27,45 @@ pub type ChannelSelect = SelectMenu<8>;
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum Component {
+    /// Type 1: a row of buttons or one select (`<Row>`)
     ActionRow(ActionRow),
+    /// Type 2: a button (`<Button>`)
     Button(ButtonComponent),
+    /// Type 3: a select of text options (`<StringSelect>`)
     StringSelect(StringSelect),
+    /// Type 4: free text, in modals (`<TextInput>`)
     TextInput(TextInput),
+    /// Type 5: a user select (`<UserSelect>`)
     UserSelect(UserSelect),
+    /// Type 6: a role select (`<RoleSelect>`)
     RoleSelect(RoleSelect),
+    /// Type 7: a user-or-role select (`<MentionableSelect>`)
     MentionableSelect(MentionableSelect),
+    /// Type 8: a channel select (`<ChannelSelect>`)
     ChannelSelect(ChannelSelect),
+    /// Type 9: text beside an accessory (`<Section>`)
     Section(Section),
+    /// Type 10: markdown text (`<Text>`)
     TextDisplay(TextDisplay),
+    /// Type 11: a small image, as a section's accessory (`<Thumbnail>`)
     Thumbnail(Thumbnail),
+    /// Type 12: a grid of images and videos (`<Gallery>`)
     MediaGallery(MediaGallery),
+    /// Type 13: an uploaded file (`<File>`)
     File(FileComponent),
+    /// Type 14: space and a divider (`<Separator>`)
     Separator(Separator),
+    /// Type 17: a framed group of components (`<Container>`)
     Container(Container),
+    /// Type 18: a title above one modal input (`<Label>`)
     Label(Label),
+    /// Type 19: file attachments, in modals (`<FileUpload>`)
     FileUpload(FileUpload),
+    /// Type 21: pick one, in modals (`<RadioGroup>`)
     RadioGroup(RadioGroup),
+    /// Type 22: pick several, in modals (`<CheckboxGroup>`)
     CheckboxGroup(CheckboxGroup),
+    /// Type 23: one yes/no, in modals (`<Checkbox>`)
     Checkbox(Checkbox),
     /// A component type Discord added after this version, kept as received
     Unknown(Box<RawValue>),
@@ -171,6 +191,7 @@ impl Component {
         Component::TextDisplay(TextDisplay::new(content))
     }
 
+    /// A [`ButtonComponent`]: a `custom_id` button, or a link button with `url`
     pub fn new_button(
         style: ButtonStyle,
         label: Option<String>,
@@ -184,6 +205,7 @@ impl Component {
         ))
     }
 
+    /// A [`StringSelect`] offering `options`
     pub fn new_string_select(
         custom_id: String,
         options: Option<Vec<SelectOption>>,
@@ -206,6 +228,8 @@ impl Component {
 
     // Mirrors the Discord text input fields; a builder would be a breaking change.
     #[allow(clippy::too_many_arguments)]
+    /// A [`TextInput`] with a (deprecated) built-in label; inside a [`Label`] use
+    /// [`TextInput::new`] and clear `label`
     pub fn new_text_input(
         custom_id: String,
         style: TextInputStyle,
@@ -228,6 +252,7 @@ impl Component {
         ))
     }
 
+    /// A [`UserSelect`]; `options` and `channel_types` do not apply
     pub fn new_user_select(
         custom_id: String,
         options: Option<Vec<SelectOption>>,
@@ -248,6 +273,7 @@ impl Component {
         ))
     }
 
+    /// A [`RoleSelect`]; `options` and `channel_types` do not apply
     pub fn new_role_select(
         custom_id: String,
         options: Option<Vec<SelectOption>>,
@@ -268,6 +294,7 @@ impl Component {
         ))
     }
 
+    /// A [`MentionableSelect`]; `options` and `channel_types` do not apply
     pub fn new_mentionable_select(
         custom_id: String,
         options: Option<Vec<SelectOption>>,
@@ -288,6 +315,7 @@ impl Component {
         ))
     }
 
+    /// A [`ChannelSelect`] offering `channel_types` (all when `None`); `options` does not apply
     pub fn new_channel_select(
         custom_id: String,
         options: Option<Vec<SelectOption>>,
@@ -363,20 +391,23 @@ impl Component {
 }
 
 /// [Action Row](https://discord.com/developers/docs/components/reference#action-row): a row of up
-/// to 5 buttons, or one select
+/// to 5 buttons, or one select. In markup: [`<Row>`](crate::guide::views#row-alias-actionrow).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ActionRow {
     #[serde(rename = "type")]
+    /// The component type, always `1`
     pub t: TypeField<1>,
 
     /// Identifier unique within the message; Discord numbers components without one
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<i32>,
 
+    /// Up to 5 buttons, or one select
     pub components: Vec<Component>,
 }
 
 impl ActionRow {
+    /// A row of `components`: up to 5 buttons, or one select
     pub fn new(components: Vec<Component>) -> Self {
         Self {
             t: TypeField,
@@ -386,24 +417,27 @@ impl ActionRow {
     }
 }
 
-/// Button Object
+/// [Button](https://discord.com/developers/docs/components/reference#button): in an
+/// [`ActionRow`], or as a [`Section`]'s accessory. In markup:
+/// [`<Button>`](crate::guide::views#button).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ButtonComponent {
     #[serde(rename = "type")]
+    /// The component type, always `2`
     pub t: TypeField<2>,
 
     /// Identifier unique within the message; Discord numbers components without one
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<i32>,
 
-    /// Button style
+    /// Color and behavior
     pub style: ButtonStyle,
 
     /// Text that appears on the button; max 80 characters
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 
-    /// name, id, and animated
+    /// Shown before the label: a unicode emoji (`name`) or a custom one (`id`, `name`, `animated`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub emoji: Option<PartialEmoji>,
 
@@ -425,6 +459,8 @@ pub struct ButtonComponent {
 }
 
 impl ButtonComponent {
+    /// A button: give it a `custom_id` (styles `Primary` to `Danger`) or a `url` (`Link`); see
+    /// [`ButtonComponent::premium`] for `Premium`
     pub fn new(
         style: ButtonStyle,
         label: Option<String>,
@@ -456,6 +492,9 @@ impl ButtonComponent {
     }
 }
 
+/// [Button Style](https://discord.com/developers/docs/components/reference#button-button-styles):
+/// the color and behavior of a button. In markup, the `primary`, `secondary`, `success` and
+/// `danger` flags, or `style=..`.
 #[derive(Debug, Clone, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum ButtonStyle {
@@ -478,7 +517,11 @@ pub enum ButtonStyle {
     Premium = 6,
 }
 
-/// [Select Menu Structure](https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-menu-structure)
+/// [Select menu](https://discord.com/developers/docs/components/reference#string-select): in an
+/// [`ActionRow`] in messages, or a [`Label`] in modals. `T` is the component type; use the
+/// aliases [`StringSelect`], [`UserSelect`], [`RoleSelect`], [`MentionableSelect`] and
+/// [`ChannelSelect`]. In markup: [`<StringSelect>`](crate::guide::views#stringselect-alias-select),
+/// [`<UserSelect>` and the other entity selects](crate::guide::views#userselect-roleselect-mentionableselect-channelselect).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SelectMenu<const T: u8> {
     /// [Type](https://discord.com/developers/docs/interactions/message-components#component-object-component-types) of select menu component (text: 3, user: 5, role: 6, mentionable: 7, channels: 8)
@@ -526,6 +569,8 @@ pub struct SelectMenu<const T: u8> {
 }
 
 impl<const T: u8> SelectMenu<T> {
+    /// A select of type `T`; `options` only apply to string selects, `channel_types` only to
+    /// channel selects
     pub fn new(
         custom_id: String,
         options: Option<Vec<SelectOption>>,
@@ -555,6 +600,7 @@ impl<const T: u8> SelectMenu<T> {
 /// of an entity select
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SelectDefaultValue {
+    /// The preselected entity
     pub id: Snowflake,
     /// `"user"`, `"role"`, or `"channel"`
     #[serde(rename = "type")]
@@ -562,14 +608,17 @@ pub struct SelectDefaultValue {
 }
 
 impl SelectDefaultValue {
+    /// A preselected user
     pub fn user(id: Snowflake) -> Self {
         Self::of(id, "user")
     }
 
+    /// A preselected role
     pub fn role(id: Snowflake) -> Self {
         Self::of(id, "role")
     }
 
+    /// A preselected channel
     pub fn channel(id: Snowflake) -> Self {
         Self::of(id, "channel")
     }
@@ -582,7 +631,8 @@ impl SelectDefaultValue {
     }
 }
 
-/// [Select Option Structure](https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure)
+/// [Select option](https://discord.com/developers/docs/components/reference#string-select-select-option-structure)
+/// of a [`StringSelect`]. In markup: [`<Option>`](crate::guide::views#option).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SelectOption {
     /// User-facing name of the option; max 100 characters
@@ -595,7 +645,7 @@ pub struct SelectOption {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
-    /// id, name, and animated
+    /// Shown before the label: a unicode emoji (`name`) or a custom one (`id`, `name`, `animated`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub emoji: Option<PartialEmoji>,
 
@@ -605,6 +655,7 @@ pub struct SelectOption {
 }
 
 impl SelectOption {
+    /// An option showing `label` and submitting `value`
     pub fn new(
         label: String,
         value: String,
@@ -622,9 +673,12 @@ impl SelectOption {
     }
 }
 
+/// [Text Input](https://discord.com/developers/docs/components/reference#text-input): free text in
+/// a modal, inside a [`Label`]. In markup: [`<TextInput>`](crate::guide::views#textinput).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TextInput {
     #[serde(rename = "type")]
+    /// The component type, always `4`
     pub t: TypeField<4>,
 
     /// Identifier unique within the message; Discord numbers components without one
@@ -665,6 +719,8 @@ pub struct TextInput {
 
 impl TextInput {
     #[allow(clippy::too_many_arguments)]
+    /// A text input. `label` is the deprecated built-in label: set the field to `None` when the
+    /// input goes in a [`Label`], as `rsx!` and `#[derive(Modal)]` do.
     pub fn new(
         custom_id: String,
         style: TextInputStyle,
@@ -690,20 +746,25 @@ impl TextInput {
     }
 }
 
-/// [Text Display](https://discord.com/developers/docs/components/reference#text-display): markdown
+/// [Text Display](https://discord.com/developers/docs/components/reference#text-display): markdown,
+/// in Components V2 messages and modals. In markup:
+/// [`<Text>`](crate::guide::views#text-alias-textdisplay), or bare text.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TextDisplay {
     #[serde(rename = "type")]
+    /// The component type, always `10`
     pub t: TypeField<10>,
 
     /// Identifier unique within the message; Discord numbers components without one
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<i32>,
 
+    /// Markdown: headings, lists, links, mentions, `-#` subtext
     pub content: String,
 }
 
 impl TextDisplay {
+    /// Markdown text
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             t: TypeField,
@@ -714,10 +775,12 @@ impl TextDisplay {
 }
 
 /// [Container](https://discord.com/developers/docs/components/reference#container): top-level
-/// component of a Components V2 message, grouping others in a frame with an optional accent bar
+/// component of a Components V2 message, grouping others in a frame with an optional accent bar.
+/// In markup: [`<Container>`](crate::guide::views#container).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Container {
     #[serde(rename = "type")]
+    /// The component type, always `17`
     pub t: TypeField<17>,
 
     /// Identifier unique within the message; Discord numbers components without one
@@ -738,6 +801,7 @@ pub struct Container {
 }
 
 impl Container {
+    /// A container of `components` without an accent color, which the App's [`Theme`](crate::command::Theme) fills in
     pub fn new(components: Vec<Component>) -> Self {
         Self {
             t: TypeField,
@@ -748,11 +812,13 @@ impl Container {
         }
     }
 
+    /// Sets the accent bar's color (`0xRRGGBB`)
     pub fn with_accent_color(mut self, color: u32) -> Self {
         self.accent_color = Some(color);
         self
     }
 
+    /// Blurs the content until clicked
     pub fn spoiler(mut self) -> Self {
         self.spoiler = Some(true);
         self
@@ -760,10 +826,11 @@ impl Container {
 }
 
 /// [Section](https://discord.com/developers/docs/components/reference#section): text beside an
-/// accessory, in Components V2 messages
+/// accessory, in Components V2 messages. In markup: [`<Section>`](crate::guide::views#section).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Section {
     #[serde(rename = "type")]
+    /// The component type, always `9`
     pub t: TypeField<9>,
 
     /// Identifier unique within the message; Discord numbers components without one
@@ -778,6 +845,7 @@ pub struct Section {
 }
 
 impl Section {
+    /// `components` (1-3 text displays) beside `accessory` (a button or a thumbnail)
     pub fn new(components: Vec<Component>, accessory: Component) -> Self {
         Self {
             t: TypeField,
@@ -793,9 +861,11 @@ impl Section {
 /// only `url` is sent, the rest is filled in by Discord
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UnfurledMedia {
+    /// The media's URL, or `attachment://<filename>` for a file uploaded with the message; the only field sent
     pub url: String,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Discord's cached copy of the media
     pub proxy_url: Option<String>,
 
     /// Images and videos only
@@ -811,6 +881,7 @@ pub struct UnfurledMedia {
     pub placeholder: Option<String>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Version of the `placeholder` format
     pub placeholder_version: Option<u8>,
 
     /// Media type
@@ -818,6 +889,7 @@ pub struct UnfurledMedia {
     pub content_type: Option<String>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Whether the image is animated
     pub flags: Option<UnfurledMediaFlags>,
 
     /// The uploaded attachment, for `attachment://` media
@@ -826,6 +898,7 @@ pub struct UnfurledMedia {
 }
 
 impl UnfurledMedia {
+    /// Media at `url` (or `attachment://<filename>`), for Discord to unfurl
     pub fn new(url: impl Into<String>) -> Self {
         Self {
             url: url.into(),
@@ -869,10 +942,11 @@ impl<'de> Deserialize<'de> for UnfurledMediaFlags {
 }
 
 /// [Thumbnail](https://discord.com/developers/docs/components/reference#thumbnail): a small image
-/// as a [`Section`]'s accessory
+/// as a [`Section`]'s accessory. In markup: [`<Thumbnail>`](crate::guide::views#thumbnail).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Thumbnail {
     #[serde(rename = "type")]
+    /// The component type, always `11`
     pub t: TypeField<11>,
 
     /// Identifier unique within the message; Discord numbers components without one
@@ -892,6 +966,7 @@ pub struct Thumbnail {
 }
 
 impl Thumbnail {
+    /// A thumbnail of the image at `url`, or `attachment://<filename>`
     pub fn new(url: impl Into<String>) -> Self {
         Self {
             t: TypeField,
@@ -902,11 +977,13 @@ impl Thumbnail {
         }
     }
 
+    /// Sets the alt text
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
+    /// Blurs the image until clicked
     pub fn spoiler(mut self) -> Self {
         self.spoiler = Some(true);
         self
@@ -914,10 +991,11 @@ impl Thumbnail {
 }
 
 /// [Media Gallery](https://discord.com/developers/docs/components/reference#media-gallery): a grid
-/// of images and videos
+/// of images and videos. In markup: [`<Gallery>`](crate::guide::views#gallery-alias-mediagallery).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MediaGallery {
     #[serde(rename = "type")]
+    /// The component type, always `12`
     pub t: TypeField<12>,
 
     /// Identifier unique within the message; Discord numbers components without one
@@ -929,6 +1007,7 @@ pub struct MediaGallery {
 }
 
 impl MediaGallery {
+    /// A gallery of `items` (1-10)
     pub fn new(items: Vec<MediaGalleryItem>) -> Self {
         Self {
             t: TypeField,
@@ -938,7 +1017,9 @@ impl MediaGallery {
     }
 }
 
-/// [Media Gallery Item](https://discord.com/developers/docs/components/reference#media-gallery-media-gallery-item-structure)
+/// [Media Gallery Item](https://discord.com/developers/docs/components/reference#media-gallery-media-gallery-item-structure):
+/// one image or video of a [`MediaGallery`]. In markup:
+/// [`<Item>`](crate::guide::views#item-alias-mediagalleryitem).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MediaGalleryItem {
     /// An image or video
@@ -963,11 +1044,13 @@ impl MediaGalleryItem {
         }
     }
 
+    /// Sets the alt text
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
+    /// Blurs the media until clicked
     pub fn spoiler(mut self) -> Self {
         self.spoiler = Some(true);
         self
@@ -975,10 +1058,11 @@ impl MediaGalleryItem {
 }
 
 /// [File](https://discord.com/developers/docs/components/reference#file): one file uploaded with
-/// the message, shown inline
+/// the message, shown inline. In markup: [`<File>`](crate::guide::views#file).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FileComponent {
     #[serde(rename = "type")]
+    /// The component type, always `13`
     pub t: TypeField<13>,
 
     /// Identifier unique within the message; Discord numbers components without one
@@ -1014,6 +1098,7 @@ impl FileComponent {
         }
     }
 
+    /// Blurs the file until clicked
     pub fn spoiler(mut self) -> Self {
         self.spoiler = Some(true);
         self
@@ -1021,10 +1106,12 @@ impl FileComponent {
 }
 
 /// [Separator](https://discord.com/developers/docs/components/reference#separator): vertical
-/// space between components, with a divider line by default
+/// space between components, with a divider line by default. In markup:
+/// [`<Separator>`](crate::guide::views#separator).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Separator {
     #[serde(rename = "type")]
+    /// The component type, always `14`
     pub t: TypeField<14>,
 
     /// Identifier unique within the message; Discord numbers components without one
@@ -1041,6 +1128,7 @@ pub struct Separator {
 }
 
 impl Separator {
+    /// A divider with small spacing
     pub fn new() -> Self {
         Self {
             t: TypeField,
@@ -1056,6 +1144,7 @@ impl Separator {
         self
     }
 
+    /// Sets the space around it
     pub fn with_spacing(mut self, spacing: SeparatorSpacing) -> Self {
         self.spacing = Some(spacing);
         self
@@ -1072,7 +1161,9 @@ impl Default for Separator {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum SeparatorSpacing {
+    /// Small space (the default)
     Small = 1,
+    /// Large space
     Large = 2,
 }
 
@@ -1110,10 +1201,11 @@ into_component! {
 }
 
 /// [Label](https://discord.com/developers/docs/components/reference#label): a title (and
-/// description) above one modal input
+/// description) above one modal input. In markup: [`<Label>`](crate::guide::views#label).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Label {
     #[serde(rename = "type")]
+    /// The component type, always `18`
     pub t: TypeField<18>,
 
     /// Identifier unique within the message; Discord numbers components without one
@@ -1132,6 +1224,7 @@ pub struct Label {
 }
 
 impl Label {
+    /// `label` above `component`
     pub fn new(label: impl Into<String>, component: Component) -> Self {
         Self {
             t: TypeField,
@@ -1142,6 +1235,7 @@ impl Label {
         }
     }
 
+    /// Sets the line shown under the label
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
@@ -1149,16 +1243,19 @@ impl Label {
 }
 
 /// [File Upload](https://discord.com/developers/docs/components/reference#file-upload) in a modal;
-/// the submit carries attachment ids, resolved in `resolved.attachments`
+/// the submit carries attachment ids, resolved in `resolved.attachments`. In markup:
+/// [`<FileUpload>`](crate::guide::views#fileupload).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FileUpload {
     #[serde(rename = "type")]
+    /// The component type, always `19`
     pub t: TypeField<19>,
 
     /// Identifier unique within the message; Discord numbers components without one
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<i32>,
 
+    /// Identifies the input in the submit; max 100 characters
     pub custom_id: String,
 
     /// 0-10, default 1
@@ -1179,6 +1276,7 @@ pub struct FileUpload {
 }
 
 impl FileUpload {
+    /// An upload of one file of any type, submitted under `custom_id`
     pub fn new(custom_id: impl Into<String>) -> Self {
         Self {
             t: TypeField,
@@ -1192,7 +1290,8 @@ impl FileUpload {
     }
 }
 
-/// One choice of a [`RadioGroup`] or [`CheckboxGroup`]
+/// One choice of a [`RadioGroup`] or [`CheckboxGroup`]. In markup:
+/// [`<Option>`](crate::guide::views#option).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GroupOption {
     /// Max 100 characters
@@ -1202,6 +1301,7 @@ pub struct GroupOption {
     pub label: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// A second line under the label; max 100 characters
     pub description: Option<String>,
 
     /// Selected initially
@@ -1210,6 +1310,7 @@ pub struct GroupOption {
 }
 
 impl GroupOption {
+    /// An option showing `label` and submitting `value`
     pub fn new(label: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             value: value.into(),
@@ -1221,18 +1322,22 @@ impl GroupOption {
 }
 
 /// [Radio Group](https://discord.com/developers/docs/components/reference#radio-group): pick one
-/// of 2-10 options; the submit carries the value (or null)
+/// of 2-10 options; the submit carries the value (or null). In markup:
+/// [`<RadioGroup>`](crate::guide::views#radiogroup).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RadioGroup {
     #[serde(rename = "type")]
+    /// The component type, always `21`
     pub t: TypeField<21>,
 
     /// Identifier unique within the message; Discord numbers components without one
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<i32>,
 
+    /// Identifies the input in the submit; max 100 characters
     pub custom_id: String,
 
+    /// 2-10 options
     pub options: Vec<GroupOption>,
 
     /// Defaults to true
@@ -1241,6 +1346,7 @@ pub struct RadioGroup {
 }
 
 impl RadioGroup {
+    /// A radio group of `options`, submitted under `custom_id`
     pub fn new(custom_id: impl Into<String>, options: Vec<GroupOption>) -> Self {
         Self {
             t: TypeField,
@@ -1253,18 +1359,22 @@ impl RadioGroup {
 }
 
 /// [Checkbox Group](https://discord.com/developers/docs/components/reference#checkbox-group): pick
-/// any of 1-10 options; the submit carries the selected values
+/// any of 1-10 options; the submit carries the selected values. In markup:
+/// [`<CheckboxGroup>`](crate::guide::views#checkboxgroup).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CheckboxGroup {
     #[serde(rename = "type")]
+    /// The component type, always `22`
     pub t: TypeField<22>,
 
     /// Identifier unique within the message; Discord numbers components without one
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<i32>,
 
+    /// Identifies the input in the submit; max 100 characters
     pub custom_id: String,
 
+    /// 1-10 options
     pub options: Vec<GroupOption>,
 
     /// 0-10, default 1
@@ -1281,6 +1391,7 @@ pub struct CheckboxGroup {
 }
 
 impl CheckboxGroup {
+    /// A checkbox group of `options`, submitted under `custom_id`
     pub fn new(custom_id: impl Into<String>, options: Vec<GroupOption>) -> Self {
         Self {
             t: TypeField,
@@ -1295,16 +1406,19 @@ impl CheckboxGroup {
 }
 
 /// [Checkbox](https://discord.com/developers/docs/components/reference#checkbox): a single
-/// yes/no; cannot be required. The submit carries a boolean.
+/// yes/no; cannot be required. The submit carries a boolean. In markup:
+/// [`<Checkbox>`](crate::guide::views#checkbox).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Checkbox {
     #[serde(rename = "type")]
+    /// The component type, always `23`
     pub t: TypeField<23>,
 
     /// Identifier unique within the message; Discord numbers components without one
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<i32>,
 
+    /// Identifies the input in the submit; max 100 characters
     pub custom_id: String,
 
     /// Checked initially
@@ -1313,6 +1427,7 @@ pub struct Checkbox {
 }
 
 impl Checkbox {
+    /// An unchecked checkbox submitted under `custom_id`
     pub fn new(custom_id: impl Into<String>) -> Self {
         Self {
             t: TypeField,

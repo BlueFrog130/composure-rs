@@ -9,12 +9,17 @@ use crate::types::{Channel, Member, Snowflake, User};
 /// [Guild Scheduled Event](https://discord.com/developers/docs/resources/guild-scheduled-event#guild-scheduled-event-object)
 #[derive(Debug, Clone, Deserialize)]
 pub struct ScheduledEvent {
+    /// The event's id
     pub id: Snowflake,
+    /// The guild it belongs to
     pub guild_id: Snowflake,
     /// Stage or voice channel; `None` for external events
     pub channel_id: Option<Snowflake>,
+    /// Who created it
     pub creator_id: Option<Snowflake>,
+    /// 1-100 characters
     pub name: String,
+    /// 1-1000 characters
     pub description: Option<String>,
     /// ISO 8601
     pub scheduled_start_time: String,
@@ -22,10 +27,15 @@ pub struct ScheduledEvent {
     pub scheduled_end_time: Option<String>,
     /// 2: guild only
     pub privacy_level: u8,
+    /// Scheduled, active, completed or canceled
     pub status: ScheduledEventStatus,
+    /// Where it happens: a stage, a voice channel, or elsewhere
     pub entity_type: ScheduledEventEntityType,
+    /// The stage instance, for stage events
     pub entity_id: Option<Snowflake>,
+    /// The location, for external events
     pub entity_metadata: Option<EntityMetadata>,
+    /// Who created it (absent for events created before October 2021)
     pub creator: Option<User>,
     /// With `with_user_count`
     pub user_count: Option<u32>,
@@ -39,9 +49,13 @@ pub struct ScheduledEvent {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum ScheduledEventStatus {
+    /// Not started yet
     Scheduled = 1,
+    /// Happening now
     Active = 2,
+    /// Ended
     Completed = 3,
+    /// Canceled before it started
     Canceled = 4,
 }
 
@@ -49,14 +63,18 @@ pub enum ScheduledEventStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum ScheduledEventEntityType {
+    /// In a stage channel
     StageInstance = 1,
+    /// In a voice channel
     Voice = 2,
+    /// Somewhere else, at `entity_metadata.location`
     External = 3,
 }
 
 /// Where an external event happens
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct EntityMetadata {
+    /// Where it happens, 1-100 characters; required for external events
     #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
 }
@@ -64,7 +82,9 @@ pub struct EntityMetadata {
 /// [Scheduled Event User](https://discord.com/developers/docs/resources/guild-scheduled-event#guild-scheduled-event-user-object)
 #[derive(Debug, Clone, Deserialize)]
 pub struct ScheduledEventUser {
+    /// The event
     pub guild_scheduled_event_id: Snowflake,
+    /// The interested user
     pub user: User,
     /// With `with_member`
     pub member: Option<Member>,
@@ -73,17 +93,27 @@ pub struct ScheduledEventUser {
 /// [Auto Moderation Rule](https://discord.com/developers/docs/resources/auto-moderation#auto-moderation-rule-object)
 #[derive(Debug, Clone, Deserialize)]
 pub struct AutoModerationRule {
+    /// The rule's id
     pub id: Snowflake,
+    /// The guild it belongs to
     pub guild_id: Snowflake,
+    /// The rule's name
     pub name: String,
+    /// Who created it
     pub creator_id: Snowflake,
     /// 1 message send, 2 member update
     pub event_type: u8,
+    /// What triggers it
     pub trigger_type: AutoModerationTriggerType,
+    /// Settings of the trigger
     pub trigger_metadata: TriggerMetadata,
+    /// What happens when it triggers
     pub actions: Vec<AutoModerationAction>,
+    /// Whether it is on
     pub enabled: bool,
+    /// Roles it does not apply to (max 20)
     pub exempt_roles: Vec<Snowflake>,
+    /// Channels it does not apply to (max 50)
     pub exempt_channels: Vec<Snowflake>,
 }
 
@@ -91,10 +121,15 @@ pub struct AutoModerationRule {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum AutoModerationTriggerType {
+    /// Messages containing words from a list
     Keyword = 1,
+    /// Generic spam
     Spam = 3,
+    /// Words from Discord's predefined lists
     KeywordPreset = 4,
+    /// Too many unique mentions
     MentionSpam = 5,
+    /// Words in member profiles
     MemberProfile = 6,
 }
 
@@ -102,9 +137,11 @@ pub enum AutoModerationTriggerType {
 /// which fields apply depends on the trigger type
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct TriggerMetadata {
+    /// Keyword: substrings that trigger (max 1000)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keyword_filter: Option<Vec<String>>,
 
+    /// Keyword and member profile: regular expressions that trigger (max 10)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub regex_patterns: Option<Vec<String>>,
 
@@ -112,12 +149,15 @@ pub struct TriggerMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub presets: Option<Vec<u8>>,
 
+    /// Keyword and keyword preset: substrings that never trigger
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allow_list: Option<Vec<String>>,
 
+    /// Mention spam: unique mentions allowed per message (max 50)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mention_total_limit: Option<u32>,
 
+    /// Mention spam: whether to detect mention raids
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mention_raid_protection_enabled: Option<bool>,
 }
@@ -129,10 +169,12 @@ pub struct AutoModerationAction {
     #[serde(rename = "type")]
     pub kind: u8,
 
+    /// Settings for the action type
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ActionMetadata>,
 }
 
+/// Settings of an [`AutoModerationAction`], depending on its type
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ActionMetadata {
     /// Send alert: where
@@ -152,20 +194,27 @@ pub struct ActionMetadata {
 /// plus the objects they reference
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuditLog {
+    /// The entries, newest first
     pub audit_log_entries: Vec<AuditLogEntry>,
+    /// Users referenced by the entries
     #[serde(default)]
     pub users: Vec<User>,
+    /// Threads referenced by the entries
     #[serde(default)]
     pub threads: Vec<Channel>,
+    /// Scheduled events referenced by the entries
     #[serde(default)]
     pub guild_scheduled_events: Vec<ScheduledEvent>,
+    /// Auto moderation rules referenced by the entries
     #[serde(default)]
     pub auto_moderation_rules: Vec<Option<AutoModerationRule>>,
+    /// Webhooks referenced by the entries
     #[serde(default)]
     pub webhooks: Vec<Webhook>,
     /// Integrations and application commands, as sent
     #[serde(default)]
     pub integrations: Vec<Box<RawValue>>,
+    /// Application Commands referenced by the entries, as sent
     #[serde(default)]
     pub application_commands: Vec<Box<RawValue>>,
 }
@@ -173,6 +222,7 @@ pub struct AuditLog {
 /// [Audit Log Entry](https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object)
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuditLogEntry {
+    /// The entry's id
     pub id: Snowflake,
     /// [Audit log event](https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object-audit-log-events)
     pub action_type: u16,
@@ -180,9 +230,12 @@ pub struct AuditLogEntry {
     pub user_id: Option<Snowflake>,
     /// What it was done to
     pub target_id: Option<String>,
+    /// What changed
     #[serde(default)]
     pub changes: Vec<AuditLogChange>,
+    /// Extra details for some action types
     pub options: Option<AuditLogOptions>,
+    /// Why it was done (0-512 characters)
     pub reason: Option<String>,
 }
 
@@ -190,44 +243,65 @@ pub struct AuditLogEntry {
 /// values are as sent, their type depends on `key`
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuditLogChange {
+    /// The changed field's name
     pub key: String,
+    /// The value after the change
     pub new_value: Option<Box<RawValue>>,
+    /// The value before the change
     pub old_value: Option<Box<RawValue>>,
 }
 
 /// [Optional Audit Entry Info](https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object-optional-audit-entry-info)
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct AuditLogOptions {
+    /// The application whose permissions were changed
     pub application_id: Option<Snowflake>,
+    /// The triggered auto moderation rule's name
     pub auto_moderation_rule_name: Option<String>,
+    /// The triggered auto moderation rule's trigger type
     pub auto_moderation_rule_trigger_type: Option<String>,
+    /// The channel in which entities were targeted
     pub channel_id: Option<Snowflake>,
+    /// How many entities were targeted
     pub count: Option<String>,
+    /// Days after which inactive members were kicked
     pub delete_member_days: Option<String>,
+    /// The id of the overwritten entity
     pub id: Option<Snowflake>,
+    /// How many members were removed by the prune
     pub members_removed: Option<String>,
+    /// The id of the message that was targeted
     pub message_id: Option<Snowflake>,
+    /// The name of the role, for overwrite entries
     pub role_name: Option<String>,
+    /// The overwritten entity's type: `"0"` role, `"1"` member
     #[serde(rename = "type")]
     pub kind: Option<String>,
+    /// The type of integration which performed the action
     pub integration_type: Option<String>,
 }
 
 /// [Webhook](https://discord.com/developers/docs/resources/webhook#webhook-object)
 #[derive(Debug, Clone, Deserialize)]
 pub struct Webhook {
+    /// The webhook's id
     pub id: Snowflake,
     /// 1 incoming, 2 channel follower, 3 application
     #[serde(rename = "type")]
     pub kind: u8,
+    /// The guild it belongs to
     pub guild_id: Option<Snowflake>,
+    /// The channel it posts to
     pub channel_id: Option<Snowflake>,
     /// Who created it (absent when fetched by token)
     pub user: Option<User>,
+    /// Default name (1-80 characters)
     pub name: Option<String>,
+    /// Default avatar hash
     pub avatar: Option<String>,
     /// Incoming webhooks: the secure token
     pub token: Option<String>,
+    /// The application that created it
     pub application_id: Option<Snowflake>,
     /// Incoming webhooks: execution URL
     pub url: Option<String>,

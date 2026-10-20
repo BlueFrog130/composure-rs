@@ -53,10 +53,15 @@ pub use snowflake::*;
 pub use sticker::*;
 pub use type_field::*;
 
+/// [Image formats](https://discord.com/developers/docs/reference#image-formatting-image-formats) of CDN images
 #[derive(Debug, AsRefStr, PartialEq, Eq)]
 pub enum ImageFormat {
+    /// `.png`
     Png,
+    /// `.jpg`
     Jpeg,
+    /// `.webp`
     Webp,
+    /// `.gif`, for animated images
     Gif,
 }

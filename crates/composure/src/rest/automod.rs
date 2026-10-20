@@ -21,6 +21,7 @@ routes! {
 /// `actions`) and [`BotClient::modify_automod_rule`] (`trigger_type` cannot change)
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct AutoModerationRuleFields<'a> {
+    /// 1-100 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
@@ -28,15 +29,19 @@ pub struct AutoModerationRuleFields<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_type: Option<u8>,
 
+    /// What triggers it; cannot change once created
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger_type: Option<AutoModerationTriggerType>,
 
+    /// Settings of the trigger
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger_metadata: Option<&'a TriggerMetadata>,
 
+    /// What happens when it triggers
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actions: Option<&'a [AutoModerationAction]>,
 
+    /// Whether it is on (default false)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
 

@@ -15,18 +15,26 @@ use crate::{
 /// Name, description, and constraints of one Option, from `#[option(...)]`
 #[derive(Debug, Clone, Copy)]
 pub struct OptionMeta {
+    /// The Option's name: the parameter's, or `name = ".."`
     pub name: &'static str,
+    /// From `#[option("description")]`
     pub description: &'static str,
+    /// `min`, or the bound implied by the type
     pub min_value: Option<f64>,
+    /// `max`, or the bound implied by the type
     pub max_value: Option<f64>,
+    /// `min_len`
     pub min_length: Option<i32>,
+    /// `max_len`
     pub max_length: Option<i32>,
+    /// `channel_types(..)`
     pub channel_types: Option<&'static [ChannelType]>,
     /// Suggestions come from an Autocomplete Handler while the user types
     pub autocomplete: bool,
 }
 
 impl OptionMeta {
+    /// An Option without constraints
     pub const fn new(name: &'static str, description: &'static str) -> Self {
         Self {
             name,
@@ -78,6 +86,7 @@ pub trait OptionType<'a>: Sized {
     /// number, e.g. 3 for string
     const OPTION_TYPE: u8;
 
+    /// Whether the user must fill it in; `false` for `Option<T>`
     const REQUIRED: bool = true;
 
     /// Lower bound implied by the type (e.g. `0` for `u8`); explicit bounds must stay inside it
@@ -89,8 +98,11 @@ pub trait OptionType<'a>: Sized {
     /// Restricted to fixed Choices (`#[derive(Choice)]`), which rules out autocomplete
     const HAS_CHOICES: bool = false;
 
+    /// The Option Definition synced to Discord
     fn definition(meta: &OptionMeta, required: bool) -> ApplicationCommandOption;
 
+    /// Reads the value of `option` (`None` when it was not sent), resolving users, channels,
+    /// roles and attachments from `data`
     fn extract(
         option: Option<&'a DataOption>,
         data: &'a ApplicationCommandInteractionData,
@@ -415,7 +427,9 @@ fn attachment_definition(meta: &OptionMeta, required: bool) -> ApplicationComman
 /// is a user Option that fails outside guilds.
 #[derive(Debug, Clone)]
 pub struct ResolvedMember {
+    /// The user
     pub user: User,
+    /// Their membership in the guild: nickname, roles, join date, ...
     pub member: PartialMember,
 }
 
@@ -463,7 +477,9 @@ impl OptionType<'_> for ResolvedMember {
 /// Value of a mentionable Option
 #[derive(Debug, Clone)]
 pub enum UserOrRole {
+    /// A user was picked
     User(User),
+    /// A role was picked
     Role(Role),
 }
 
@@ -496,6 +512,7 @@ pub trait CommandTarget<'a>: Sized {
     /// User or message: the kind of Command this target belongs to
     const KIND: ApplicationCommandType;
 
+    /// Reads the target from the Interaction's resolved data
     fn extract(data: &'a ApplicationCommandInteractionData) -> Result<Self, OptionError>;
 }
 

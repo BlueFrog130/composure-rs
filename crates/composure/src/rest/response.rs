@@ -20,24 +20,29 @@ impl<T> Response<T> {
         }
     }
 
+    /// The HTTP status
     pub fn status(&self) -> u16 {
         self.raw.status
     }
 
+    /// The value of header `name`, matched case-insensitively
     pub fn header(&self, name: &str) -> Option<&str> {
         self.raw.header(name)
     }
 
+    /// The raw body
     pub fn bytes(&self) -> &[u8] {
         &self.raw.body
     }
 
+    /// The underlying response
     pub fn into_raw(self) -> RawResponse {
         self.raw
     }
 }
 
 impl<T: DeserializeOwned> Response<T> {
+    /// The body decoded as `T`
     pub fn model(&self) -> Result<T> {
         serde_json::from_slice(&self.raw.body).map_err(Error::Decode)
     }

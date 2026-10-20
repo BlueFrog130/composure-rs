@@ -22,6 +22,7 @@ pub trait InteractionHandler<S> {
         None
     }
 
+    /// Answers a Command (chat input, user, or message); defaults to an unknown-command error
     fn command(
         &self,
         command: ApplicationCommandInteraction,
@@ -30,6 +31,7 @@ pub trait InteractionHandler<S> {
         async move { Err(HandlerError::unknown_command(&command.data.name)) }
     }
 
+    /// Answers a button click or select; defaults to a "not handled" ephemeral message
     fn component(
         &self,
         _component: MessageComponentInteraction,
@@ -51,6 +53,7 @@ pub trait InteractionHandler<S> {
         }
     }
 
+    /// Answers a modal submit; defaults to a "not handled" ephemeral message
     fn modal_submit(
         &self,
         _modal: ModalSubmitInteraction,
@@ -179,10 +182,13 @@ pub struct WithFallback<C, F> {
 }
 
 impl<C, F> WithFallback<C, F> {
+    /// `commands` (an App) first, `fallback` for the rest; usually built with the App's
+    /// `with_fallback`
     pub fn new(commands: C, fallback: F) -> Self {
         Self { commands, fallback }
     }
 
+    /// The App
     pub fn commands(&self) -> &C {
         &self.commands
     }

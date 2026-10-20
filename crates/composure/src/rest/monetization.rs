@@ -23,10 +23,15 @@ routes! {
 /// Filters and paging of [`BotClient::list_entitlements`], by entitlement id
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ListEntitlements<'a> {
+    /// Only this user's
     pub user_id: Option<Snowflake>,
+    /// Only for these SKUs
     pub sku_ids: &'a [Snowflake],
+    /// Only this guild's
     pub guild_id: Option<Snowflake>,
+    /// Entitlements before this id
     pub before: Option<Snowflake>,
+    /// Entitlements after this id
     pub after: Option<Snowflake>,
     /// 1-100, default 100
     pub limit: Option<u8>,
@@ -39,7 +44,9 @@ pub struct ListEntitlements<'a> {
 /// Owner of a test entitlement
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntitlementOwner {
+    /// A guild
     Guild(Snowflake),
+    /// A user
     User(Snowflake),
 }
 

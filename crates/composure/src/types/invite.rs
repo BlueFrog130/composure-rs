@@ -15,14 +15,19 @@ pub struct Invite {
     /// The `discord.gg/<code>` code
     pub code: String,
 
+    /// The guild it invites to
     pub guild: Option<PartialGuild>,
 
+    /// The channel it invites to
     pub channel: Option<PartialChannel>,
 
+    /// Who created it
     pub inviter: Option<User>,
 
+    /// What a voice channel invite targets
     pub target_type: Option<InviteTargetType>,
 
+    /// Whose stream it shows, for stream invites
     pub target_user: Option<User>,
 
     /// With `with_counts`
@@ -54,20 +59,26 @@ pub struct Invite {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 pub enum InviteTargetType {
+    /// A user's stream in a voice channel
     Stream = 1,
+    /// An embedded application (an Activity) in a voice channel
     EmbeddedApplication = 2,
 }
 
 /// [Ban](https://discord.com/developers/docs/resources/guild#ban-object)
 #[derive(Debug, Clone, Deserialize)]
 pub struct Ban {
+    /// Why they were banned
     pub reason: Option<String>,
+    /// The banned user
     pub user: User,
 }
 
 /// Result of a [bulk ban](https://discord.com/developers/docs/resources/guild#bulk-guild-ban)
 #[derive(Debug, Clone, Deserialize)]
 pub struct BulkBan {
+    /// Users who were banned
     pub banned_users: Vec<Snowflake>,
+    /// Users who could not be banned (missing permissions, already banned, ...)
     pub failed_users: Vec<Snowflake>,
 }

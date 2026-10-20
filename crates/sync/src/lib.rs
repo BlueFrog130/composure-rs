@@ -1,8 +1,65 @@
-//! Sync: make Discord's stored Command Definitions match an App's Commands.
+//! Sync: make Discord's stored Command Definitions match an App's Commands, at deploy time.
 //!
-//! Each target (global, or one guild) gets every Command whose Scope maps to it. A Sync Plan is
-//! computed by comparing Definitions by name and type; targets with changes are overwritten with
-//! one bulk request each, targets without changes are left alone.
+//! Discord only shows the Commands it has stored for an application. This crate reads the
+//! definitions of a [Composure](https://docs.rs/composure) App (`#[app]` implements
+//! [`CommandSetDefinition`](composure::command::CommandSetDefinition)) and makes Discord's match
+//! them, from a binary that runs on the host, never in the deployed bot:
+//!
+//! ```ignore
+//! // src/bin/sync.rs
+//! fn main() -> std::process::ExitCode {
+//!     composure_sync::sync_from_env(&my_bot::Bot)
+//! }
+//! ```
+//!
+//! ```sh
+//! cargo run --bin sync             # show the plan, apply after confirming
+//! cargo run --bin sync -- --check  # CI: exit 2 when Discord is out of date
+//! cargo run --bin sync -- --yes    # CI deploys: apply without asking
+//! ```
+//!
+//! # Configuration
+//!
+//! | Env var | |
+//! |---|---|
+//! | `DISCORD_TOKEN` | The bot token |
+//! | `DISCORD_APPLICATION_ID` | The application id |
+//! | `COMPOSURE_SCOPE_<NAME>` | Comma-separated guild ids for Commands with `scope = "name"` (uppercased, `-` as `_`) |
+//!
+//! # How it works
+//!
+//! Each target (global, or one guild) gets every Command whose Scope maps to it: Commands without
+//! a Scope are global, Scoped ones go to their Scope's guilds. A [`SyncPlan`] is computed by
+//! comparing Definitions by name and type; targets with changes are overwritten with one bulk
+//! request each, targets without changes are left alone. Every guild listed for a Scope is
+//! synced, so a guild whose Commands were all removed is cleared; guilds not listed are never
+//! touched.
+//!
+//! The command line (`sync_from_env`, clap and cliclack) is the default `cli` feature. Without
+//! it, [`SyncConfig`], [`plan`] and [`apply`] remain, for other configuration sources or a custom
+//! front end:
+//!
+//! ```no_run
+//! # fn main() -> Result<(), composure_sync::SyncError> {
+//! # struct Bot;
+//! # impl composure::command::CommandSetDefinition for Bot {
+//! #     fn definitions() -> Vec<composure::command::ScopedDefinition> { Vec::new() }
+//! # }
+//! use composure::command::CommandSetDefinition;
+//!
+//! let config = composure_sync::SyncConfig::from_env()?;
+//! let plan = composure_sync::plan(Bot::definitions(), &config)?;
+//! println!("{plan}");
+//! if plan.has_changes() {
+//!     composure_sync::apply(&plan, &config)?;
+//! }
+//! # Ok(())
+//! # }
+//! ```
+
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -30,7 +87,9 @@ const SCOPE_PREFIX: &str = "COMPOSURE_SCOPE_";
 /// Where a set of Commands is stored on Discord
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Target {
+    /// Global Commands
     Global,
+    /// One guild's Commands, by guild id
     Guild(String),
 }
 
@@ -46,7 +105,9 @@ impl fmt::Display for Target {
 /// Credentials and Scope mapping for a Sync
 #[derive(Debug, Clone, Default)]
 pub struct SyncConfig {
+    /// The bot token
     pub token: String,
+    /// The application id
     pub application_id: String,
 
     /// Scope name to guild ids. Every listed guild is synced, even if no Command maps to it
@@ -65,6 +126,7 @@ impl SyncConfig {
         Self::from_vars(std::env::vars())
     }
 
+    /// [`SyncConfig::from_env`] from any `(name, value)` pairs, e.g. a `.env` file read by hand
     pub fn from_vars(vars: impl IntoIterator<Item = (String, String)>) -> Result<Self, SyncError> {
         let mut config = SyncConfig::default();
         for (key, value) in vars {
@@ -109,6 +171,7 @@ fn scope_key(scope: &str) -> String {
     scope.to_ascii_uppercase().replace('-', "_")
 }
 
+/// Why a Sync could not be planned or applied
 #[derive(Debug)]
 pub enum SyncError {
     /// Missing or malformed configuration
@@ -117,9 +180,12 @@ pub enum SyncError {
     UnmappedScope(String),
     /// Two Commands with the same name and type go to the same target
     Duplicate {
+        /// Where both would go
         target: Target,
+        /// Their name
         name: String,
     },
+    /// A request to Discord failed
     Api(rest::Error),
 }
 
@@ -239,10 +305,14 @@ fn label(command: &ApplicationCommand) -> String {
     }
 }
 
+/// One change to a target
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Change {
+    /// A Command to create, by label (`/name`, `name (user)`, `name (message)`)
     Create(String),
+    /// A Command whose definition changed
     Update(String),
+    /// A Command to delete
     Delete(String),
 }
 
@@ -259,20 +329,25 @@ impl fmt::Display for Change {
 /// What a Sync would do to one target
 #[derive(Debug)]
 pub struct TargetPlan {
+    /// Where the Commands are stored
     pub target: Target,
     /// The Commands the target ends up with
     pub commands: Vec<ApplicationCommand>,
+    /// What changes
     pub changes: Vec<Change>,
+    /// How many Commands stay as they are
     pub unchanged: usize,
 }
 
 /// The creates, updates, and deletes a Sync would perform, per target
 #[derive(Debug)]
 pub struct SyncPlan {
+    /// One plan per target, global first
     pub targets: Vec<TargetPlan>,
 }
 
 impl SyncPlan {
+    /// Whether applying would change anything
     pub fn has_changes(&self) -> bool {
         self.targets.iter().any(|t| !t.changes.is_empty())
     }
@@ -291,14 +366,19 @@ impl SyncPlan {
     }
 }
 
+/// How many Commands a plan creates, updates and deletes
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ChangeCounts {
+    /// Creates
     pub create: usize,
+    /// Updates
     pub update: usize,
+    /// Deletes
     pub delete: usize,
 }
 
 impl ChangeCounts {
+    /// All changes
     pub fn total(&self) -> usize {
         self.create + self.update + self.delete
     }

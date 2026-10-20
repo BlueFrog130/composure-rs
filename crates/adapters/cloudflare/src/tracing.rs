@@ -1,4 +1,4 @@
-//! A [`tracing`](::tracing) subscriber for Workers (`tracing` feature). Each event is one console
+//! A [`tracing`](https://docs.rs/tracing) subscriber for Workers (`tracing` feature). Each event is one console
 //! call (ERROR `console.error`, WARN `console.warn`, INFO `console.log`, DEBUG and TRACE
 //! `console.debug`) with an object, so Workers Logs indexes every field: `level`, `target`,
 //! `spans` (names, outermost first), then the fields of each enclosing span and of the event
@@ -53,6 +53,7 @@ pub struct ConsoleLayer {
 }
 
 impl ConsoleLayer {
+    /// A layer writing to the console as objects
     pub fn new() -> Self {
         Self { write: console }
     }

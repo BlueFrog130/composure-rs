@@ -17,10 +17,12 @@ const PROCESS_ID_SHIFT: u8 = 12;
 pub struct Snowflake(u64);
 
 impl Snowflake {
+    /// The id with this numeric value
     pub const fn from_u64(snowflake: u64) -> Self {
         Snowflake(snowflake)
     }
 
+    /// The numeric value
     pub const fn to_u64(&self) -> u64 {
         self.0
     }
@@ -30,14 +32,17 @@ impl Snowflake {
         (self.0 >> TIMESTAMP_SHIFT) + DISCORD_EPOCH
     }
 
+    /// The internal worker that generated the id
     pub const fn worker_id(&self) -> u8 {
         ((self.0 & WORKER_BITS) >> WORKER_SHIFT) as u8
     }
 
+    /// The internal process that generated the id
     pub const fn internal_process_id(&self) -> u8 {
         ((self.0 & PROCESS_ID_BITS) >> PROCESS_ID_SHIFT) as u8
     }
 
+    /// Incremented for every id generated on that process
     pub const fn increment(&self) -> u16 {
         (self.0 & INCREMENT_BITS) as u16
     }
@@ -118,6 +123,7 @@ impl Serialize for Snowflake {
 pub struct SnowflakeMap<T>(Vec<(Snowflake, T)>);
 
 impl<T> SnowflakeMap<T> {
+    /// The object with id `id`
     pub fn get(&self, id: &Snowflake) -> Option<&T> {
         self.0
             .iter()
@@ -125,26 +131,32 @@ impl<T> SnowflakeMap<T> {
             .map(|(_, value)| value)
     }
 
+    /// Whether an object has id `id`
     pub fn contains_key(&self, id: &Snowflake) -> bool {
         self.get(id).is_some()
     }
 
+    /// How many objects there are
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Whether there are none
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Every id and object, in the order received
     pub fn iter(&self) -> impl Iterator<Item = (&Snowflake, &T)> {
         self.0.iter().map(|(key, value)| (key, value))
     }
 
+    /// Every id
     pub fn keys(&self) -> impl Iterator<Item = &Snowflake> {
         self.0.iter().map(|(key, _)| key)
     }
 
+    /// Every object
     pub fn values(&self) -> impl Iterator<Item = &T> {
         self.0.iter().map(|(_, value)| value)
     }

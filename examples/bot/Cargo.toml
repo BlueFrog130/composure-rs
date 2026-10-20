@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version = "1.91"
 description = "The example Composure bot's shared commands, served by the Cloudflare and tokio examples"
-license = "Apache-2.0"
+license.workspace = true
 publish = false
 
 [dependencies]

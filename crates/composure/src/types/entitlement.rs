@@ -6,10 +6,13 @@ use crate::types::Snowflake;
 /// a user's or guild's access to a premium SKU
 #[derive(Debug, Clone, Deserialize)]
 pub struct Entitlement {
+    /// The entitlement's id
     pub id: Snowflake,
 
+    /// The SKU it grants
     pub sku_id: Snowflake,
 
+    /// The application the SKU belongs to
     pub application_id: Snowflake,
 
     /// The user granted access, for user subscriptions and purchases

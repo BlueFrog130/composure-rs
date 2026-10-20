@@ -34,10 +34,12 @@ impl<T: Transport> BotClient<T> {
         self
     }
 
+    /// The application the client acts for
     pub fn application_id(&self) -> Snowflake {
         self.application_id
     }
 
+    /// The Transport requests go through
     pub fn transport(&self) -> &T {
         self.rest.transport()
     }

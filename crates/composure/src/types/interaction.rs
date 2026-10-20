@@ -8,17 +8,25 @@ use crate::types::{
     User,
 };
 
+/// A Command or autocomplete Interaction: chat input, user, or message Command data
 pub type ApplicationCommandInteraction = DataInteraction<ApplicationCommandInteractionData>;
+/// A button click or select Interaction
 pub type MessageComponentInteraction = DataInteraction<MessageComponentData>;
+/// A modal submit Interaction
 pub type ModalSubmitInteraction = DataInteraction<ModalSubmitData>;
 
 /// [Interaction Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-structure)
 #[derive(Debug, Clone)]
 pub enum Interaction {
+    /// Discord checking the endpoint; answered with a Pong
     Ping(PingInteraction),
+    /// A Command was invoked
     ApplicationCommand(ApplicationCommandInteraction),
+    /// A button was clicked or a select used
     MessageComponent(MessageComponentInteraction),
+    /// The user is typing in an Option with autocomplete
     ApplicationCommandAutocomplete(ApplicationCommandInteraction),
+    /// A modal was submitted
     ModalSubmit(ModalSubmitInteraction),
 }
 
@@ -88,6 +96,7 @@ struct Envelope {
     context: Option<InteractionContextType>,
 }
 
+/// The fields every Interaction has (besides `type` and `data`)
 #[derive(Debug, Clone, Deserialize)]
 pub struct InteractionCommon {
     /// ID of the interaction
@@ -155,6 +164,7 @@ pub struct IntegrationOwners {
 }
 
 impl IntegrationOwners {
+    /// The id of the guild or user that installed the app for `integration_type`
     pub fn get(&self, integration_type: ApplicationIntegrationType) -> Option<Snowflake> {
         match integration_type {
             ApplicationIntegrationType::GuildInstall => self.guild,
@@ -167,6 +177,7 @@ impl IntegrationOwners {
         usize::from(self.guild.is_some()) + usize::from(self.user.is_some())
     }
 
+    /// Whether no installation context is listed
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -193,15 +204,22 @@ impl InteractionCommon {
     }
 }
 
+/// Discord checking the Interactions Endpoint URL
 #[derive(Debug, Clone)]
 pub struct PingInteraction {
+    /// Ids, token, version
     pub common: InteractionCommon,
 }
 
+/// An Interaction carrying data `D`: [`ApplicationCommandInteraction`], [`MessageComponentInteraction`]
+/// or [`ModalSubmitInteraction`]
 #[derive(Debug, Clone)]
 pub struct DataInteraction<D> {
+    /// Ids, token, user, member, guild, channel, ...
     pub common: InteractionCommon,
+    /// The invoking user's language
     pub locale: Option<String>,
+    /// What was invoked: Command options, component values, or modal fields
     pub data: D,
 }
 
@@ -248,6 +266,7 @@ pub struct ApplicationCommandInteractionData {
 }
 
 impl ApplicationCommandInteractionData {
+    /// The resolved user with this id
     pub fn resolved_user(&self, snowflake: &Snowflake) -> Option<&User> {
         self.resolved
             .as_ref()
@@ -255,6 +274,7 @@ impl ApplicationCommandInteractionData {
             .and_then(|u| u.get(snowflake))
     }
 
+    /// The resolved guild member with this id (its user is in [`resolved_user`](Self::resolved_user))
     pub fn resolved_member(&self, snowflake: &Snowflake) -> Option<&PartialMember> {
         self.resolved
             .as_ref()
@@ -262,6 +282,7 @@ impl ApplicationCommandInteractionData {
             .and_then(|u| u.get(snowflake))
     }
 
+    /// The resolved role with this id
     pub fn resolved_role(&self, snowflake: &Snowflake) -> Option<&Role> {
         self.resolved
             .as_ref()
@@ -269,6 +290,7 @@ impl ApplicationCommandInteractionData {
             .and_then(|u| u.get(snowflake))
     }
 
+    /// The resolved channel with this id
     pub fn resolved_channel(&self, snowflake: &Snowflake) -> Option<&PartialChannel> {
         self.resolved
             .as_ref()
@@ -276,6 +298,7 @@ impl ApplicationCommandInteractionData {
             .and_then(|c| c.get(snowflake))
     }
 
+    /// The resolved message with this id (the target of message Commands)
     pub fn resolved_message(&self, snowflake: &Snowflake) -> Option<&Message> {
         self.resolved
             .as_ref()
@@ -283,6 +306,7 @@ impl ApplicationCommandInteractionData {
             .and_then(|m| m.get(snowflake))
     }
 
+    /// The resolved attachment with this id
     pub fn resolved_attachment(&self, snowflake: &Snowflake) -> Option<&Attachment> {
         self.resolved
             .as_ref()
@@ -290,6 +314,7 @@ impl ApplicationCommandInteractionData {
             .and_then(|a| a.get(snowflake))
     }
 
+    /// The only top-level option, if there is exactly one
     pub fn first_option(&self) -> Option<&ApplicationCommandInteractionDataOption> {
         self.options.as_ref().and_then(|o| o.single())
     }
@@ -317,16 +342,25 @@ pub struct MessageComponentData {
     pub resolved: Option<ResolvedData>,
 }
 
+/// Types of the classic message components; [`Component`](crate::types::Component) covers every type
 #[derive(Debug, Clone, Deserialize_repr)]
 #[repr(u8)]
 pub enum MessageComponentType {
+    /// A row of components
     ActionRow = 1,
+    /// A button
     Button = 2,
+    /// A select of text options
     StringSelect = 3,
+    /// Free text, in modals
     TextInput = 4,
+    /// A user select
     UserSelect = 5,
+    /// A role select
     RoleSelect = 6,
+    /// A user-or-role select
     MentionableSelect = 7,
+    /// A channel select
     ChannelSelect = 8,
 }
 
@@ -355,22 +389,27 @@ impl ModalSubmitData {
         self.find(custom_id).and_then(ModalSubmitComponent::checked)
     }
 
+    /// The resolved user with this id
     pub fn resolved_user(&self, id: &Snowflake) -> Option<&User> {
         self.resolved.as_ref()?.users.as_ref()?.get(id)
     }
 
+    /// The resolved guild member with this id
     pub fn resolved_member(&self, id: &Snowflake) -> Option<&PartialMember> {
         self.resolved.as_ref()?.members.as_ref()?.get(id)
     }
 
+    /// The resolved role with this id
     pub fn resolved_role(&self, id: &Snowflake) -> Option<&Role> {
         self.resolved.as_ref()?.roles.as_ref()?.get(id)
     }
 
+    /// The resolved channel with this id
     pub fn resolved_channel(&self, id: &Snowflake) -> Option<&PartialChannel> {
         self.resolved.as_ref()?.channels.as_ref()?.get(id)
     }
 
+    /// The resolved attachment with this id
     pub fn resolved_attachment(&self, id: &Snowflake) -> Option<&Attachment> {
         self.resolved.as_ref()?.attachments.as_ref()?.get(id)
     }
@@ -414,7 +453,9 @@ pub struct ModalSubmitComponent {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]
 pub enum SubmittedValue {
+    /// Text, from a text input or radio group
     Text(String),
+    /// Whether a checkbox was checked
     Checked(bool),
 }
 
@@ -469,24 +510,40 @@ pub struct ResolvedData {
     pub attachments: Option<SnowflakeMap<Attachment>>,
 }
 
+/// A string Option's value
 pub type StringOption = ValueOption<String>;
+/// An integer Option's value
 pub type IntegerOption = ValueOption<i64>;
+/// A boolean Option's value
 pub type BooleanOption = ValueOption<bool>;
+/// A user, channel, role, mentionable or attachment Option's value: the id, resolved in the
+/// Interaction's resolved data
 pub type SnowflakeOption = ValueOption<Snowflake>;
+/// A number Option's value
 pub type NumberOption = ValueOption<f64>;
 
 /// [Application Command Interaction Data Option Structure](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-application-command-interaction-data-option-structure)
 #[derive(Debug, Clone)]
 pub enum ApplicationCommandInteractionDataOption {
+    /// A subcommand, with its own options
     Subcommand(Subcommand),
+    /// A subcommand group, with the chosen subcommand
     SubcommandGroup(SubcommandGroup),
+    /// A string Option
     String(StringOption),
+    /// An integer Option
     Integer(IntegerOption),
+    /// A boolean Option
     Boolean(BooleanOption),
+    /// A user Option
     User(SnowflakeOption),
+    /// A channel Option
     Channel(SnowflakeOption),
+    /// A role Option
     Role(SnowflakeOption),
+    /// A mentionable Option
     Mentionable(SnowflakeOption),
+    /// A number Option
     Number(NumberOption),
     /// Value is the attachment id; see [`ApplicationCommandInteractionData::resolved_attachment`]
     Attachment(SnowflakeOption),
@@ -498,6 +555,7 @@ pub enum ApplicationCommandInteractionDataOption {
 /// which for integer and number options may not parse yet, so it is kept as text.
 #[derive(Debug, Clone)]
 pub struct FocusedOption {
+    /// The Option's name
     pub name: String,
 
     /// [Option type](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type)
@@ -508,6 +566,7 @@ pub struct FocusedOption {
 }
 
 impl ApplicationCommandInteractionDataOption {
+    /// The option's name, whatever its type
     pub fn name(&self) -> &str {
         match self {
             Self::Subcommand(s) => &s.name,
@@ -656,14 +715,17 @@ impl<'de> Deserialize<'de> for RawOptionValue {
     }
 }
 
+/// The options of a Command or subcommand, in the order Discord sent them
 #[derive(Debug, Clone, Default)]
 pub struct OptionList(Vec<ApplicationCommandInteractionDataOption>);
 
 impl OptionList {
+    /// No options
     pub const fn empty() -> Self {
         OptionList(Vec::new())
     }
 
+    /// Every option
     pub fn iter(&self) -> impl Iterator<Item = &ApplicationCommandInteractionDataOption> {
         self.0.iter()
     }
@@ -680,6 +742,7 @@ impl OptionList {
         })
     }
 
+    /// The number Option named `name`
     pub fn get_number_option(&self, name: &str) -> Option<&NumberOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::Number(s) if s.name == name => Some(s),
@@ -687,6 +750,7 @@ impl OptionList {
         })
     }
 
+    /// The attachment Option named `name`
     pub fn get_attachment_option(&self, name: &str) -> Option<&SnowflakeOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::Attachment(s) if s.name == name => Some(s),
@@ -694,10 +758,12 @@ impl OptionList {
         })
     }
 
+    /// The first option
     pub fn single(&self) -> Option<&ApplicationCommandInteractionDataOption> {
         self.0.first()
     }
 
+    /// The subcommand invoked, if this level holds one
     pub fn subcommand(&self) -> Option<&Subcommand> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::Subcommand(s) => Some(s),
@@ -705,6 +771,7 @@ impl OptionList {
         })
     }
 
+    /// The subcommand group invoked, if this level holds one
     pub fn subcommand_group(&self) -> Option<&SubcommandGroup> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::SubcommandGroup(s) => Some(s),
@@ -712,10 +779,12 @@ impl OptionList {
         })
     }
 
+    /// The option named `name`, of any type
     pub fn get_option(&self, name: &str) -> Option<&ApplicationCommandInteractionDataOption> {
         self.0.iter().find(|o| o.name() == name)
     }
 
+    /// The string Option named `name`
     pub fn get_string_option(&self, name: &str) -> Option<&StringOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::String(s) if s.name == name => Some(s),
@@ -723,6 +792,7 @@ impl OptionList {
         })
     }
 
+    /// The integer Option named `name`
     pub fn get_integer_option(&self, name: &str) -> Option<&IntegerOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::Integer(s) if s.name == name => Some(s),
@@ -730,6 +800,7 @@ impl OptionList {
         })
     }
 
+    /// The boolean Option named `name`
     pub fn get_boolean_option(&self, name: &str) -> Option<&BooleanOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::Boolean(s) if s.name == name => Some(s),
@@ -737,6 +808,7 @@ impl OptionList {
         })
     }
 
+    /// The user Option named `name`
     pub fn get_user_option(&self, name: &str) -> Option<&SnowflakeOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::User(s) if s.name == name => Some(s),
@@ -744,6 +816,7 @@ impl OptionList {
         })
     }
 
+    /// The channel Option named `name`
     pub fn get_channel_option(&self, name: &str) -> Option<&SnowflakeOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::Channel(s) if s.name == name => Some(s),
@@ -751,6 +824,7 @@ impl OptionList {
         })
     }
 
+    /// The role Option named `name`
     pub fn get_role_option(&self, name: &str) -> Option<&SnowflakeOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::Role(s) if s.name == name => Some(s),
@@ -758,6 +832,7 @@ impl OptionList {
         })
     }
 
+    /// The mentionable Option named `name`
     pub fn get_mentionable_option(&self, name: &str) -> Option<&SnowflakeOption> {
         self.0.iter().find_map(|o| match o {
             ApplicationCommandInteractionDataOption::Mentionable(s) if s.name == name => Some(s),
@@ -777,6 +852,7 @@ impl<'de> Deserialize<'de> for OptionList {
     }
 }
 
+/// A subcommand being invoked
 #[derive(Debug, Clone, Deserialize)]
 pub struct Subcommand {
     /// Name of the parameter
@@ -790,6 +866,7 @@ pub struct Subcommand {
     pub focused: Option<bool>,
 }
 
+/// A subcommand group being invoked; Discord sends exactly one subcommand in it
 #[derive(Debug, Clone)]
 pub struct SubcommandGroup {
     /// Name of the parameter
@@ -833,6 +910,7 @@ impl<'de> Deserialize<'de> for SubcommandGroup {
     }
 }
 
+/// An Option's name and value
 #[derive(Debug, Clone, Deserialize)]
 pub struct ValueOption<T> {
     /// Name of the parameter

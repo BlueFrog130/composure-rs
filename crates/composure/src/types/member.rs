@@ -42,6 +42,8 @@ impl Mentionable for User {
     }
 }
 
+/// The member fields sent in resolved data: a [`Member`] without its `user`, which is resolved
+/// separately
 #[derive(Debug, Clone, Deserialize)]
 pub struct PartialMember {
     /// Guild nickname

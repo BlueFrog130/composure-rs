@@ -23,6 +23,7 @@ pub trait Autocomplete<S> {
 
 /// What an Autocomplete Handler may return: a `Vec` of suggestions, or a `Result` of one
 pub trait AutocompleteOutput {
+    /// The autocomplete Response, or the error to answer with instead
     fn into_result(self) -> Result<InteractionResponse, HandlerError>;
 }
 
@@ -46,6 +47,7 @@ impl<T: AutocompleteOutput, E: Display + 'static> AutocompleteOutput for Result<
 /// One suggestion: a string (shown and sent as is), a number, `(name, value)`, or a full
 /// [`ApplicationCommandOptionChoice`]
 pub trait IntoChoice {
+    /// The suggestion's name (shown) and value (sent)
     fn into_choice(self) -> ApplicationCommandOptionChoice;
 }
 
@@ -92,6 +94,7 @@ impl<N: Into<String>, V: ChoiceValue> IntoChoice for (N, V) {
 /// The value half of a `(name, value)` suggestion: a string for string Options, an integer or
 /// number for numeric ones
 pub trait ChoiceValue {
+    /// The value, typed for its Option
     fn into_value(self) -> ApplicationCommandOptionChoiceValue;
 }
 

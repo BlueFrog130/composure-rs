@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::{Snowflake, User};
 
+/// An emoji as used on buttons, select options and reactions: a unicode emoji (`name` only) or a
+/// custom one (`id`, `name`, `animated`). In `rsx!` markup, `emoji="👍"`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PartialEmoji {
     /// [emoji id](https://discord.com/developers/docs/reference#image-formatting)

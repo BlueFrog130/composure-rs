@@ -1,5 +1,9 @@
 # Composure example bot on Cloudflare Workers
 
+[![CI](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml)
+[![Docs.rs](https://img.shields.io/docsrs/composure?logo=docs.rs&label=guide)](https://docs.rs/composure/latest/composure/guide/index.html)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
+
 Serves the [example bot](../bot)'s shared commands from a Worker with `CloudflareInteractionBot`, plus what only Workers has, and a cron trigger using the Bot Client outside Interactions. `src/lib.rs` declares its App with `#[app(handlers(Bot, Note), theme = THEME)] pub struct CloudflareBot;`.
 
 [`src/notes.rs`](src/notes.rs): Workers KV

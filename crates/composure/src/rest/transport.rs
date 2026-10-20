@@ -10,6 +10,7 @@ use std::{borrow::Cow, fmt, sync::Arc, time::Duration};
 /// Futures are `Send` so REST calls can run on any thread (ADR 0012); single-threaded platforms
 /// wrap theirs (`worker::send::SendFuture` on Cloudflare).
 pub trait Transport: Send + Sync {
+    /// Sends `request` and returns Discord's response, whatever its status
     fn send(
         &self,
         request: &Request,
@@ -39,16 +40,23 @@ impl<T: Transport + ?Sized> Transport for Arc<T> {
     }
 }
 
+/// An HTTP method
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
+    /// `GET`
     Get,
+    /// `POST`
     Post,
+    /// `PUT`
     Put,
+    /// `PATCH`
     Patch,
+    /// `DELETE`
     Delete,
 }
 
 impl Method {
+    /// The method's name, e.g. `"GET"`
     pub fn as_str(self) -> &'static str {
         match self {
             Method::Get => "GET",
@@ -70,14 +78,18 @@ impl fmt::Display for Method {
 /// a body) and the encoded body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
+    /// The method
     pub method: Method,
+    /// The absolute URL
     pub url: String,
     /// Values are borrowed when constant (`User-Agent`, `Content-Type: application/json`)
     pub headers: Vec<(&'static str, Cow<'static, str>)>,
+    /// The encoded body, if any
     pub body: Option<Vec<u8>>,
 }
 
 impl Request {
+    /// The value of header `name`, matched case-insensitively
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
@@ -104,13 +116,16 @@ pub const DISCORD_HEADERS: &[&str] = &[
 /// An HTTP response as received, any status
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct RawResponse {
+    /// The HTTP status
     pub status: u16,
     /// Header names as sent; looked up case-insensitively by [`RawResponse::header`]
     pub headers: Vec<(String, String)>,
+    /// The body
     pub body: Vec<u8>,
 }
 
 impl RawResponse {
+    /// The value of header `name`, matched case-insensitively
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
@@ -118,6 +133,7 @@ impl RawResponse {
             .map(|(_, value)| value.as_str())
     }
 
+    /// Whether the status is 2xx
     pub fn is_success(&self) -> bool {
         (200..300).contains(&self.status)
     }
@@ -128,6 +144,7 @@ impl RawResponse {
 pub struct TransportError(pub String);
 
 impl TransportError {
+    /// An error described by `error`
     pub fn new(error: impl fmt::Display) -> Self {
         Self(error.to_string())
     }

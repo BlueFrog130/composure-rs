@@ -35,6 +35,7 @@ routes! {
 /// [`WebhookClient::modify`] (which cannot move channels)
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct WebhookFields<'a> {
+    /// 1-80 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
@@ -54,6 +55,7 @@ pub struct WebhookFields<'a> {
 /// Body of [`WebhookClient::execute`]
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ExecuteWebhook<'a> {
+    /// Text, up to 2000 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<&'a str>,
 
@@ -65,12 +67,15 @@ pub struct ExecuteWebhook<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub avatar_url: Option<&'a str>,
 
+    /// Read aloud
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tts: Option<bool>,
 
+    /// Up to 10 embeds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embeds: Option<&'a [Embed]>,
 
+    /// Who may be pinged
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<&'a AllowedMentions>,
 
@@ -78,9 +83,11 @@ pub struct ExecuteWebhook<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<&'a [Component]>,
 
+    /// Metadata of `files`; generated from them when absent
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<&'a [PartialAttachment]>,
 
+    /// Only `SUPPRESS_EMBEDS`, `SUPPRESS_NOTIFICATIONS` and `IS_COMPONENTS_V2` can be set
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
 
@@ -88,6 +95,7 @@ pub struct ExecuteWebhook<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thread_name: Option<&'a str>,
 
+    /// Forum/media channel posts: tags to apply
     #[serde(skip_serializing_if = "Option::is_none")]
     pub applied_tags: Option<&'a [Snowflake]>,
 
@@ -95,6 +103,7 @@ pub struct ExecuteWebhook<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<&'a PollCreate>,
 
+    /// Files to upload, sent as multipart
     #[serde(skip)]
     pub files: &'a [File],
 
@@ -177,6 +186,7 @@ pub struct WebhookClient<T> {
 }
 
 impl<T: Transport> WebhookClient<T> {
+    /// A client for webhook `id`, authorized by its `token`
     pub fn new(transport: T, id: Snowflake, token: impl Into<String>) -> Self {
         Self {
             rest: Rest::new(transport, None),
@@ -200,11 +210,14 @@ impl<T: Transport> WebhookClient<T> {
         self
     }
 
+    /// Longest single rate-limit wait before giving up with
+    /// [`Error::RateLimited`](super::Error::RateLimited)
     pub fn with_max_rate_limit_wait(mut self, wait: Duration) -> Self {
         self.rest.set_max_rate_limit_wait(wait);
         self
     }
 
+    /// The Transport requests go through
     pub fn transport(&self) -> &T {
         self.rest.transport()
     }

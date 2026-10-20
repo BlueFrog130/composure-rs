@@ -36,6 +36,7 @@ pub struct CreateInvite<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unique: Option<bool>,
 
+    /// What a voice channel invite targets
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_type: Option<InviteTargetType>,
 

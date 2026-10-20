@@ -3,10 +3,12 @@ name = "composure_macros"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Command macros for Composure"
-repository = "https://github.com/BlueFrog130/composure-rs"
-keywords = ["discord", "bot", "edge", "serverless", "wasm"]
-license = "Apache-2.0"
+description = "Procedural macros for Composure Discord bots: #[command], #[app], #[view] and rsx! markup"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["discord", "bot", "macros", "slash-commands", "jsx"]
+categories = ["api-bindings", "development-tools"]
 
 [lib]
 proc-macro = true

@@ -48,6 +48,8 @@ impl Default for Embed {
 }
 
 impl Embed {
+    /// An empty embed. Discord needs at least a title, description, field, image or thumbnail; an App's
+    /// [`Theme`](crate::command::Theme) fills in the color, author and footer
     pub fn new() -> Self {
         Self {
             title: None,
@@ -65,61 +67,73 @@ impl Embed {
         }
     }
 
+    /// Sets the title (max 256 characters)
     pub fn with_title(mut self, title: &str) -> Self {
         self.title = Some(title.into());
         self
     }
 
+    /// Sets the description: markdown, max 4096 characters
     pub fn with_description(mut self, description: &str) -> Self {
         self.description = Some(description.into());
         self
     }
 
+    /// Makes the title a link to `url`
     pub fn with_url(mut self, url: &str) -> Self {
         self.url = Some(url.into());
         self
     }
 
+    /// Sets the timestamp shown in the footer (ISO 8601)
     pub fn with_timestamp(mut self, timestamp: &str) -> Self {
         self.timestamp = Some(timestamp.into());
         self
     }
 
+    /// Sets the color of the left border (`0xRRGGBB`)
     pub fn with_color(mut self, color: u32) -> Self {
         self.color = Some(color);
         self
     }
 
+    /// Sets the footer
     pub fn with_footer(mut self, footer: EmbedFooter) -> Self {
         self.footer = Some(footer);
         self
     }
 
+    /// Sets the large image
     pub fn with_image(mut self, image: EmbedImage) -> Self {
         self.image = Some(image);
         self
     }
 
+    /// Sets the thumbnail, at the top right
     pub fn with_thumbnail(mut self, thumbnail: EmbedThumbnail) -> Self {
         self.thumbnail = Some(thumbnail);
         self
     }
 
+    /// Sets the video (ignored when sent by bots)
     pub fn with_video(mut self, video: EmbedVideo) -> Self {
         self.video = Some(video);
         self
     }
 
+    /// Sets the provider (ignored when sent by bots)
     pub fn with_provider(mut self, provider: EmbedProvider) -> Self {
         self.provider = Some(provider);
         self
     }
 
+    /// Sets the author, above the title
     pub fn with_author(mut self, author: EmbedAuthor) -> Self {
         self.author = Some(author);
         self
     }
 
+    /// Adds a field (max 25)
     pub fn with_field(mut self, field: EmbedField) -> Self {
         if let Some(fields) = &mut self.fields {
             fields.push(field);
@@ -129,6 +143,7 @@ impl Embed {
         self
     }
 
+    /// Sets the fields (max 25)
     pub fn with_fields(mut self, fields: Vec<EmbedField>) -> Self {
         if let Some(existing_fields) = &mut self.fields {
             existing_fields.extend(fields);
@@ -153,6 +168,7 @@ pub struct EmbedFooter {
 }
 
 impl EmbedFooter {
+    /// A footer with `text` (max 2048 characters) and an optional icon
     pub fn new(text: String, icon_url: Option<String>, proxy_icon_url: Option<String>) -> Self {
         Self {
             text,
@@ -179,6 +195,7 @@ pub struct EmbedImage {
 }
 
 impl EmbedImage {
+    /// An image at `url` (`http(s)` or `attachment://<filename>`); the other fields are filled in by Discord
     pub fn new(
         url: String,
         proxy_url: Option<String>,
@@ -211,6 +228,7 @@ pub struct EmbedThumbnail {
 }
 
 impl EmbedThumbnail {
+    /// A thumbnail at `url` (`http(s)` or `attachment://<filename>`); the other fields are filled in by Discord
     pub fn new(
         url: String,
         proxy_url: Option<String>,
@@ -243,6 +261,7 @@ pub struct EmbedVideo {
 }
 
 impl EmbedVideo {
+    /// A video; bots cannot send these
     pub fn new(
         url: Option<String>,
         proxy_url: Option<String>,
@@ -269,6 +288,7 @@ pub struct EmbedProvider {
 }
 
 impl EmbedProvider {
+    /// A provider; bots cannot send these
     pub fn new(name: Option<String>, url: Option<String>) -> Self {
         Self { name, url }
     }
@@ -291,6 +311,7 @@ pub struct EmbedAuthor {
 }
 
 impl EmbedAuthor {
+    /// An author: `name` (max 256 characters), an optional link and icon
     pub fn new(
         name: String,
         url: Option<String>,
@@ -320,6 +341,7 @@ pub struct EmbedField {
 }
 
 impl EmbedField {
+    /// A field: `name` (max 256 characters), `value` (max 1024), side by side with its neighbors when `inline`
     pub fn new(name: String, value: String, inline: Option<bool>) -> Self {
         Self {
             name,

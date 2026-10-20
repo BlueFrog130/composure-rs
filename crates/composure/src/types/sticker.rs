@@ -59,12 +59,16 @@ pub enum StickerType {
 #[derive(Debug, Clone, Deserialize_repr)]
 #[repr(u8)]
 pub enum StickerFormatTypes {
+    /// PNG
     Png = 1,
 
+    /// Animated PNG
     Apng = 2,
 
+    /// Lottie (JSON animation)
     Lottie = 3,
 
+    /// GIF
     Gif = 4,
 }
 

@@ -1,4 +1,7 @@
 #![doc = include_str!("../README.md")]
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[macro_use]
 mod log;
@@ -25,12 +28,16 @@ pub use state::{Worker, bot_client};
 pub use transport::FetchTransport;
 use worker::{Context, Env, Headers, Request, Response};
 
+/// Why a request could not be validated
 #[derive(Debug)]
 pub enum Error {
+    /// The signature is missing or invalid, or the public key is not a valid key
     ValidationError,
+    /// The Workers runtime failed: a missing secret, an unreadable request, ...
     WorkerError(worker::Error),
 }
 
+/// This crate's result
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Validates a request from Discord

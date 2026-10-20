@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::Snowflake;
 
+/// An attachment of a message being sent: which uploaded or existing file it is, and its metadata
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PartialAttachment {
     /// name of file attached
@@ -63,10 +64,12 @@ pub struct File {
     /// media type; Discord infers it from the name when absent
     pub content_type: Option<String>,
 
+    /// The file's content
     pub bytes: Vec<u8>,
 }
 
 impl File {
+    /// A file named `name` (with its extension) holding `bytes`
     pub fn new(name: impl Into<String>, bytes: impl Into<Vec<u8>>) -> Self {
         Self {
             name: name.into(),
@@ -76,11 +79,13 @@ impl File {
         }
     }
 
+    /// Sets the alt text (max 1024 characters)
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
+    /// Sets the media type, e.g. `image/png`
     pub fn content_type(mut self, content_type: impl Into<String>) -> Self {
         self.content_type = Some(content_type.into());
         self

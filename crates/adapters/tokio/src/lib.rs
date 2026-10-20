@@ -1,4 +1,7 @@
 #![doc = include_str!("../README.md")]
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod host;
 mod transport;
@@ -49,7 +52,12 @@ pub enum Error {
     MissingVar(&'static str),
 
     /// An environment variable is set but unusable
-    InvalidVar { name: &'static str, reason: String },
+    InvalidVar {
+        /// The variable
+        name: &'static str,
+        /// What is wrong with it
+        reason: String,
+    },
 
     /// The public key is not a valid hex Ed25519 key
     InvalidPublicKey,

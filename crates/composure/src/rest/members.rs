@@ -25,6 +25,7 @@ routes! {
 /// Body of [`BotClient::modify_member`]. Absent fields are unchanged; `Some(None)` clears.
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ModifyMember<'a> {
+    /// Server nickname
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nick: Option<Option<&'a str>>,
 
@@ -60,6 +61,7 @@ pub struct ModifyMember<'a> {
 /// Body of [`BotClient::modify_current_member`]: the bot's own server profile
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ModifyCurrentMember<'a> {
+    /// Server nickname
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nick: Option<Option<&'a str>>,
 
@@ -71,6 +73,7 @@ pub struct ModifyCurrentMember<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub banner: Option<Option<&'a str>>,
 
+    /// Server profile bio
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bio: Option<Option<&'a str>>,
 
@@ -86,15 +89,19 @@ pub struct AddMember<'a> {
     /// The user's OAuth2 access token
     pub access_token: &'a str,
 
+    /// Server nickname
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nick: Option<&'a str>,
 
+    /// Roles to give
     #[serde(skip_serializing_if = "Option::is_none")]
     pub roles: Option<&'a [Snowflake]>,
 
+    /// Server mute in voice
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mute: Option<bool>,
 
+    /// Server deafen in voice
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deaf: Option<bool>,
 }

@@ -45,6 +45,7 @@ pub struct Worker {
 }
 
 impl Worker {
+    /// The State for one request, from the `fetch` event's `env` and `ctx`
     pub fn new(env: Env, ctx: Context) -> Self {
         Self {
             env: SendWrapper::new(env),
@@ -52,10 +53,12 @@ impl Worker {
         }
     }
 
+    /// The Worker's bindings: vars, secrets, KV, D1, ... (also through `Deref`)
     pub fn env(&self) -> &Env {
         &self.env
     }
 
+    /// The request's execution context, which runs Background Work (`wait_until`)
     pub fn context(&self) -> &Context {
         &self.ctx
     }

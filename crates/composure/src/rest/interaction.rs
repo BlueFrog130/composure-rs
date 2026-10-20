@@ -34,6 +34,7 @@ pub struct InteractionClient<T> {
 }
 
 impl<T: Transport> InteractionClient<T> {
+    /// A client for the Interaction `interaction_id` of `application_id`, authorized by its `token`
     pub fn new(
         transport: T,
         application_id: Snowflake,
@@ -61,6 +62,7 @@ impl<T: Transport> InteractionClient<T> {
         self
     }
 
+    /// The Transport requests go through
     pub fn transport(&self) -> &T {
         self.rest.transport()
     }
@@ -185,9 +187,11 @@ impl<T: Transport> InteractionClient<T> {
 /// Body of [`InteractionClient::create_followup`]
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct CreateFollowup<'a> {
+    /// Text, up to 2000 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<&'a str>,
 
+    /// Read aloud
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tts: Option<bool>,
 
@@ -195,9 +199,11 @@ pub struct CreateFollowup<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embeds: Option<&'a [Embed]>,
 
+    /// Who may be pinged
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<&'a AllowedMentions>,
 
+    /// Components: action rows, or the whole message with `IS_COMPONENTS_V2`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<&'a [Component]>,
 
@@ -213,6 +219,7 @@ pub struct CreateFollowup<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<&'a PollCreate>,
 
+    /// Files to upload, sent as multipart
     #[serde(skip)]
     pub files: &'a [File],
 }
@@ -220,18 +227,23 @@ pub struct CreateFollowup<'a> {
 /// Body of the edit Endpoints. Absent fields are left unchanged.
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct EditMessage<'a> {
+    /// New text, up to 2000 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<&'a str>,
 
+    /// New embeds, up to 10
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embeds: Option<&'a [Embed]>,
 
+    /// New flags (only `SUPPRESS_EMBEDS` and `IS_COMPONENTS_V2` can change)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
 
+    /// Who may be pinged
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<&'a AllowedMentions>,
 
+    /// New components
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<&'a [Component]>,
 
@@ -239,6 +251,7 @@ pub struct EditMessage<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<&'a [PartialAttachment]>,
 
+    /// Files to upload, sent as multipart
     #[serde(skip)]
     pub files: &'a [File],
 }

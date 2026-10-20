@@ -24,6 +24,7 @@ routes! {
 /// nullable one. Thread-only fields apply to threads.
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ModifyChannel<'a> {
+    /// 1-100 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
@@ -31,12 +32,15 @@ pub struct ModifyChannel<'a> {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub kind: Option<ChannelType>,
 
+    /// Sorting position
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Option<i32>>,
 
+    /// 0-1024 characters (4096 for forums)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub topic: Option<Option<&'a str>>,
 
+    /// Age-restricted
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nsfw: Option<bool>,
 
@@ -44,12 +48,15 @@ pub struct ModifyChannel<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_per_user: Option<Option<u32>>,
 
+    /// Voice: bits per second, 8000 or more
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitrate: Option<Option<u32>>,
 
+    /// Voice: most users, 0 for no limit
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_limit: Option<Option<u32>>,
 
+    /// Permission overwrites, replacing the current ones
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permission_overwrites: Option<&'a [Overwrite]>,
 
@@ -57,9 +64,11 @@ pub struct ModifyChannel<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<Option<Snowflake>>,
 
+    /// Voice: region id, automatic when `None`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rtc_region: Option<Option<&'a str>>,
 
+    /// Voice: camera video quality
     #[serde(skip_serializing_if = "Option::is_none")]
     pub video_quality_mode: Option<VideoQualityMode>,
 
@@ -67,6 +76,7 @@ pub struct ModifyChannel<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_auto_archive_duration: Option<u32>,
 
+    /// [Channel flags](https://discord.com/developers/docs/resources/channel#channel-object-channel-flags)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<ChannelFlags>,
 
@@ -98,12 +108,15 @@ pub struct ModifyChannel<'a> {
 /// Body of [`BotClient::edit_channel_permissions`]
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct EditChannelPermissions {
+    /// Whether `id` is a role or a member
     #[serde(rename = "type")]
     pub kind: OverwriteType,
 
+    /// Permissions to allow
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allow: Option<Permissions>,
 
+    /// Permissions to deny
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deny: Option<Permissions>,
 }

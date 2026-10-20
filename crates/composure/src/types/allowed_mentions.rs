@@ -22,8 +22,11 @@ pub struct AllowedMentions {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AllowedMentionTypes {
+    /// Role mentions in the content
     Roles,
+    /// User mentions in the content
     Users,
+    /// `@everyone` and `@here`
     Everyone,
 }
 

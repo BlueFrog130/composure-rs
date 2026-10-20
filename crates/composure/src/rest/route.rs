@@ -6,7 +6,9 @@ use super::Method;
 /// check can match it (parameter names may differ, positions may not).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Route {
+    /// The HTTP method
     pub method: Method,
+    /// The path template, with `{name}` parameters
     pub path: &'static str,
 }
 

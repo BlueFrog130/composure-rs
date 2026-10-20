@@ -203,6 +203,7 @@ pub trait ModalChoice: Sized {
     /// `(name, value)` of every variant
     const OPTIONS: &'static [(&'static str, &'static str)];
 
+    /// The variant whose value is `value`, as submitted by an input
     fn from_modal_value(value: &str) -> Option<Self>;
 }
 
@@ -260,6 +261,7 @@ impl<C: ModalChoice> ModalValue for Vec<C> {
     note = "list them with `option(\"Label\", \"value\")` in the field's attribute, or use a #[derive(Choice)] enum"
 )]
 pub trait ModalOptions {
+    /// `(label, value)` of every option
     const OPTIONS: &'static [(&'static str, &'static str)];
 }
 
@@ -278,9 +280,13 @@ impl<C: ModalChoice> ModalOptions for Vec<C> {
 /// Settings of one Modal field, from its attribute; builds the field's [`Label`]
 #[derive(Debug, Clone, Copy)]
 pub struct FieldMeta {
+    /// The input's `custom_id`, which the submitted value is found by: `id`, or the field name
     pub custom_id: &'static str,
+    /// Shown above the input: `label`, or the field name
     pub label: &'static str,
+    /// Shown under the label
     pub description: Option<&'static str>,
+    /// Shown while the input is empty (text inputs, selects)
     pub placeholder: Option<&'static str>,
     /// Fewest selections (selects, checkbox groups, file uploads)
     pub min: Option<u8>,
@@ -295,8 +301,11 @@ pub struct FieldMeta {
 /// Text input settings, from `#[input]`
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TextInputMeta {
+    /// Multi-line instead of single-line
     pub paragraph: bool,
+    /// Fewest characters, 0-4000
     pub min_length: Option<i32>,
+    /// Most characters, 1-4000
     pub max_length: Option<i32>,
     /// Pre-filled text
     pub value: Option<&'static str>,
@@ -319,6 +328,7 @@ impl FieldMeta {
             .or_else(|| self.many.then(|| all.min(u8::MAX as usize) as u8))
     }
 
+    /// The field as a [`TextInput`] in its [`Label`]
     pub fn text_input(&self, input: &TextInputMeta) -> Component {
         let style = if input.paragraph {
             TextInputStyle::Paragraph
@@ -339,6 +349,7 @@ impl FieldMeta {
         self.label(Component::TextInput(text))
     }
 
+    /// The field as a string select of `(label, value)` options in its [`Label`]
     pub fn string_select(&self, options: &[(&str, &str)]) -> Component {
         let all = options.len();
         let options = options
@@ -350,18 +361,22 @@ impl FieldMeta {
         self.label(Component::StringSelect(self.select(all, Some(options))))
     }
 
+    /// The field as a user select in its [`Label`]
     pub fn user_select(&self) -> Component {
         self.label(Component::UserSelect(self.select(25, None)))
     }
 
+    /// The field as a role select in its [`Label`]
     pub fn role_select(&self) -> Component {
         self.label(Component::RoleSelect(self.select(25, None)))
     }
 
+    /// The field as a user-and-role select in its [`Label`]
     pub fn mentionable_select(&self) -> Component {
         self.label(Component::MentionableSelect(self.select(25, None)))
     }
 
+    /// The field as a channel select offering `channel_types` (all when `None`) in its [`Label`]
     pub fn channel_select(&self, channel_types: Option<&[ChannelType]>) -> Component {
         let mut select = self.select::<8>(25, None);
         select.channel_types = channel_types.map(<[_]>::to_vec);
@@ -382,12 +397,14 @@ impl FieldMeta {
         select
     }
 
+    /// The field as a [`RadioGroup`] of `(label, value)` options in its [`Label`]
     pub fn radio(&self, options: &[(&str, &str)]) -> Component {
         let mut radio = RadioGroup::new(self.custom_id, group_options(options));
         radio.required = self.required();
         self.label(Component::RadioGroup(radio))
     }
 
+    /// The field as a [`CheckboxGroup`] of `(label, value)` options in its [`Label`]
     pub fn checkboxes(&self, options: &[(&str, &str)]) -> Component {
         let mut group = CheckboxGroup::new(self.custom_id, group_options(options));
         group.min_values = self.min;
@@ -396,13 +413,15 @@ impl FieldMeta {
         self.label(Component::CheckboxGroup(group))
     }
 
-    /// Checkboxes cannot be required
+    /// The field as a [`Checkbox`], checked initially when `default`, in its [`Label`].
+    /// Checkboxes cannot be required.
     pub fn checkbox(&self, default: bool) -> Component {
         let mut checkbox = Checkbox::new(self.custom_id);
         checkbox.default = default.then_some(true);
         self.label(Component::Checkbox(checkbox))
     }
 
+    /// The field as a [`FileUpload`] accepting `file_types` (any when `None`) in its [`Label`]
     pub fn file_upload(&self, file_types: Option<&[&str]>) -> Component {
         let mut upload = FileUpload::new(self.custom_id);
         upload.min_values = self.min;

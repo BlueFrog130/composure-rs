@@ -38,12 +38,15 @@ pub struct CreateSticker<'a> {
 /// Body of [`BotClient::modify_guild_sticker`]
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ModifySticker<'a> {
+    /// 2-30 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
+    /// 2-100 characters; `Some(None)` removes it
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<Option<&'a str>>,
 
+    /// Autocomplete/suggestion tags, up to 200 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<&'a str>,
 
@@ -55,17 +58,26 @@ pub struct ModifySticker<'a> {
 /// [Sticker Pack](https://discord.com/developers/docs/resources/sticker#sticker-pack-object)
 #[derive(Debug, Clone, Deserialize)]
 pub struct StickerPack {
+    /// The pack's id
     pub id: Snowflake,
+    /// Its stickers
     pub stickers: Vec<Sticker>,
+    /// Its name
     pub name: String,
+    /// The SKU it belongs to
     pub sku_id: Snowflake,
+    /// The sticker shown as the pack's icon
     pub cover_sticker_id: Option<Snowflake>,
+    /// Its description
     pub description: String,
+    /// Its banner image's id
     pub banner_asset_id: Option<Snowflake>,
 }
 
+/// The response of [`BotClient::list_sticker_packs`]
 #[derive(Debug, Clone, Deserialize)]
 pub struct StickerPacks {
+    /// The packs
     pub sticker_packs: Vec<StickerPack>,
 }
 

@@ -246,26 +246,34 @@ pub struct MessageActivity {
 #[derive(Debug, Clone, Deserialize_repr)]
 #[repr(u8)]
 pub enum MessageActivityType {
+    /// Join a party
     Join = 1,
 
+    /// Spectate a game
     Spectate = 2,
 
+    /// Listen along on Spotify
     Listen = 3,
 
+    /// Ask to join a party
     JoinRequest = 5,
 }
 
 /// A page of [pinned messages](https://discord.com/developers/docs/resources/message#get-channel-pins)
 #[derive(Debug, Clone, Deserialize)]
 pub struct PinnedMessages {
+    /// The pins, newest first
     pub items: Vec<PinnedMessage>,
+    /// Whether there are more, older pins
     pub has_more: bool,
 }
 
+/// One pinned message
 #[derive(Debug, Clone, Deserialize)]
 pub struct PinnedMessage {
     /// When it was pinned (ISO 8601)
     pub pinned_at: String,
+    /// The message
     pub message: Message,
 }
 

@@ -1,6 +1,27 @@
-# Cloudflare Adapter
+# composure_adapter_cloudflare
 
-Runs a Composure bot on Cloudflare Workers. The adapter verifies the request signature against the `DISCORD_PUBLIC_KEY` secret, answers Discord's Ping, and dispatches everything else to your handler, passing a `Worker` (the worker's `Env` and `Context`) as State.
+**Run your Discord bot on Cloudflare's edge.** Serve a [Composure](https://github.com/BlueFrog130/composure-rs)
+bot from a Cloudflare Worker: no server to run, scaled to zero between requests, and for many
+bots within the Workers free plan (100,000 requests a day).
+
+[![Crates.io](https://img.shields.io/crates/v/composure_adapter_cloudflare.svg?logo=rust)](https://crates.io/crates/composure_adapter_cloudflare)
+[![Docs.rs](https://img.shields.io/docsrs/composure_adapter_cloudflare?logo=docs.rs)](https://docs.rs/composure_adapter_cloudflare)
+[![CI](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml)
+[![License](https://img.shields.io/crates/l/composure_adapter_cloudflare.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
+[![MSRV](https://img.shields.io/badge/rustc-1.91+-orange.svg?logo=rust)](https://blog.rust-lang.org/)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflareworkers&logoColor=white)](https://workers.cloudflare.com/)
+[![WASM](https://img.shields.io/badge/target-wasm32-654FF0?logo=webassembly&logoColor=white)](https://webassembly.org/)
+
+- **No crypto in your bundle**: signatures are checked with Workers' built-in Web Crypto, the key imported once per isolate
+- **Small**: the full example bot is about 344 KB of gzipped WASM
+- **Answer late**: `ctx.defer(..)` replies at once and finishes the work with `wait_until`
+- **KV, D1, R2 and friends** through the `Worker` State, in any Command
+- **Webhook Events** (app installs, entitlements) on `/events`, and a Bot Client for cron triggers
+- **Workers Logs**: optional `tracing` support that turns every span field into a searchable log field
+
+The adapter verifies the request signature against the `DISCORD_PUBLIC_KEY` secret, answers
+Discord's Ping, and dispatches everything else to your handler, passing a `Worker` (the
+worker's `Env` and `Context`) as State.
 
 ## Usage
 
@@ -130,3 +151,7 @@ opt-level = 3
 ## Size and speed
 
 The example bot (`examples/cloudflare`) builds to about 1.25 MB of wasm (373 KB gzipped) with `tracing`, 1.16 MB (344 KB) without. Parsing, dispatching and answering an interaction takes a few microseconds and 20-45 small allocations; `examples/bot/tests/perf.rs` measures each path and fails if one allocates more than its budget. `FetchTransport` keeps only the rate limit headers and `content-type` of REST responses (`composure::rest::DISCORD_HEADERS`).
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE).

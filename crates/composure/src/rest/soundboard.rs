@@ -20,6 +20,7 @@ routes! {
 /// [`BotClient::modify_guild_soundboard_sound`]
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct SoundboardSoundFields<'a> {
+    /// 2-32 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
@@ -31,9 +32,11 @@ pub struct SoundboardSoundFields<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub volume: Option<Option<f64>>,
 
+    /// A custom emoji shown with it
     #[serde(skip_serializing_if = "Option::is_none")]
     pub emoji_id: Option<Option<Snowflake>>,
 
+    /// A unicode emoji shown with it
     #[serde(skip_serializing_if = "Option::is_none")]
     pub emoji_name: Option<Option<&'a str>>,
 
@@ -45,6 +48,7 @@ pub struct SoundboardSoundFields<'a> {
 /// Guild sounds come wrapped
 #[derive(Debug, Clone, Deserialize)]
 pub struct SoundboardSounds {
+    /// The sounds
     pub items: Vec<SoundboardSound>,
 }
 

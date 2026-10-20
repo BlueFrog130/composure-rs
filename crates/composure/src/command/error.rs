@@ -16,6 +16,7 @@ pub struct HandlerError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// What went wrong, which decides what the user sees and how it is logged
 pub enum ErrorKind {
     /// The handler or Command returned an error
     Handler,
@@ -31,6 +32,7 @@ pub enum ErrorKind {
 }
 
 impl HandlerError {
+    /// A handler failure: logged as an error; the user sees a generic message
     pub fn new(message: impl fmt::Display) -> Self {
         Self {
             kind: ErrorKind::Handler,
@@ -46,6 +48,7 @@ impl HandlerError {
         }
     }
 
+    /// No Command matches `name`; usually Discord's Commands are out of sync with the App
     pub fn unknown_command(name: &str) -> Self {
         Self {
             kind: ErrorKind::UnknownCommand,
@@ -53,6 +56,7 @@ impl HandlerError {
         }
     }
 
+    /// The Option (or input) `name` could not be read, because of `error`
     pub fn invalid_option(name: &str, error: impl fmt::Display) -> Self {
         Self {
             kind: ErrorKind::InvalidOption,
@@ -60,6 +64,7 @@ impl HandlerError {
         }
     }
 
+    /// What kind of error this is
     pub fn kind(&self) -> ErrorKind {
         self.kind
     }

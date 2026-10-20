@@ -4,13 +4,18 @@ use composure::types::{
 
 use crate::command::*;
 
+/// Builds the chat-input Command Definitions of an application, one closure per Command
 pub struct CommandsBuilder {
+    /// The application the Commands belong to
     pub application_id: Snowflake,
+    /// The guild, for guild Commands; `None` for global ones
     pub guild_id: Option<Snowflake>,
+    /// The Commands built so far
     pub commands: Vec<ApplicationCommand>,
 }
 
 impl CommandsBuilder {
+    /// No Commands yet
     pub fn new(application_id: Snowflake, guild_id: Option<Snowflake>) -> Self {
         Self {
             commands: Vec::new(),
@@ -19,6 +24,7 @@ impl CommandsBuilder {
         }
     }
 
+    /// Adds a Command, built by `command_builder` from an empty [`CommandBuilder`]
     pub fn add_command<F>(mut self, command_builder: F) -> Self
     where
         F: FnOnce(CommandBuilder) -> CommandBuilder,
@@ -28,11 +34,13 @@ impl CommandsBuilder {
         self
     }
 
+    /// The Command Definitions, ready to send with `BotClient::bulk_overwrite_commands`
     pub fn build(self) -> Vec<ApplicationCommand> {
         self.commands
     }
 }
 
+/// Builds one chat-input (slash) Command Definition
 pub struct CommandBuilder {
     name: String,
     description: String,
@@ -50,6 +58,7 @@ impl Default for CommandBuilder {
 }
 
 impl CommandBuilder {
+    /// An unnamed Command without Options
     pub fn new() -> Self {
         Self {
             name: String::new(),
@@ -62,18 +71,21 @@ impl CommandBuilder {
         }
     }
 
+    /// The name: 1-32 lowercase characters
     pub fn name(mut self, name: &str) -> Self {
         self.name.clear();
         self.name.push_str(name);
         self
     }
 
+    /// The description: 1-100 characters
     pub fn description(mut self, description: &str) -> Self {
         self.description.clear();
         self.description.push_str(description);
         self
     }
 
+    /// Adds an Option (max 25)
     pub fn add_option(mut self, option: ApplicationCommandOption) -> Self {
         match self.options {
             None => self.options = Some(vec![option]),
@@ -82,6 +94,7 @@ impl CommandBuilder {
         self
     }
 
+    /// Adds a subcommand, built by `subcommand_builder`
     pub fn add_subcommand<F>(self, subcommand_builder: F) -> Self
     where
         F: FnOnce(SubcommandBuilder) -> SubcommandBuilder,
@@ -90,6 +103,7 @@ impl CommandBuilder {
         self.add_option(option.build())
     }
 
+    /// Adds a subcommand group, built by `subcommand_group_builder`
     pub fn add_subcommand_group<F>(self, subcommand_group_builder: F) -> Self
     where
         F: FnOnce(SubcommandGroupBuilder) -> SubcommandGroupBuilder,
@@ -98,11 +112,13 @@ impl CommandBuilder {
         self.add_option(option.build())
     }
 
+    /// Permissions a member needs to see the Command, unless a server admin changes it
     pub fn with_default_member_permissions(mut self, permissions: Permissions) -> Self {
         self.default_member_permissions = Some(permissions);
         self
     }
 
+    /// Whether the Command works in DMs; replaced by contexts
     #[deprecated(note = "Discord deprecated dm_permission; use with_contexts")]
     pub fn with_dm_permission(mut self, dm_permission: bool) -> Self {
         self.dm_permission = Some(dm_permission);
@@ -126,6 +142,7 @@ impl CommandBuilder {
         self
     }
 
+    /// The Command Definition
     pub fn build_chat_command(self) -> ApplicationCommand {
         ApplicationCommand::ChatInputCommand(ChatInputCommand {
             details: CommandDetails {
@@ -149,6 +166,7 @@ impl CommandBuilder {
     }
 }
 
+/// Builds a subcommand of a [`CommandBuilder`] or [`SubcommandGroupBuilder`]
 pub struct SubcommandBuilder {
     name: String,
     description: String,
@@ -162,6 +180,7 @@ impl Default for SubcommandBuilder {
 }
 
 impl SubcommandBuilder {
+    /// An unnamed subcommand without Options
     pub fn new() -> Self {
         Self {
             name: String::new(),
@@ -170,18 +189,21 @@ impl SubcommandBuilder {
         }
     }
 
+    /// The name: 1-32 lowercase characters
     pub fn name(mut self, name: &str) -> Self {
         self.name.clear();
         self.name.push_str(name);
         self
     }
 
+    /// The description: 1-100 characters
     pub fn description(mut self, description: &str) -> Self {
         self.description.clear();
         self.description.push_str(description);
         self
     }
 
+    /// Adds an Option (max 25)
     pub fn add_option(mut self, option: SubcommandCommandOption) -> Self {
         match self.options {
             None => self.options = Some(vec![option]),
@@ -206,6 +228,7 @@ impl SubcommandBuilder {
     }
 }
 
+/// Builds a subcommand group of a [`CommandBuilder`]
 pub struct SubcommandGroupBuilder {
     name: String,
     description: String,
@@ -219,6 +242,7 @@ impl Default for SubcommandGroupBuilder {
 }
 
 impl SubcommandGroupBuilder {
+    /// An unnamed group without subcommands
     pub fn new() -> Self {
         Self {
             name: String::new(),
@@ -227,18 +251,21 @@ impl SubcommandGroupBuilder {
         }
     }
 
+    /// The name: 1-32 lowercase characters
     pub fn name(mut self, name: &str) -> Self {
         self.name.clear();
         self.name.push_str(name);
         self
     }
 
+    /// The description: 1-100 characters
     pub fn description(mut self, description: &str) -> Self {
         self.description.clear();
         self.description.push_str(description);
         self
     }
 
+    /// Adds a subcommand, built by `subcommand_builder` (max 25)
     pub fn add_subcommand<F>(mut self, subcommand_builder: F) -> Self
     where
         F: FnOnce(SubcommandBuilder) -> SubcommandBuilder,

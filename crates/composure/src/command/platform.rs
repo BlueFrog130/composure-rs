@@ -22,8 +22,10 @@ pub type BackgroundWork = Pin<Box<dyn Future<Output = Result<(), HandlerError>> 
 /// (`composure_adapter_cloudflare::Worker`, `composure_adapter_tokio::Host`); enables
 /// [`Ctx::client`], [`Ctx::bot`] and [`Ctx::defer`].
 pub trait Platform: Clone + Send + Sync + 'static {
+    /// The HTTP client REST calls go through
     type Transport: Transport + Clone + 'static;
 
+    /// A handle to the Transport, for a new client
     fn transport(&self) -> Self::Transport;
 
     /// Runs `work` after the response is sent (`wait_until` on Cloudflare, `tokio::spawn` on a
@@ -249,14 +251,17 @@ impl<S: Clone, D> Clone for DeferredCtx<S, D> {
 }
 
 impl<S: Platform, D> DeferredCtx<S, D> {
+    /// The Interaction being answered
     pub fn interaction(&self) -> &DataInteraction<D> {
         &self.interaction
     }
 
+    /// The Interaction's data
     pub fn data(&self) -> &D {
         &self.interaction.data
     }
 
+    /// Platform resources passed through by the Adapter
     pub fn state(&self) -> &S {
         &self.state
     }
@@ -266,18 +271,22 @@ impl<S: Platform, D> DeferredCtx<S, D> {
         self.theme.unwrap_or(&Theme::DEFAULT)
     }
 
+    /// The invoking user, in guilds and DMs alike
     pub fn user(&self) -> Option<&User> {
         self.interaction.common.invoking_user()
     }
 
+    /// The invoking member, in guilds only
     pub fn member(&self) -> Option<&Member> {
         self.interaction.common.member.as_ref()
     }
 
+    /// The guild it was invoked in; `None` in DMs
     pub fn guild_id(&self) -> Option<Snowflake> {
         self.interaction.common.guild_id
     }
 
+    /// The channel it was invoked in
     pub fn channel_id(&self) -> Option<Snowflake> {
         self.interaction.common.channel_id
     }

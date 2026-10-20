@@ -1,6 +1,23 @@
 # composure_adapter_tokio
 
-Serve a [Composure](../../../README.md) bot from a hosted server: an HTTP server on tokio (hyper) answering Discord's signed Interactions and Webhook Events, each Interaction on its own task across the runtime's threads.
+**Your Discord bot as a plain HTTP server.** Serve a [Composure](https://github.com/BlueFrog130/composure-rs)
+bot from any machine, container or PaaS with tokio and hyper: every Interaction on its own task
+across all cores, with the same answers as on Cloudflare Workers.
+
+[![Crates.io](https://img.shields.io/crates/v/composure_adapter_tokio.svg?logo=rust)](https://crates.io/crates/composure_adapter_tokio)
+[![Docs.rs](https://img.shields.io/docsrs/composure_adapter_tokio?logo=docs.rs)](https://docs.rs/composure_adapter_tokio)
+[![CI](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml)
+[![License](https://img.shields.io/crates/l/composure_adapter_tokio.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
+[![MSRV](https://img.shields.io/badge/rustc-1.91+-orange.svg?logo=rust)](https://blog.rust-lang.org/)
+[![tokio](https://img.shields.io/badge/runs_on-tokio-463F3A?logo=rust&logoColor=white)](https://tokio.rs/)
+
+- **Production-ready defaults**: `GET /health`, a 1 MiB body limit, panics isolated to their request, graceful shutdown on Ctrl-C / SIGTERM
+- **Configured from the environment**: `DISCORD_PUBLIC_KEY`, `DISCORD_TOKEN`, `PORT`, and you're serving
+- **Your data in every Command**: `.with_data(..)` hands it to handlers through `Host<T>`
+- **Background Work you can trust**: deferred work is tracked and awaited on shutdown
+- **Testable**: point the HTTP client at a stand-in Discord with `HttpTransport::with_api_base`
+
+## Usage
 
 ```rust,ignore
 use composure_adapter_tokio::TokioInteractionBot;
@@ -23,4 +40,8 @@ async fn main() -> Result<(), composure_adapter_tokio::Error> {
 - Plain HTTP only: Discord needs HTTPS, so run it behind a TLS-terminating proxy or tunnel.
 - Logs through `tracing`; install a subscriber (e.g. `tracing_subscriber::fmt`) to see them, Composure's `interaction` / `background_work` / `event` / `rest` spans included.
 
-See [`examples/tokio`](../../../examples/tokio) for the example bot served this way.
+See [`examples/tokio`](https://github.com/BlueFrog130/composure-rs/tree/main/examples/tokio) for the example bot served this way.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE).

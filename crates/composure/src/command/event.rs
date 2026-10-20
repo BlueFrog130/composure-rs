@@ -25,6 +25,7 @@ impl<S> Clone for EventCtx<'_, S> {
 impl<S> Copy for EventCtx<'_, S> {}
 
 impl<'a, S> EventCtx<'a, S> {
+    /// The context of an event for `application_id` that happened at `timestamp`
     pub fn new(state: &'a S, application_id: Snowflake, timestamp: &'a str) -> Self {
         Self {
             state,
@@ -33,10 +34,12 @@ impl<'a, S> EventCtx<'a, S> {
         }
     }
 
+    /// Platform resources passed through by the Adapter
     pub fn state(&self) -> &'a S {
         self.state
     }
 
+    /// The application the event is for
     pub fn application_id(&self) -> Snowflake {
         self.application_id
     }
@@ -91,6 +94,7 @@ pub trait EventHandler<S: Sync>: Sync {
         }
     }
 
+    /// The app was installed to a server or a user account
     fn application_authorized(
         &self,
         _ctx: EventCtx<'_, S>,
@@ -99,6 +103,7 @@ pub trait EventHandler<S: Sync>: Sync {
         async { Ok(()) }
     }
 
+    /// A user removed the app from their account
     fn application_deauthorized(
         &self,
         _ctx: EventCtx<'_, S>,
@@ -107,6 +112,7 @@ pub trait EventHandler<S: Sync>: Sync {
         async { Ok(()) }
     }
 
+    /// A user or server bought one of the app's SKUs
     fn entitlement_create(
         &self,
         _ctx: EventCtx<'_, S>,
@@ -115,6 +121,7 @@ pub trait EventHandler<S: Sync>: Sync {
         async { Ok(()) }
     }
 
+    /// An entitlement changed, e.g. a subscription renewed or ended
     fn entitlement_update(
         &self,
         _ctx: EventCtx<'_, S>,
@@ -123,6 +130,7 @@ pub trait EventHandler<S: Sync>: Sync {
         async { Ok(()) }
     }
 
+    /// An entitlement was removed, e.g. refunded
     fn entitlement_delete(
         &self,
         _ctx: EventCtx<'_, S>,
@@ -131,6 +139,7 @@ pub trait EventHandler<S: Sync>: Sync {
         async { Ok(()) }
     }
 
+    /// A message was sent in a lobby the app owns
     fn lobby_message_create(
         &self,
         _ctx: EventCtx<'_, S>,
@@ -139,6 +148,7 @@ pub trait EventHandler<S: Sync>: Sync {
         async { Ok(()) }
     }
 
+    /// A lobby message was edited
     fn lobby_message_update(
         &self,
         _ctx: EventCtx<'_, S>,
@@ -147,6 +157,7 @@ pub trait EventHandler<S: Sync>: Sync {
         async { Ok(()) }
     }
 
+    /// A lobby message was deleted
     fn lobby_message_delete(
         &self,
         _ctx: EventCtx<'_, S>,

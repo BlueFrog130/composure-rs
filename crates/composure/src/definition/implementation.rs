@@ -24,6 +24,7 @@ fn parse<T: DeserializeOwned, E: serde::de::Error>(raw: &RawValue) -> Result<T, 
 }
 
 impl ApplicationCommand {
+    /// A slash Command Definition. `dm_permission` is Discord's deprecated predecessor of `contexts`.
     pub fn new_chat_input_command(
         name: String,
         description: String,
@@ -53,6 +54,7 @@ impl ApplicationCommand {
         })
     }
 
+    /// A user context menu Command Definition
     pub fn new_user_command(
         name: String,
         default_member_permissions: Option<Permissions>,
@@ -75,6 +77,7 @@ impl ApplicationCommand {
         })
     }
 
+    /// A message context menu Command Definition
     pub fn new_message_command(
         name: String,
         default_member_permissions: Option<Permissions>,
@@ -97,6 +100,7 @@ impl ApplicationCommand {
         })
     }
 
+    /// The guild a guild Command belongs to; `None` for global ones
     pub fn get_guild_id(&self) -> &Option<Snowflake> {
         match self {
             ApplicationCommand::ChatInputCommand(value) => &value.details.guild_id,
@@ -127,6 +131,7 @@ impl<'de> Deserialize<'de> for ApplicationCommand {
 }
 
 impl ApplicationCommandOption {
+    /// A subcommand with its `options`
     pub fn new_subcommand_option(
         name: String,
         description: String,
@@ -142,6 +147,7 @@ impl ApplicationCommandOption {
         })
     }
 
+    /// A subcommand group of `options` (subcommands)
     pub fn new_subcommand_group_option(
         name: String,
         description: String,
@@ -157,6 +163,7 @@ impl ApplicationCommandOption {
         })
     }
 
+    /// A string Option, optionally restricted to `choices`
     pub fn new_string_option(
         name: String,
         description: String,
@@ -180,6 +187,7 @@ impl ApplicationCommandOption {
         })
     }
 
+    /// An integer Option, optionally restricted to `choices`
     pub fn new_integer_option(
         name: String,
         description: String,
@@ -203,6 +211,7 @@ impl ApplicationCommandOption {
         })
     }
 
+    /// A boolean Option
     pub fn new_boolean_option(
         name: String,
         description: String,
@@ -211,6 +220,7 @@ impl ApplicationCommandOption {
         ApplicationCommandOption::Boolean(Self::new_base_option::<5>(name, description, required))
     }
 
+    /// A user Option
     pub fn new_user_option(
         name: String,
         description: String,
@@ -219,6 +229,7 @@ impl ApplicationCommandOption {
         ApplicationCommandOption::User(Self::new_base_option::<6>(name, description, required))
     }
 
+    /// A channel Option offering `channel_types` (all when `None`)
     pub fn new_channel_option(
         name: String,
         description: String,
@@ -235,6 +246,7 @@ impl ApplicationCommandOption {
         })
     }
 
+    /// A role Option
     pub fn new_role_option(
         name: String,
         description: String,
@@ -243,6 +255,7 @@ impl ApplicationCommandOption {
         ApplicationCommandOption::Role(Self::new_base_option::<8>(name, description, required))
     }
 
+    /// A mentionable (user or role) Option
     pub fn new_mentionable_option(
         name: String,
         description: String,
@@ -255,6 +268,7 @@ impl ApplicationCommandOption {
         ))
     }
 
+    /// An attachment Option
     pub fn new_attachment_option(
         name: String,
         description: String,
@@ -267,6 +281,7 @@ impl ApplicationCommandOption {
         ))
     }
 
+    /// A number Option, optionally restricted to `choices`
     pub fn new_number_option(
         name: String,
         description: String,
@@ -352,6 +367,7 @@ impl<'de> Deserialize<'de> for ApplicationCommandOption {
 }
 
 impl SubcommandCommandOption {
+    /// A string Option of a subcommand, optionally restricted to `choices`
     pub fn new_string_option(
         name: String,
         description: String,
@@ -375,6 +391,7 @@ impl SubcommandCommandOption {
         })
     }
 
+    /// An integer Option of a subcommand, optionally restricted to `choices`
     pub fn new_integer_option(
         name: String,
         description: String,
@@ -398,6 +415,7 @@ impl SubcommandCommandOption {
         })
     }
 
+    /// A boolean Option of a subcommand
     pub fn new_boolean_option(
         name: String,
         description: String,
@@ -406,6 +424,7 @@ impl SubcommandCommandOption {
         SubcommandCommandOption::Boolean(Self::new_base_option::<5>(name, description, required))
     }
 
+    /// A user Option of a subcommand
     pub fn new_user_option(
         name: String,
         description: String,
@@ -414,6 +433,7 @@ impl SubcommandCommandOption {
         SubcommandCommandOption::User(Self::new_base_option::<6>(name, description, required))
     }
 
+    /// A channel Option of a subcommand, offering `channel_types` (all when `None`)
     pub fn new_channel_option(
         name: String,
         description: String,
@@ -430,6 +450,7 @@ impl SubcommandCommandOption {
         })
     }
 
+    /// A role Option of a subcommand
     pub fn new_role_option(
         name: String,
         description: String,
@@ -438,6 +459,7 @@ impl SubcommandCommandOption {
         SubcommandCommandOption::Role(Self::new_base_option::<8>(name, description, required))
     }
 
+    /// A mentionable (user or role) Option of a subcommand
     pub fn new_mentionable_option(
         name: String,
         description: String,
@@ -450,6 +472,7 @@ impl SubcommandCommandOption {
         ))
     }
 
+    /// An attachment Option of a subcommand
     pub fn new_attachment_option(
         name: String,
         description: String,
@@ -462,6 +485,7 @@ impl SubcommandCommandOption {
         ))
     }
 
+    /// A number Option of a subcommand, optionally restricted to `choices`
     pub fn new_number_option(
         name: String,
         description: String,

@@ -16,6 +16,9 @@ members = [
 [workspace.package]
 edition = "2024"
 rust-version = "1.88"
+license = "Apache-2.0"
+repository = "https://github.com/BlueFrog130/composure-rs"
+homepage = "https://github.com/BlueFrog130/composure-rs"
 
 [profile.release]
 lto = true

@@ -1,5 +1,26 @@
-//! Macros for defining Composure Commands and handlers. Use them through `composure` with the
-//! `macros` feature: `composure::{app, command, group, component, modal, view, rsx, Choice, Modal}`.
+//! Procedural macros for [Composure](https://docs.rs/composure), the Discord Interactions
+//! framework. Use them through `composure` with its `macros` feature, which re-exports them:
+//! `composure::{app, command, group, component, modal, autocomplete, view, rsx, Choice, Modal}`.
+//!
+//! | Macro | |
+//! |---|---|
+//! | [`#[app]`](macro@app) | Collects Commands, Groups, handlers, Views and other Apps into the handler an Adapter serves |
+//! | [`#[command]`](macro@command) | A Command from a function: Options from its parameters, the description from its doc comment |
+//! | [`#[group]`](macro@group) | A Command whose subcommands are other Commands |
+//! | [`#[autocomplete]`](macro@autocomplete) | Suggestions for an Option while the user types |
+//! | [`#[component]`](macro@component) | Answers buttons and selects by `custom_id` prefix, with state in the `custom_id` |
+//! | [`#[modal]`](macro@modal) | Answers modal submits by `custom_id` prefix |
+//! | [`#[derive(Modal)]`](derive@Modal) | A form shown as a modal, read back typed |
+//! | [`#[derive(Choice)]`](derive@Choice) | An enum of fixed Choices |
+//! | [`rsx!`](macro@rsx) | Markup for message and modal layouts |
+//! | [`#[view]`](macro@view) | A layout rendered from Props, with inline handlers |
+//!
+//! The [Composure guide](https://docs.rs/composure/latest/composure/guide/index.html) explains
+//! each in depth; [Views](https://docs.rs/composure/latest/composure/guide/views/index.html#tag-reference)
+//! lists every `rsx!` tag and attribute.
+
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 use proc_macro::TokenStream;
 
@@ -223,9 +244,24 @@ pub fn autocomplete(args: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Makes a fieldless enum usable as an Option restricted to its variants. Values are the
-/// variant names unless every variant sets an integer `#[choice(value = N)]`; `#[choice(name =
-/// "...")]` sets the name shown to users. Adds `name()` and `value()` for the chosen variant.
+/// Makes a fieldless enum (1-25 variants) usable as an Option restricted to its variants, and as
+/// the options of selects, radio groups and checkbox groups.
+///
+/// ```ignore
+/// #[derive(Choice)]
+/// enum Flavor {
+///     Vanilla,
+///     #[choice(name = "Mint chip", value = "mint")]
+///     MintChip,
+/// }
+/// ```
+///
+/// - `#[choice(name = "...")]`: the name shown to users (1-100 characters); the variant's
+///   identifier by default
+/// - `#[choice(value = "...")]`: what Discord sends; the identifier by default. If every variant
+///   sets an integer `#[choice(value = N)]`, the Option is an integer Option.
+///
+/// Adds `name()` and `value()` for the chosen variant.
 #[proc_macro_derive(Choice, attributes(choice))]
 pub fn derive_choice(item: TokenStream) -> TokenStream {
     choice::expand(item.into())
@@ -262,6 +298,28 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 /// point at a `#[component]` or `#[modal]` handler; inline handlers (`on:click:name=|ctx| ..`)
 /// need the markup to be in a `#[view]`. A `<Section>`'s `<Button>` or `<Thumbnail>` child is
 /// its accessory. Wrap attribute values that use `<..>` in braces.
+///
+/// | Tag | Builds | Attributes (every tag but `<Modal>`, `<Item>` and `<Option>` also takes `id`) |
+/// |---|---|---|
+/// | `<Container>` | `Container` | `accent_color`, `spoiler` |
+/// | `<Section>` | `Section` | `accessory` (or a `<Button>` / `<Thumbnail>` child) |
+/// | `<Text>` (`<TextDisplay>`) | `TextDisplay` | `content` (or text children) |
+/// | `<Separator>` | `Separator` | `small` / `large`, `spacing`, `divider` |
+/// | `<Row>` (`<ActionRow>`) | `ActionRow` | |
+/// | `<Thumbnail>` | `Thumbnail` | `url` (required), `description`, `spoiler` |
+/// | `<Gallery>` (`<MediaGallery>`) | `MediaGallery` | `<Item url=..>` children: `description`, `spoiler` |
+/// | `<File>` | `FileComponent` | `url` (required, `attachment://..`), `spoiler` |
+/// | `<Button>` | `ButtonComponent` | `primary` / `secondary` / `success` / `danger`, `style`, `on:click`, `custom_id`, `url`, `sku_id`, `label`, `emoji`, `disabled` |
+/// | `<StringSelect>` (`<Select>`) | `StringSelect` | `on:select`, `custom_id`, `name` (modals), `options` (a Choice enum), `placeholder`, `min`, `max`, `disabled`, `required` |
+/// | `<UserSelect>`, `<RoleSelect>`, `<MentionableSelect>`, `<ChannelSelect>` | the entity selects | as `<StringSelect>` without `options`, plus `default_values`, `channel_types` |
+/// | `<Option>` | `SelectOption` / `GroupOption` | `value` (required), `label` (or text children), `description`, `emoji`, `default` |
+/// | `<Modal>` | `ModalView` | `title` (required), `on:submit` or `custom_id` |
+/// | `<Label>` | `Label` | `text` (required), `description` |
+/// | `<TextInput>` | `TextInput` | `name`, `paragraph`, `style`, `min_len`, `max_len`, `placeholder`, `value`, `required` |
+/// | `<RadioGroup>` | `RadioGroup` | `name`, `options`, `required` |
+/// | `<CheckboxGroup>` | `CheckboxGroup` | `name`, `options`, `min`, `max`, `required` |
+/// | `<Checkbox>` | `Checkbox` | `name`, `default` |
+/// | `<FileUpload>` | `FileUpload` | `name`, `min`, `max`, `file_types`, `required` |
 #[proc_macro]
 pub fn rsx(input: TokenStream) -> TokenStream {
     view::expand_macro(input.into())

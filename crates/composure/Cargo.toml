@@ -1,16 +1,16 @@
 [package]
 name = "composure"
-edition.workspace = true
 version = "0.1.0"
+edition.workspace = true
 rust-version.workspace = true
+description = "Discord bots over HTTP Interactions, no gateway: slash commands, components, modals and JSX-like views, on Cloudflare Workers (WASM) or any server"
 readme = "../../README.md"
-description = "Discord bot framework for running on the edge"
-repository = "https://github.com/BlueFrog130/composure-rs"
-keywords = ["discord", "bot", "edge", "serverless", "wasm"]
-license = "Apache-2.0"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["discord", "bot", "interactions", "serverless", "wasm"]
+categories = ["api-bindings", "web-programming::http-server", "wasm", "asynchronous"]
 exclude = ["spec"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bitflags = "2.13.2"
@@ -90,3 +90,7 @@ reqwest = ["rest", "dep:reqwest"]
 
 [dev-dependencies]
 futures = { version = "0.3.34", default-features = false, features = ["executor"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

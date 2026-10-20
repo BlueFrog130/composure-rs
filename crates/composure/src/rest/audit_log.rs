@@ -18,7 +18,9 @@ pub struct GetAuditLog {
     pub user_id: Option<Snowflake>,
     /// [Audit log event](https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object-audit-log-events)
     pub action_type: Option<u16>,
+    /// Entries before this id
     pub before: Option<Snowflake>,
+    /// Entries after this id
     pub after: Option<Snowflake>,
     /// 1-100, default 50
     pub limit: Option<u8>,

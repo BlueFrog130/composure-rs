@@ -16,19 +16,30 @@ use super::{
 /// What a Route is, as the compile-time checks of the App listing it see it
 #[derive(Debug, Clone, Copy)]
 pub enum RouteInfo {
+    /// A `#[command]` or `#[group]`
     Command {
+        /// The Command's name
         name: &'static str,
+        /// Chat input, user, or message
         kind: ApplicationCommandType,
+        /// Its named Scope; `None` is global
         scope: Option<&'static str>,
     },
+    /// A `#[component]` handler
     Component {
+        /// The `custom_id` prefix it answers
         prefix: &'static str,
     },
+    /// A `#[modal]` handler
     Modal {
+        /// The `custom_id` prefix it answers
         prefix: &'static str,
     },
+    /// A `#[view]`
     View(ViewInfo),
+    /// An `#[app]`
     App {
+        /// What it lists
         routes: &'static [RouteInfo],
         /// Whether this App sets `events`
         events: bool,
@@ -78,6 +89,7 @@ impl RouteInfo {
     note = "list items made with `#[command]`, `#[group]`, `#[component]`, `#[modal]`, `#[view]` or `#[app]`"
 )]
 pub trait RouteDefinition {
+    /// What it is, for the App's compile-time checks
     const ROUTE: RouteInfo;
 
     /// An App's `theme`; `None` for everything else

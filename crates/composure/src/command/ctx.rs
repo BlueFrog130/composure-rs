@@ -30,6 +30,8 @@ impl<S, D> Clone for Ctx<'_, S, D> {
 impl<S, D> Copy for Ctx<'_, S, D> {}
 
 impl<'a, S, D> Ctx<'a, S, D> {
+    /// A context for `interaction` with the Adapter's `state`, without a theme. Dispatch builds
+    /// these; build one by hand to call a handler directly.
     pub fn new(interaction: &'a Arc<DataInteraction<D>>, state: &'a S) -> Self {
         Self {
             interaction,
@@ -56,6 +58,7 @@ impl<'a, S, D> Ctx<'a, S, D> {
         self.theme
     }
 
+    /// The Interaction being answered: ids, token, user, member, guild, channel, data
     pub fn interaction(&self) -> &'a DataInteraction<D> {
         self.interaction
     }
@@ -87,10 +90,12 @@ impl<'a, S, D> Ctx<'a, S, D> {
         self.interaction.common.member.as_ref()
     }
 
+    /// The guild it was invoked in; `None` in DMs
     pub fn guild_id(&self) -> Option<&'a Snowflake> {
         self.interaction.common.guild_id.as_ref()
     }
 
+    /// The channel it was invoked in
     pub fn channel_id(&self) -> Option<&'a Snowflake> {
         self.interaction.common.channel_id.as_ref()
     }

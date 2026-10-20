@@ -4,8 +4,11 @@ use crate::types::{Container, Embed, InteractionResponse, MessageFlags};
 
 use super::HandlerError;
 
-/// A value a Command can answer with
+/// A value a Command can answer with. See [Responses](crate::guide::responses) for the types
+/// implementing it.
 pub trait IntoResponse: Sized {
+    /// The Response; a failure to build it (see [`try_into_response`](Self::try_into_response))
+    /// becomes the error message
     fn into_response(self) -> InteractionResponse;
 
     /// The Response, or why it could not be built (a [`View`](super::View) whose `custom_id`
@@ -121,6 +124,7 @@ impl<T: IntoResponse> IntoResponse for Unthemed<T> {
 /// An `Err` is logged by the Adapter and shown to the user as a generic failure, except a
 /// [`HandlerError::user`], whose message the user sees.
 pub trait CommandOutput {
+    /// The Response, or the error to answer with instead
     fn into_result(self) -> Result<InteractionResponse, HandlerError>;
 }
 

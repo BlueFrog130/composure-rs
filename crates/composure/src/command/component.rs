@@ -8,6 +8,7 @@ use super::{ComponentCtx, HandlerError, ModalCtx, custom_id};
 
 /// The `custom_id` prefix a Component Handler answers. Implemented by `#[component]`.
 pub trait ComponentDefinition {
+    /// The `custom_id` prefix: what comes before the first `:`
     const PREFIX: &'static str;
 }
 
@@ -23,12 +24,15 @@ pub trait ComponentHandler<S>: ComponentDefinition {
 
 /// The `custom_id` prefix a Modal Handler answers. Implemented by `#[modal]`.
 pub trait ModalDefinition {
+    /// The `custom_id` prefix: what comes before the first `:`
     const PREFIX: &'static str;
 }
 
 /// Answers submits of modals whose `custom_id` starts with its prefix. Implemented by
 /// `#[modal]`; listed in an `#[app]`.
 pub trait ModalHandler<S>: ModalDefinition {
+    /// Decodes the state and the form, runs the handler; `fields` is the `custom_id` after
+    /// `prefix:`
     fn invoke(
         ctx: ModalCtx<'_, S>,
         fields: Option<&str>,

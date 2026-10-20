@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+/// A zero-sized `type` tag: serializes as `T`, and fails to deserialize anything but `T`. Tells
+/// apart the variants of untagged enums, like [`Component`](crate::types::Component)'s.
 #[derive(Debug, Clone)]
 pub struct TypeField<const T: u8>;
 

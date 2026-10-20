@@ -1,5 +1,9 @@
 # Composure example bot on a hosted server (tokio)
 
+[![CI](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml)
+[![Docs.rs](https://img.shields.io/docsrs/composure?logo=docs.rs&label=guide)](https://docs.rs/composure/latest/composure/guide/index.html)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
+
 Serves the [example bot](../bot)'s shared commands from a plain process with [`composure_adapter_tokio`](../../crates/adapters/tokio) (an HTTP server on tokio, each Interaction on its own task), plus what only a server has. `src/lib.rs` declares its App with `#[app(handlers(Bot, file, uptime, primes), theme = THEME)] pub struct TokioBot;`; [`src/main.rs`](src/main.rs) serves it with a `Server` as the `Host` data.
 
 [`src/server.rs`](src/server.rs): the server's disk, process and threads, through `Ctx<Host<Server>>`

@@ -23,22 +23,32 @@ use crate::types::{Embed, EmbedAuthor, EmbedFooter, InteractionResponse};
 /// [`Container`](crate::types::Container)s get `primary` as accent color. Errors become an
 /// `error`-colored embed. Wrap a response in [`Unthemed`](super::Unthemed) to send it as is.
 /// Messages sent through REST are never changed: build them with the helpers.
+///
+/// See the [Themes chapter](crate::guide::theming) of the guide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Theme {
-    /// Embeds without a semantic color, auto-filled embeds and container accents
+    /// Embeds without a semantic color, auto-filled embeds and container accents (`0xRRGGBB`)
     pub primary: u32,
+    /// [`Theme::success`] embeds
     pub success: u32,
+    /// [`Theme::warning`] embeds
     pub warning: u32,
+    /// [`Theme::error`] embeds, and the error messages users see when a handler fails
     pub error: u32,
+    /// [`Theme::info`] embeds
     pub info: u32,
+    /// Set on the first embed of a themed message, and on every helper's embed
     pub author: Option<Branding>,
+    /// Set on the last embed of a themed message, and on every helper's embed
     pub footer: Option<Branding>,
 }
 
 /// Text and optional icon url of a [`Theme`]'s author or footer
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Branding {
+    /// The author's name, or the footer's text
     pub text: &'static str,
+    /// A small image shown before the text
     pub icon_url: Option<&'static str>,
 }
 
@@ -65,26 +75,31 @@ impl Theme {
         Self::DEFAULT
     }
 
+    /// Sets [`primary`](Theme::primary): the default color of embeds and container accents
     pub const fn with_primary(mut self, color: u32) -> Self {
         self.primary = color;
         self
     }
 
+    /// Sets [`success`](Theme::success)
     pub const fn with_success(mut self, color: u32) -> Self {
         self.success = color;
         self
     }
 
+    /// Sets [`warning`](Theme::warning)
     pub const fn with_warning(mut self, color: u32) -> Self {
         self.warning = color;
         self
     }
 
+    /// Sets [`error`](Theme::error), also used for handler error messages
     pub const fn with_error(mut self, color: u32) -> Self {
         self.error = color;
         self
     }
 
+    /// Sets [`info`](Theme::info)
     pub const fn with_info(mut self, color: u32) -> Self {
         self.info = color;
         self

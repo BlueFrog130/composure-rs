@@ -17,6 +17,7 @@ mod web_crypto;
 #[cfg(all(feature = "web-crypto", target_arch = "wasm32", target_os = "unknown"))]
 use web_crypto as backend;
 
+/// Why a key or signature was rejected
 #[derive(Debug)]
 pub enum ValidateError {
     /// Public key or signature is not hex of the right length (32 / 64 bytes)

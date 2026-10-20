@@ -36,6 +36,7 @@ pub enum InteractionResponse {
 }
 
 impl InteractionResponse {
+    /// A message with `content`
     pub fn respond_with_message(content: String) -> Self {
         InteractionResponse::ChannelMessageWithSource(MessageCallbackData {
             content: Some(content),
@@ -52,6 +53,7 @@ impl InteractionResponse {
         })
     }
 
+    /// A message with one embed
     pub fn respond_with_embed(embed: Embed) -> Self {
         InteractionResponse::ChannelMessageWithSource(MessageCallbackData {
             embeds: Some(vec![embed]),
@@ -77,6 +79,7 @@ impl InteractionResponse {
         }
     }
 
+    /// The message of a message response (new or update), to change it
     pub fn message_data_mut(&mut self) -> Option<&mut MessageCallbackData> {
         match self {
             InteractionResponse::ChannelMessageWithSource(data)
@@ -85,6 +88,7 @@ impl InteractionResponse {
         }
     }
 
+    /// The message of a message response (new or update)
     pub fn into_message_data(self) -> Option<MessageCallbackData> {
         match self {
             InteractionResponse::ChannelMessageWithSource(data)
@@ -106,6 +110,7 @@ impl InteractionResponse {
         self
     }
 
+    /// Autocomplete suggestions (max 25)
     pub fn respond_with_autocomplete_choices(choices: Vec<ApplicationCommandOptionChoice>) -> Self {
         InteractionResponse::ApplicationCommandAutocompleteResult(AutocompleteCallbackData {
             choices,
@@ -235,6 +240,7 @@ impl MessageCallbackData {
     }
 }
 
+/// Suggestions answering an autocomplete Interaction
 #[derive(Debug, Clone, Serialize)]
 pub struct AutocompleteCallbackData {
     /// autocomplete choices (max of 25 choices)
@@ -255,11 +261,15 @@ pub struct ApplicationCommandOptionChoice {
     pub value: ApplicationCommandOptionChoiceValue,
 }
 
+/// A Choice's value, typed like its Option
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ApplicationCommandOptionChoiceValue {
+    /// For string Options
     String(String),
+    /// For integer Options
     Integer(i64),
+    /// For number Options
     Double(f64),
 }
 

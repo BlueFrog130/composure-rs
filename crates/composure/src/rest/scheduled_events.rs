@@ -27,15 +27,19 @@ routes! {
 /// voice) or `entity_metadata.location` plus `scheduled_end_time` (external). Times are ISO 8601.
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct ScheduledEventFields<'a> {
+    /// 1-100 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
 
+    /// 1-1000 characters; `Some(None)` removes it
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<Option<&'a str>>,
 
+    /// When it starts (ISO 8601)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheduled_start_time: Option<&'a str>,
 
+    /// When it ends (ISO 8601); required for external events
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheduled_end_time: Option<&'a str>,
 
@@ -43,6 +47,7 @@ pub struct ScheduledEventFields<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub privacy_level: Option<u8>,
 
+    /// Stage, voice, or external
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_type: Option<ScheduledEventEntityType>,
 
@@ -50,6 +55,7 @@ pub struct ScheduledEventFields<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub channel_id: Option<Option<Snowflake>>,
 
+    /// External events: where
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_metadata: Option<&'a EntityMetadata>,
 
@@ -76,8 +82,11 @@ pub struct ScheduledEventFields<'a> {
 pub struct GetScheduledEventUsers {
     /// 1-100, default 100
     pub limit: Option<u8>,
+    /// Include each user's guild member
     pub with_member: bool,
+    /// Users before this id
     pub before: Option<Snowflake>,
+    /// Users after this id
     pub after: Option<Snowflake>,
 }
 

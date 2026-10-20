@@ -1,6 +1,24 @@
-# Composure Sync
+# composure_sync
 
-Makes Discord's stored command definitions match an App's Commands, at deploy time. Requests go through core's `BotClient` (`composure::rest`) over the blocking `reqwest` Transport, driven by `pollster`.
+**`terraform plan` for your Discord slash commands.** Make Discord's stored commands match your
+[Composure](https://github.com/BlueFrog130/composure-rs) bot's code: see exactly what will be
+created, updated and deleted, confirm, done. Or let CI fail the build when they drift.
+
+[![Crates.io](https://img.shields.io/crates/v/composure_sync.svg?logo=rust)](https://crates.io/crates/composure_sync)
+[![Docs.rs](https://img.shields.io/docsrs/composure_sync?logo=docs.rs)](https://docs.rs/composure_sync)
+[![CI](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml)
+[![License](https://img.shields.io/crates/l/composure_sync.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
+[![MSRV](https://img.shields.io/badge/rustc-1.88+-orange.svg?logo=rust)](https://blog.rust-lang.org/)
+
+- **One source of truth**: definitions come from your `#[command]` functions, never hand-written JSON
+- **Safe by default**: a readable plan first; the prompt defaults to *No* when something would be deleted
+- **CI-native**: `--check` exits 2 on drift, `--yes` deploys, and it never hangs waiting for input outside a terminal
+- **Scopes**: keep admin and test commands in your own servers with `scope = "dev"`
+- **Minimal requests**: unchanged targets are skipped, changed ones are one bulk overwrite each
+
+## Usage
+
+Requests go through Composure's `BotClient` over a blocking `reqwest` Transport, driven by `pollster`.
 
 `sync_from_env(&Bot)` makes Discord's commands match an App's: it prints a Sync Plan (creates, updates, deletes per target) and applies it after confirmation. Call it from a host-only bin:
 
@@ -41,7 +59,7 @@ The CLI (clap + cliclack) is the default `cli` feature; with `default-features =
 
 Commands without a scope are global. Every guild listed in a `COMPOSURE_SCOPE_*` var is synced, so a guild whose commands were all removed gets cleared; guilds not listed are never touched. Targets without changes are skipped; changed ones are overwritten with one bulk request. `SyncConfig`, `plan`, and `apply` are available for other config sources or a custom front end.
 
-## Live API tests
+## Development: live API tests
 
 `tests/api_regression.rs` holds a command suite covering every option type and field, subcommands and groups, localizations, permissions, NSFW, user/message commands, and contexts/integration types.
 
@@ -59,3 +77,7 @@ DISCORD_GUILD_ID=...
 ```sh
 cargo test -p composure_sync --test api_regression -- --ignored --test-threads=1 --nocapture
 ```
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE).

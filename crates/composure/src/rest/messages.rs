@@ -35,8 +35,11 @@ routes! {
 /// `after`; newest first otherwise
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GetMessages {
+    /// Messages around this id
     pub around: Option<Snowflake>,
+    /// Messages before this id
     pub before: Option<Snowflake>,
+    /// Messages after this id
     pub after: Option<Snowflake>,
     /// 1-100, default 50
     pub limit: Option<u8>,
@@ -50,9 +53,11 @@ struct BulkDelete<'a> {
 /// Body of [`BotClient::create_message`]; at least one of content, embeds, components, files
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct CreateMessage<'a> {
+    /// Text, up to 2000 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<&'a str>,
 
+    /// Read aloud
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tts: Option<bool>,
 
@@ -60,9 +65,11 @@ pub struct CreateMessage<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embeds: Option<&'a [Embed]>,
 
+    /// Who may be pinged
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<&'a AllowedMentions>,
 
+    /// Components: action rows, or the whole message with `IS_COMPONENTS_V2`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<&'a [Component]>,
 
@@ -78,6 +85,7 @@ pub struct CreateMessage<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<&'a PollCreate>,
 
+    /// Files to upload, sent as multipart
     #[serde(skip)]
     pub files: &'a [File],
 }

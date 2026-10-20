@@ -16,12 +16,15 @@ routes! {
 /// clears. Images are data URIs.
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 pub struct EditApplication<'a> {
+    /// Shown in the app's profile
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<&'a str>,
 
+    /// App icon
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<Option<&'a str>>,
 
+    /// Cover image of the app's store page
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cover_image: Option<Option<&'a str>>,
 
@@ -29,6 +32,7 @@ pub struct EditApplication<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<ApplicationFlags>,
 
+    /// Where Discord sends Interactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interactions_endpoint_url: Option<Option<&'a str>>,
 
@@ -36,9 +40,11 @@ pub struct EditApplication<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<&'a [&'a str]>,
 
+    /// Default install URL
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_install_url: Option<Option<&'a str>>,
 
+    /// Verification URL for linked roles
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role_connections_verification_url: Option<Option<&'a str>>,
 

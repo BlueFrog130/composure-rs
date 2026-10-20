@@ -27,7 +27,9 @@ routes! {
 /// Where a Command Definition lives on Discord
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandScope {
+    /// Global Commands, in every guild and DM
     Global,
+    /// Commands of one guild
     Guild(Snowflake),
 }
 

@@ -13,6 +13,7 @@ pub struct HttpTransport {
 }
 
 impl HttpTransport {
+    /// A Transport with a default `reqwest` client
     pub fn new() -> Self {
         Self::default()
     }
@@ -34,6 +35,7 @@ impl HttpTransport {
         self
     }
 
+    /// The `reqwest` client requests go through
     pub fn client(&self) -> &reqwest::Client {
         &self.client
     }

@@ -3,11 +3,12 @@ name = "composure_adapter_cloudflare"
 version = "0.1.0"
 edition.workspace = true
 rust-version = "1.91"
-readme = "README.md"
-description = "Discord bot framework for running on the edge"
-repository = "https://github.com/BlueFrog130/composure-rs/adapters/cloudflare"
-keywords = ["discord", "bot", "edge", "wasm", "cloudflare"]
-license = "Apache-2.0"
+description = "Serve Composure Discord bots on Cloudflare Workers: Web Crypto signatures, wait_until Background Work, Workers Logs tracing"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["discord", "bot", "cloudflare", "workers", "wasm"]
+categories = ["wasm", "web-programming::http-server", "api-bindings"]
 exclude = ["bench"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -33,3 +34,7 @@ tracing = ["composure/tracing", "dep:tracing", "dep:tracing-subscriber"]
 [dev-dependencies]
 composure = { path = "../../composure", features = ["macros", "rest-users"] }
 futures = { version = "0.3.34", default-features = false, features = ["executor"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
