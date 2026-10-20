@@ -99,6 +99,7 @@ pub mod auth;
 pub mod command;
 pub mod credentials;
 pub mod definition;
+mod outline;
 // The guide (`book/`) as doctests
 #[cfg(all(feature = "macros", feature = "rest", doctest))]
 mod guide;

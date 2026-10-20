@@ -7,6 +7,7 @@ use std::fmt;
 
 use serde::Deserialize;
 
+pub use crate::outline::outlined;
 use crate::{
     auth::PublicKey,
     command::{EventHandler, HandlerError, InteractionHandler, Platform, dispatch, spawn_event},

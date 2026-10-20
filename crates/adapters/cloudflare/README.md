@@ -13,7 +13,7 @@ bots within the Workers free plan (100,000 requests a day).
 [![WASM](https://img.shields.io/badge/target-wasm32-654FF0?logo=webassembly&logoColor=white)](https://webassembly.org/)
 
 - **No crypto in your bundle**: signatures are checked with Workers' built-in Web Crypto, the key imported once per isolate
-- **Small**: the full example bot is about 344 KB of gzipped WASM
+- **Small, quick to start**: the full example bot is about 307 KB of gzipped WASM; see [Cold starts](#cold-starts) for the build settings
 - **Answer late**: `ctx.defer(..)` replies at once and finishes the work with `wait_until`
 - **KV, D1, R2 and friends** through the `Worker` State, in any Command
 - **Webhook Events** (app installs, entitlements) on `/events`, and a Bot Client for cron triggers
@@ -138,7 +138,7 @@ fn start() {
 
 Every event becomes one `console.error`/`warn`/`log`/`debug` call with an object, so Workers Logs indexes its fields: `level`, `target`, `message`, `spans`, plus the fields of the enclosing spans. Composure's `interaction` span adds `interaction_id`, `interaction_type`, `name` (the command, or the `custom_id` prefix), `guild_id`, `channel_id` and `user_id` to everything logged while handling an Interaction, Background Work included; `event` adds `event_type`; `rest` adds `method` and `route` (the template, never the token-bearing URL). Log from handlers with `tracing::info!(..)` and the line carries all of that. `tracing::ConsoleLayer` composes with other `tracing-subscriber` layers.
 
-Handler errors are logged at ERROR, unknown commands and invalid Options at WARN, `HandlerError::user` at DEBUG, inside the span they happened in (with `error` and `error_kind` fields), so the line carries the Interaction's or event's context. Without the feature the adapter writes the same messages straight to the console and nothing else is compiled in; with it the example bot grows by about 96 KB of wasm (about 36 KB of that is Composure's instrumentation, the rest the subscriber).
+Handler errors are logged at ERROR, unknown commands and invalid Options at WARN, `HandlerError::user` at DEBUG, inside the span they happened in (with `error` and `error_kind` fields), so the line carries the Interaction's or event's context. Without the feature the adapter writes the same messages straight to the console and nothing else is compiled in; with it the example bot grows by about 55 KB of wasm, its first request takes about 5 ms more and a warm one about 0.2 ms more at `DEBUG`; `init()` (INFO) skips Composure's per-Interaction DEBUG lines, which are most of that.
 
 ## Signature validation
 
@@ -162,7 +162,49 @@ opt-level = 3
 
 ## Size and speed
 
-The example bot (`examples/cloudflare`) builds to about 1.25 MB of wasm (373 KB gzipped) with `tracing`, 1.16 MB (344 KB) without. Parsing, dispatching and answering an interaction takes a few microseconds and 20-45 small allocations; `examples/bot/tests/perf.rs` measures each path and fails if one allocates more than its budget. `FetchTransport` keeps only the rate limit headers and `content-type` of REST responses (`composure::rest::DISCORD_HEADERS`).
+The example bot (`examples/cloudflare`) builds to about 927 KB of wasm (307 KB gzipped) with `tracing`. Parsing, dispatching and answering an interaction takes a few microseconds and 20-45 small allocations; `examples/bot/tests/perf.rs` measures each path and fails if one allocates more than its budget. `FetchTransport` keeps only the rate limit headers and `content-type` of REST responses (`composure::rest::DISCORD_HEADERS`).
+
+## Cold starts
+
+A new isolate fetches and validates the module, runs its top level and `#[event(start)]`, then serves the request. Workers compile each function on its first call, so that first request also compiles all the code it touches, and how much code that is depends on how the bundle was optimized. Two build settings, which the example uses, matter most:
+
+```toml
+# Cargo.toml: worker-build's wasm-opt step
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--one-caller-inline-max-function-size", "0"]
+```
+
+```toml
+# .cargo/config.toml, next to Cargo.toml (worker-build runs cargo there)
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C", "link-arg=--strip-all",
+    "-C", "link-arg=--keep-section=__wasm_bindgen_unstable",
+    "-C", "link-arg=--keep-section=target_features",
+]
+```
+
+- **No one-caller inlining.** binaryen inlines every function that has one caller, whatever its size, which merges a bot into a few huge functions (the example's fetch handler was 94 KB); the first request then compiles every Command in them. Kept apart, the first request compiles only the code it runs; warm requests got faster too.
+- **No name section.** worker-build 0.8.7 keeps it for readable stack traces: 29% of the bundle, parsed on every cold start. `strip = true` in the profile also drops sections wasm-bindgen needs; these flags keep them. Panics then show `wasm-function[N]` frames. A worker-build that drops names for explicit `wasm-opt` arguments makes the flags redundant.
+
+Composure does its part: dispatch polls each Interaction kind and each handler in a function of its own (`composure::adapter::outlined`), and this adapter does the same for Webhook Events and responses with files.
+
+On workerd ([`bench/tests/coldstart.rs`](https://github.com/BlueFrog130/composure-rs/blob/main/crates/adapters/cloudflare/bench/tests/coldstart.rs), the example bot, each step minus the same step for a JS Worker answering alike, median of 25 fresh starts):
+
+| Build | wasm | gzip | startup | first request | warm request |
+|---|--:|--:|--:|--:|--:|
+| 0.1.0 with worker-build's defaults | 1298 KB | 389 KB | 18.4 ms | 18.4 ms | 0.87 ms |
+| the example's settings | 927 KB | 307 KB | 14.5 ms | 12.5 ms | 0.64 ms |
+| a bare workers-rs Worker | 168 KB | 48 KB | 1.8 ms | 2.7 ms | 0.10 ms |
+
+What else the benchmark found:
+
+- `opt-level = "s"` or `3` instead of "z" makes the bundle 7% or 17% bigger for at most 0.1 ms on a warm request and none on the first: a request's time goes mostly to calls into JS (logging, Web Crypto, reading the request), not to Rust code.
+- The `tracing` feature at `DEBUG` costs about 5 ms on the first request and 0.2 ms on every request; see [Logging](#logging).
+- On nightly, std rebuilt with `-Cpanic=immediate-abort` (`-Zbuild-std=std,panic_abort`) drops panic messages and formatting: 6-7% less wasm and gzip, and panics become bare `unreachable` traps.
+- Workers run startup while the TLS handshake is still in progress and route requests to warm isolates where they can ([Eliminating Cold Starts 2](https://blog.cloudflare.com/eliminating-cold-starts-2-shard-and-conquer/)), so most requests never see these costs; the startup limit is 1 second.
+
+`bench/coldstart/size.mjs` shows where a build's bytes go (twiggy can't read modules with exception handling) and `profile.mjs` CPU-profiles the first requests.
 
 ## License
 

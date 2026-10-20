@@ -153,6 +153,16 @@ Everything logged inside a handler, Background Work included, carries its Intera
 unknown Commands and invalid Options at WARN, [`HandlerError::user`](https://docs.rs/composure/latest/composure/command/struct.HandlerError.html#method.user)
 errors at DEBUG.
 
+## Cold starts on Workers
+
+A new Workers isolate compiles each wasm function on its first call, so the first request's
+latency depends on how the bundle is built more than on the bot's code. Two build settings (no
+one-caller inlining in `wasm-opt`, and no name section) make the example's first request about
+30% faster and its bundle 29% smaller; the
+[Cloudflare adapter's README](https://docs.rs/composure_adapter_cloudflare/latest/composure_adapter_cloudflare/#cold-starts)
+has them, with measurements. Logging at INFO rather than DEBUG also saves a few milliseconds on the
+first request.
+
 ## Writing an Adapter
 
 A new platform needs little code: [`adapter`](https://docs.rs/composure/latest/composure/adapter/) does the work every Adapter

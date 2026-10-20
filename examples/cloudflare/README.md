@@ -50,6 +50,8 @@ cargo run -p composure_example_cloudflare --bin sync-cloudflare -- --guild <guil
 
 `composure_sync` is a non-wasm dependency only, so it never reaches the Workers bundle.
 
+The bundle is built for fast cold starts: `wasm-opt` settings in `Cargo.toml` and name stripping in `.cargo/config.toml`, explained in the adapter's [Cold starts](../../crates/adapters/cloudflare/README.md#cold-starts).
+
 ## Deploy
 
 ```sh

@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "name": "composure-coldstart-bench",
+  "description": "Measures Worker startup and first-request latency on workerd (Miniflare); driven by ../tests/coldstart.rs",
+  "type": "module",
+  "devDependencies": {
+    "miniflare": "4.20260730.0"
+  }
+}
