@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: groups nest at most one level: command > group > subcommand
+  --> tests/ui/nested_too_deep.rs:16:32
+   |
+16 | #[composure::group(subcommands(Middle))]
+   |                                ^^^^^^ evaluation of `_` failed here

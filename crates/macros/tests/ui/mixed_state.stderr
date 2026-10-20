@@ -1,0 +1,115 @@
+error[E0277]: the trait bound `b: composure::command::Command<u32>` is not satisfied
+  --> tests/ui/mixed_state.rs:21:9
+   |
+19 |     let _ = futures::executor::block_on(composure::command::dispatch(
+   |                                         ---------------------------- required by a bound introduced by this call
+20 |         serde_json::from_str("{}").unwrap(),
+21 |         &Bot,
+   |         ^^^^ unsatisfied trait bound
+   |
+help: the trait `Command<u32>` is not implemented for `b`
+      but trait `Command<std::string::String>` is implemented for it
+  --> tests/ui/mixed_state.rs:10:1
+   |
+10 | #[composure::command]
+   | ^^^^^^^^^^^^^^^^^^^^^
+   = help: for that trait implementation, expected `std::string::String`, found `u32`
+note: required for `b` to implement `Route<u32>`
+  --> tests/ui/mixed_state.rs:10:1
+   |
+10 | #[composure::command]
+   | ^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound introduced here
+11 | fn b(ctx: Ctx<String>) -> String {
+   |    ^
+   = note: 1 redundant requirement hidden
+   = note: required for `Bot` to implement `Route<u32>`
+note: required for `Bot` to implement `InteractionHandler<u32>`
+  --> tests/ui/mixed_state.rs:15:1
+   |
+15 | #[app(handlers(a, b))]
+   | ^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound introduced here
+16 | struct Bot;
+   |        ^^^
+note: required by a bound in `composure::command::dispatch`
+  --> $WORKSPACE/crates/composure/src/command/handler.rs
+   |
+   | pub async fn dispatch<S, H: InteractionHandler<S>>(
+   |                             ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `dispatch`
+   = note: this error originates in the attribute macro `composure::command` which comes from the expansion of the attribute macro `app` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `b: composure::command::Command<u32>` is not satisfied
+  --> tests/ui/mixed_state.rs:19:41
+   |
+19 |       let _ = futures::executor::block_on(composure::command::dispatch(
+   |  _________________________________________^
+20 | |         serde_json::from_str("{}").unwrap(),
+21 | |         &Bot,
+22 | |         &0u32,
+23 | |     ));
+   | |_____^ unsatisfied trait bound
+   |
+help: the trait `Command<u32>` is not implemented for `b`
+      but trait `Command<std::string::String>` is implemented for it
+  --> tests/ui/mixed_state.rs:10:1
+   |
+10 | #[composure::command]
+   | ^^^^^^^^^^^^^^^^^^^^^
+   = help: for that trait implementation, expected `std::string::String`, found `u32`
+note: required for `b` to implement `Route<u32>`
+  --> tests/ui/mixed_state.rs:10:1
+   |
+10 | #[composure::command]
+   | ^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound introduced here
+11 | fn b(ctx: Ctx<String>) -> String {
+   |    ^
+   = note: 1 redundant requirement hidden
+   = note: required for `Bot` to implement `Route<u32>`
+note: required for `Bot` to implement `InteractionHandler<u32>`
+  --> tests/ui/mixed_state.rs:15:1
+   |
+15 | #[app(handlers(a, b))]
+   | ^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound introduced here
+16 | struct Bot;
+   |        ^^^
+note: required by a bound in `composure::command::dispatch`
+  --> $WORKSPACE/crates/composure/src/command/handler.rs
+   |
+   | pub async fn dispatch<S, H: InteractionHandler<S>>(
+   |                             ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `dispatch`
+   = note: this error originates in the attribute macro `composure::command` which comes from the expansion of the attribute macro `app` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `b: composure::command::Command<u32>` is not satisfied
+  --> tests/ui/mixed_state.rs:19:13
+   |
+19 |     let _ = futures::executor::block_on(composure::command::dispatch(
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `Command<u32>` is not implemented for `b`
+      but trait `Command<std::string::String>` is implemented for it
+  --> tests/ui/mixed_state.rs:10:1
+   |
+10 | #[composure::command]
+   | ^^^^^^^^^^^^^^^^^^^^^
+   = help: for that trait implementation, expected `std::string::String`, found `u32`
+note: required for `b` to implement `Route<u32>`
+  --> tests/ui/mixed_state.rs:10:1
+   |
+10 | #[composure::command]
+   | ^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound introduced here
+11 | fn b(ctx: Ctx<String>) -> String {
+   |    ^
+   = note: 1 redundant requirement hidden
+   = note: required for `Bot` to implement `Route<u32>`
+note: required for `Bot` to implement `InteractionHandler<u32>`
+  --> tests/ui/mixed_state.rs:15:1
+   |
+15 | #[app(handlers(a, b))]
+   | ^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound introduced here
+16 | struct Bot;
+   |        ^^^
+note: required by a bound in `composure::command::dispatch`
+  --> $WORKSPACE/crates/composure/src/command/handler.rs
+   |
+   | pub async fn dispatch<S, H: InteractionHandler<S>>(
+   |                             ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `dispatch`
+   = note: this error originates in the attribute macro `composure::command` which comes from the expansion of the attribute macro `app` (in Nightly builds, run with -Z macro-backtrace for more info)

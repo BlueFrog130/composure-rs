@@ -1,0 +1,26 @@
+error[E0080]: evaluation panicked: two handlers have the same custom_id prefix
+  --> tests/ui/duplicate_prefix.rs:19:1
+   |
+19 | #[app(handlers(ping, first, second))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed inside this call
+   |
+note: inside `composure::command::check_app`
+  --> $WORKSPACE/crates/composure/src/command/route.rs
+   |
+   |     check_routes(root, root);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `command::route::check_routes`
+  --> $WORKSPACE/crates/composure/src/command/route.rs
+   |
+   |             RouteInfo::App { routes, .. } => check_routes(root, routes),
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `command::route::check_routes`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: $WORKSPACE/crates/composure/src/command/route.rs
+   |
+   |                     panic!("two handlers have the same custom_id prefix");
+   |                     ----------------------------------------------------- in this macro invocation

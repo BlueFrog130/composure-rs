@@ -1,0 +1,15 @@
+error: no input in this modal has `name="age"`
+ --> tests/ui/view_modal_param_without_input.rs:9:66
+  |
+9 |         <Modal title="Form" on:submit:send={|_ctx, name: String, age: String| Ephemeral(format!("{name} {age}"))}>
+  |                                                                  ^^^
+
+warning: unused imports: `Ephemeral`, `ModalView`, and `rsx`
+ --> tests/ui/view_modal_param_without_input.rs:2:15
+  |
+2 |     command::{Ephemeral, ModalView},
+  |               ^^^^^^^^^  ^^^^^^^^^
+3 |     rsx, view,
+  |     ^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default

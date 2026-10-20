@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: option `n`: `max` is above the range of its type
+ --> tests/ui/bound_out_of_range.rs:3:46
+  |
+3 | fn count(#[option("How many", max = 300)] n: u8) -> String {
+  |                                              ^^ evaluation of `_` failed here

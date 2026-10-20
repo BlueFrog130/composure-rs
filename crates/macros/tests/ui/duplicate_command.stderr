@@ -1,0 +1,26 @@
+error[E0080]: evaluation panicked: two commands have the same name and type
+  --> tests/ui/duplicate_command.rs:17:1
+   |
+17 | #[app(handlers(a, other::b))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed inside this call
+   |
+note: inside `composure::command::check_app`
+  --> $WORKSPACE/crates/composure/src/command/route.rs
+   |
+   |     check_routes(root, root);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `command::route::check_routes`
+  --> $WORKSPACE/crates/composure/src/command/route.rs
+   |
+   |             RouteInfo::App { routes, .. } => check_routes(root, routes),
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `command::route::check_routes`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: $WORKSPACE/crates/composure/src/command/route.rs
+   |
+   |                     panic!("two commands have the same name and type");
+   |                     -------------------------------------------------- in this macro invocation

@@ -1,0 +1,5 @@
+error: text cannot go in a <Row>
+ --> tests/ui/view_text_in_row.rs:4:25
+  |
+4 |     let _ = rsx! { <Row>"Text"</Row> };
+  |                         ^^^^^^

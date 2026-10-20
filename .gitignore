@@ -2,5 +2,7 @@ target/
 .env.*
 !.env.example
 *.stderr
+# trybuild expectations are the tests' expected compiler output
+!crates/macros/tests/ui/*.stderr
 .env
 .wrangler/

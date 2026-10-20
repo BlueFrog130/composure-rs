@@ -1,0 +1,17 @@
+error[E0080]: evaluation panicked: field `agreed`: `#[checkbox]` submits a bool
+  --> tests/ui/modal_type_mismatch.rs:13:13
+   |
+13 |     agreed: String,
+   |             ^^^^^^ evaluation of `_` failed here
+
+error[E0080]: evaluation panicked: field `levels`: `#[radio]` submits a single value (String, Option<String>, or a Choice enum)
+  --> tests/ui/modal_type_mismatch.rs:15:13
+   |
+15 |     levels: Vec<Level>,
+   |             ^^^ evaluation of `_` failed here
+
+error[E0080]: evaluation panicked: field `flag`: `#[input]` submits a single value (String, Option<String>, or a Choice enum)
+  --> tests/ui/modal_type_mismatch.rs:17:11
+   |
+17 |     flag: bool,
+   |           ^^^^ evaluation of `_` failed here

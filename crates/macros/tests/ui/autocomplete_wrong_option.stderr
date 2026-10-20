@@ -1,0 +1,11 @@
+error[E0080]: evaluation panicked: option `size`: `autocomplete` only applies to string, integer, and number options without fixed choices
+  --> tests/ui/autocomplete_wrong_option.rs:16:56
+   |
+16 | fn sized(#[option("Size", autocomplete = names)] size: Size) -> String {
+   |                                                        ^^^^ evaluation of `_` failed here
+
+error[E0080]: evaluation panicked: option `user`: `autocomplete` only applies to string, integer, and number options without fixed choices
+  --> tests/ui/autocomplete_wrong_option.rs:23:53
+   |
+23 | fn who(#[option("Who", autocomplete = names)] user: &User) -> String {
+   |                                                     ^ evaluation of `_` failed here

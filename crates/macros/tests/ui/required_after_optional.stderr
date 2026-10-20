@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: required option `name` must come before optional ones
+ --> tests/ui/required_after_optional.rs:5:29
+  |
+5 |     #[option("Name")] name: String,
+  |                             ^^^^^^ evaluation of `_` failed here

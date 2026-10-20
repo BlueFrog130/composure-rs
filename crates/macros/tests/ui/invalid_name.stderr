@@ -1,0 +1,5 @@
+error: `Echo Text` is not a valid command or option name: use 1-32 lowercase letters, digits, `-` or `_`
+ --> tests/ui/invalid_name.rs:2:29
+  |
+2 | #[composure::command(name = "Echo Text")]
+  |                             ^^^^^^^^^^^

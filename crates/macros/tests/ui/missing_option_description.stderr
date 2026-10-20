@@ -1,0 +1,5 @@
+error: missing option description: add `#[option("...")]`
+ --> tests/ui/missing_option_description.rs:3:9
+  |
+3 | fn echo(text: String) -> String {
+  |         ^^^^

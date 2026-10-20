@@ -1,0 +1,16 @@
+error[E0277]: `std::string::String` has no options to offer
+ --> tests/ui/modal_missing_options.rs:7:11
+  |
+7 |     free: String,
+  |           ^^^^^^ the trait `ModalChoice` is not implemented for `std::string::String`
+  |
+  = note: list them with `option("Label", "value")` in the field's attribute, or use a #[derive(Choice)] enum
+help: the following other types implement trait `ModalOptions`
+ --> $WORKSPACE/crates/composure/src/command/modal.rs
+  |
+  | impl<C: ModalChoice> ModalOptions for Option<C> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Option<C>`
+...
+  | impl<C: ModalChoice> ModalOptions for Vec<C> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Vec<C>`
+  = note: required for `std::string::String` to implement `ModalOptions`

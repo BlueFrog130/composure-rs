@@ -1,0 +1,43 @@
+error[E0277]: `Plain` is not a Command, Group, Component or Modal Handler, View, or App
+  --> tests/ui/app_not_routable.rs:11:1
+   |
+11 | #[app(handlers(ping, Plain))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ listed in `#[app(handlers(..))]`
+   |
+help: the trait `RouteDefinition` is not implemented for `Plain`
+  --> tests/ui/app_not_routable.rs:9:1
+   |
+ 9 | struct Plain;
+   | ^^^^^^^^^^^^
+   = note: list items made with `#[command]`, `#[group]`, `#[component]`, `#[modal]`, `#[view]` or `#[app]`
+help: the following other types implement trait `RouteDefinition`
+  --> tests/ui/app_not_routable.rs:4:1
+   |
+ 4 | #[composure::command]
+   | ^^^^^^^^^^^^^^^^^^^^^ `ping`
+...
+11 | #[app(handlers(ping, Plain))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Bot`
+   = note: this error originates in the attribute macro `app` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `Plain` is not a Command, Group, Component or Modal Handler, View, or App
+  --> tests/ui/app_not_routable.rs:11:22
+   |
+11 | #[app(handlers(ping, Plain))]
+   |                      ^^^^^ listed in `#[app(handlers(..))]`
+   |
+help: the trait `RouteDefinition` is not implemented for `Plain`
+  --> tests/ui/app_not_routable.rs:9:1
+   |
+ 9 | struct Plain;
+   | ^^^^^^^^^^^^
+   = note: list items made with `#[command]`, `#[group]`, `#[component]`, `#[modal]`, `#[view]` or `#[app]`
+help: the following other types implement trait `RouteDefinition`
+  --> tests/ui/app_not_routable.rs:4:1
+   |
+ 4 | #[composure::command]
+   | ^^^^^^^^^^^^^^^^^^^^^ `ping`
+...
+11 | #[app(handlers(ping, Plain))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Bot`
+   = note: this error originates in the attribute macro `composure::command` which comes from the expansion of the attribute macro `app` (in Nightly builds, run with -Z macro-backtrace for more info)

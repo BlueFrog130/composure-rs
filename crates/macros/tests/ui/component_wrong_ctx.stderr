@@ -1,0 +1,13 @@
+error: `Ctx` is for commands; a component handler takes `ComponentCtx`
+ --> tests/ui/component_wrong_ctx.rs:4:20
+  |
+4 | fn wrong_ctx(_ctx: Ctx) -> String {
+  |                    ^^^
+
+warning: unused import: `Ctx`
+ --> tests/ui/component_wrong_ctx.rs:1:17
+  |
+1 | use composure::{Ctx, component};
+  |                 ^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default

@@ -1,0 +1,5 @@
+error: description must be 1-100 characters, this one is 101
+ --> tests/ui/description_too_long.rs:3:4
+  |
+3 | fn ping() -> &'static str {
+  |    ^^^^

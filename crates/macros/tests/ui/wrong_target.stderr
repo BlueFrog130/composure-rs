@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: a user command's target must be `User`, `&User`, or `ResolvedMember`
+ --> tests/ui/wrong_target.rs:4:20
+  |
+4 | fn inspect(target: Message) -> String {
+  |                    ^^^^^^^ evaluation of `_` failed here

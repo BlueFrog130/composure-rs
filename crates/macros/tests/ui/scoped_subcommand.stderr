@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: `scope` is only allowed on top-level commands and groups
+ --> tests/ui/scoped_subcommand.rs:8:32
+  |
+8 | #[composure::group(subcommands(kick))]
+  |                                ^^^^ evaluation of `_` failed here
