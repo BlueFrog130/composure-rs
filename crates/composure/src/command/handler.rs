@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::outline::outlined;
 use crate::trace::{Instrument, Span};
 use crate::types::{
     ApplicationCommandInteraction, Interaction, InteractionResponse, MessageComponentInteraction,
@@ -37,7 +38,7 @@ pub trait InteractionHandler<S> {
         _component: MessageComponentInteraction,
         _state: &S,
     ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send {
-        async { Ok(not_handled("This bot does not handle components.")) }
+        async { __unhandled_component() }
     }
 
     /// Autocomplete for command options. Defaults to no choices.
@@ -46,11 +47,7 @@ pub trait InteractionHandler<S> {
         _autocomplete: ApplicationCommandInteraction,
         _state: &S,
     ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send {
-        async {
-            Ok(InteractionResponse::respond_with_autocomplete_choices(
-                Vec::new(),
-            ))
-        }
+        async { __unhandled_autocomplete() }
     }
 
     /// Answers a modal submit; defaults to a "not handled" ephemeral message
@@ -59,8 +56,28 @@ pub trait InteractionHandler<S> {
         _modal: ModalSubmitInteraction,
         _state: &S,
     ) -> impl Future<Output = Result<InteractionResponse, HandlerError>> + Send {
-        async { Ok(not_handled("This bot does not handle modal submissions.")) }
+        async { __unhandled_modal() }
     }
+}
+
+// The defaults' answers, for `#[app]`s without a fallback: answering by reference instead of
+// through `NoHandler` keeps the Interactions' `Clone` (what `__unshare` needs) out of the binary.
+
+#[doc(hidden)]
+pub fn __unhandled_component() -> Result<InteractionResponse, HandlerError> {
+    Ok(not_handled("This bot does not handle components."))
+}
+
+#[doc(hidden)]
+pub fn __unhandled_autocomplete() -> Result<InteractionResponse, HandlerError> {
+    Ok(InteractionResponse::respond_with_autocomplete_choices(
+        Vec::new(),
+    ))
+}
+
+#[doc(hidden)]
+pub fn __unhandled_modal() -> Result<InteractionResponse, HandlerError> {
+    Ok(not_handled("This bot does not handle modal submissions."))
 }
 
 fn not_handled(message: &str) -> InteractionResponse {
@@ -167,14 +184,17 @@ async fn route<S, H: InteractionHandler<S>>(
     handler: &H,
     state: &S,
 ) -> Result<InteractionResponse, HandlerError> {
+    // Each kind outlined: an isolate's first request compiles only its own kind's routing
     match interaction {
         Interaction::Ping(_) => Ok(InteractionResponse::Pong),
-        Interaction::ApplicationCommand(command) => handler.command(command, state).await,
-        Interaction::MessageComponent(component) => handler.component(component, state).await,
-        Interaction::ApplicationCommandAutocomplete(autocomplete) => {
-            handler.autocomplete(autocomplete, state).await
+        Interaction::ApplicationCommand(command) => outlined(handler.command(command, state)).await,
+        Interaction::MessageComponent(component) => {
+            outlined(handler.component(component, state)).await
         }
-        Interaction::ModalSubmit(modal) => handler.modal_submit(modal, state).await,
+        Interaction::ApplicationCommandAutocomplete(autocomplete) => {
+            outlined(handler.autocomplete(autocomplete, state)).await
+        }
+        Interaction::ModalSubmit(modal) => outlined(handler.modal_submit(modal, state)).await,
     }
 }
 

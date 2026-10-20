@@ -234,12 +234,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 let autocomplete = ::std::sync::Arc::new(autocomplete);
                 match <Self as #c::Route<__S>>::dispatch_autocomplete(&autocomplete, state, ::core::option::Option::None).await {
                     ::core::option::Option::Some(result) => result,
-                    ::core::option::Option::None => {
-                        #c::InteractionHandler::<__S>::autocomplete(
-                            &#c::NoHandler, #c::__unshare(autocomplete), state,
-                        )
-                        .await
-                    }
+                    ::core::option::Option::None => #c::__unhandled_autocomplete(),
                 }
             }
 
@@ -251,12 +246,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 let component = ::std::sync::Arc::new(component);
                 match <Self as #c::Route<__S>>::dispatch_component(&component, state, ::core::option::Option::None).await {
                     ::core::option::Option::Some(result) => result,
-                    ::core::option::Option::None => {
-                        #c::InteractionHandler::<__S>::component(
-                            &#c::NoHandler, #c::__unshare(component), state,
-                        )
-                        .await
-                    }
+                    ::core::option::Option::None => #c::__unhandled_component(),
                 }
             }
 
@@ -268,12 +258,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 let modal = ::std::sync::Arc::new(modal);
                 match <Self as #c::Route<__S>>::dispatch_modal(&modal, state, ::core::option::Option::None).await {
                     ::core::option::Option::Some(result) => result,
-                    ::core::option::Option::None => {
-                        #c::InteractionHandler::<__S>::modal_submit(
-                            &#c::NoHandler, #c::__unshare(modal), state,
-                        )
-                        .await
-                    }
+                    ::core::option::Option::None => #c::__unhandled_modal(),
                 }
             }
         }

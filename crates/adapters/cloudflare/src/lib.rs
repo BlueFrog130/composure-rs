@@ -16,7 +16,9 @@ pub use composure::adapter::{
     DEFAULT_EVENTS_PATH, EventOutcome, InteractionOutcome, handle_event, handle_event_with_key,
     handle_interaction, handle_interaction_with_key,
 };
-use composure::adapter::{FilesError, SIGNATURE_HEADER, TIMESTAMP_HEADER, send_with_files, verify};
+use composure::adapter::{
+    FilesError, SIGNATURE_HEADER, TIMESTAMP_HEADER, outlined, send_with_files, verify,
+};
 pub use composure::auth::PublicKey;
 pub use composure::command::{EventHandler, HandlerError, HasData, InteractionHandler, NoHandler};
 use composure::types::InteractionResponse;
@@ -283,14 +285,15 @@ where
         let timestamp = headers.get(TIMESTAMP_HEADER).ok().flatten();
 
         if req.path() == events_path {
-            let outcome = handle_event_with_key(
+            // Outlined, like the files reply: an isolate's first Interaction doesn't compile them
+            let outcome = outlined(handle_event_with_key(
                 &isolate.public_key,
                 signature.as_deref(),
                 timestamp.as_deref(),
                 &bytes,
                 handler,
                 &state,
-            )
+            ))
             .await;
             return match outcome {
                 EventOutcome::Unauthorized => {
@@ -343,7 +346,7 @@ async fn reply(body: &[u8], response: &InteractionResponse) -> worker::Result<Re
     if response.files().is_empty() {
         return Response::from_json(response);
     }
-    match send_with_files(FetchTransport, body, response).await {
+    match outlined(send_with_files(FetchTransport, body, response)).await {
         Ok(()) => Ok(Response::empty()?.with_status(202)),
         Err(e @ FilesError::MissingCallback) => {
             error!("failed to send response with files", error = e);

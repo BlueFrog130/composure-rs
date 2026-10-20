@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use crate::outline::outlined;
+
 use crate::types::{
     ApplicationCommandInteraction, ApplicationCommandType, Event, InteractionResponse,
     MessageComponentInteraction, ModalSubmitInteraction,
@@ -194,7 +196,12 @@ pub async fn __dispatch_command<C: Command<S>, S: Sync>(
     if data.name != C::NAME || data.t != C::KIND {
         return None;
     }
-    Some(C::invoke(Invocation::new(interaction, state).with_theme(theme)).await)
+    Some(
+        outlined(C::invoke(
+            Invocation::new(interaction, state).with_theme(theme),
+        ))
+        .await,
+    )
 }
 
 /// [`Route::dispatch_autocomplete`] of a Command or Group
@@ -208,7 +215,10 @@ pub async fn __dispatch_autocomplete<C: Command<S>, S: Sync>(
     if data.name != C::NAME || data.t != C::KIND {
         return None;
     }
-    C::autocomplete(Invocation::new(interaction, state).with_theme(theme)).await
+    outlined(C::autocomplete(
+        Invocation::new(interaction, state).with_theme(theme),
+    ))
+    .await
 }
 
 /// [`Route::dispatch_component`] of a Component Handler
@@ -222,7 +232,13 @@ pub async fn __dispatch_component<H: ComponentHandler<S>, S: Sync>(
     if prefix != H::PREFIX {
         return None;
     }
-    Some(H::invoke(Ctx::new(interaction, state).with_theme(theme), fields).await)
+    Some(
+        outlined(H::invoke(
+            Ctx::new(interaction, state).with_theme(theme),
+            fields,
+        ))
+        .await,
+    )
 }
 
 /// [`Route::dispatch_modal`] of a Modal Handler
@@ -236,7 +252,13 @@ pub async fn __dispatch_modal<H: ModalHandler<S>, S: Sync>(
     if prefix != H::PREFIX {
         return None;
     }
-    Some(H::invoke(Ctx::new(interaction, state).with_theme(theme), fields).await)
+    Some(
+        outlined(H::invoke(
+            Ctx::new(interaction, state).with_theme(theme),
+            fields,
+        ))
+        .await,
+    )
 }
 
 /// [`Route::dispatch_component`] of a View
@@ -250,7 +272,11 @@ pub async fn __dispatch_view_component<V: ViewHandler<S>, S: Sync>(
     if prefix != V::INFO.prefix {
         return None;
     }
-    V::component(Ctx::new(interaction, state).with_theme(theme), fields).await
+    outlined(V::component(
+        Ctx::new(interaction, state).with_theme(theme),
+        fields,
+    ))
+    .await
 }
 
 /// [`Route::dispatch_modal`] of a View
@@ -264,7 +290,11 @@ pub async fn __dispatch_view_modal<V: ViewHandler<S>, S: Sync>(
     if prefix != V::INFO.prefix {
         return None;
     }
-    V::modal(Ctx::new(interaction, state).with_theme(theme), fields).await
+    outlined(V::modal(
+        Ctx::new(interaction, state).with_theme(theme),
+        fields,
+    ))
+    .await
 }
 
 /// An App's theme filled into a response one of its Routes gave, before the Apps around it fill

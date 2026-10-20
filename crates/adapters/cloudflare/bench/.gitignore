@@ -1,2 +1,4 @@
 build-*/
 .wrangler/
+coldstart/node_modules/
+*.cpuprofile
