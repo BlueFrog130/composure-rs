@@ -1,0 +1,17 @@
+error[E0277]: the trait bound `inspect: SubcommandDefinition` is not satisfied
+ --> tests/ui/context_command_as_subcommand.rs:9:32
+  |
+9 | #[composure::group(subcommands(inspect))]
+  |                                ^^^^^^^ unsatisfied trait bound
+  |
+help: the trait `SubcommandDefinition` is not implemented for `inspect`
+ --> tests/ui/context_command_as_subcommand.rs:3:1
+  |
+3 | #[composure::command(user, name = "Inspect")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `SubcommandDefinition` is implemented for `Admin`
+ --> tests/ui/context_command_as_subcommand.rs:9:1
+  |
+9 | #[composure::group(subcommands(inspect))]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: this error originates in the attribute macro `composure::command` which comes from the expansion of the attribute macro `composure::group` (in Nightly builds, run with -Z macro-backtrace for more info)

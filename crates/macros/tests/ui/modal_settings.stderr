@@ -1,0 +1,17 @@
+error: a field is one input: use one of input, select, user_select, role_select, mentionable_select, channel_select, radio, checkboxes, checkbox, file_upload
+ --> tests/ui/modal_settings.rs:7:5
+  |
+7 |     #[select(option("A", "a"))]
+  |     ^
+
+error: a radio group has 2 to 10 options
+  --> tests/ui/modal_settings.rs:15:5
+   |
+15 |     one: String,
+   |     ^^^
+
+error: unknown `checkbox` setting; expected one of label, description, id, default
+  --> tests/ui/modal_settings.rs:21:16
+   |
+21 |     #[checkbox(placeholder = "x")]
+   |                ^^^^^^^^^^^

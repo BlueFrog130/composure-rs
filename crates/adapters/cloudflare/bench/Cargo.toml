@@ -1,0 +1,24 @@
+[package]
+name = "composure_bench_cloudflare"
+version = "0.1.0"
+edition.workspace = true
+rust-version = "1.91"
+description = "Request validation benchmark for Composure on Cloudflare Workers"
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+## Benchmark Web Crypto instead of ed25519-dalek
+web-crypto = ["composure/web-crypto"]
+
+[dependencies]
+composure = { path = "../../../composure" }
+worker = "0.8.7"
+
+[dev-dependencies]
+ed25519-dalek = "3.0.0"
+hex = "0.4.3"
+reqwest = { version = "0.13.5", features = ["blocking"] }

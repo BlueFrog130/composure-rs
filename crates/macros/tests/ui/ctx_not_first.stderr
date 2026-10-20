@@ -1,0 +1,5 @@
+error: `ctx` must be the first parameter
+ --> tests/ui/ctx_not_first.rs:3:44
+  |
+3 | fn hi(#[option("Name")] name: String, ctx: composure::Ctx) -> String {
+  |                                            ^^^^^^^^^

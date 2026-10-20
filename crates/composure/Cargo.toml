@@ -1,0 +1,96 @@
+[package]
+name = "composure"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Discord bots over HTTP Interactions, no gateway: slash commands, components, modals and JSX-like views, on Cloudflare Workers (WASM) or any server"
+readme = "../../README.md"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["discord", "bot", "interactions", "serverless", "wasm"]
+categories = ["api-bindings", "web-programming::http-server", "wasm", "asynchronous"]
+exclude = ["spec"]
+
+[dependencies]
+bitflags = "2.13.2"
+ed25519-dalek = "3.0.0"
+hex = "0.4.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["raw_value"] }
+serde_repr = "0.1.21"
+strum = { version = "0.28.0", features = ["derive"] }
+composure_macros = { workspace = true, optional = true }
+reqwest = { version = "0.13.5", optional = true, features = ["blocking"] }
+tracing = { version = "0.1.44", default-features = false, features = ["std"], optional = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+js-sys = { version = "0.3.106", optional = true }
+wasm-bindgen = { version = "0.2.129", optional = true }
+wasm-bindgen-futures = { version = "0.4.79", optional = true }
+
+[features]
+## `#[app]`, `#[command]`, `#[group]`, `#[component]`, `#[modal]`, `#[view]`, `rsx!`, and the derives
+macros = ["dep:composure_macros"]
+## Validate requests with the host's Web Crypto (`crypto.subtle`, Ed25519) instead of
+## ed25519-dalek. Only takes effect on `wasm32-unknown-unknown`; the host must support Ed25519.
+web-crypto = ["dep:js-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+
+## Async REST client over an Adapter-provided Transport, with the Interaction (token) Endpoints
+rest = []
+## Application Command Endpoints on `BotClient`
+rest-commands = ["rest"]
+## Messages and reactions on `BotClient`
+rest-messages = ["rest"]
+## Users and DMs on `BotClient`
+rest-users = ["rest"]
+## Channel settings, permission overwrites, typing, following on `BotClient`
+rest-channels = ["rest"]
+## Guild settings, preview, channels, the bot's guilds on `BotClient`
+rest-guilds = ["rest"]
+## Guild members: reading, editing, roles, kicking on `BotClient`
+rest-members = ["rest"]
+## Roles on `BotClient`
+rest-roles = ["rest"]
+## Bans and bulk bans on `BotClient`
+rest-bans = ["rest"]
+## Threads: starting, membership, listing on `BotClient`
+rest-threads = ["rest", "rest-messages"]
+## Invites on `BotClient`
+rest-invites = ["rest"]
+## Guild and application emojis on `BotClient`
+rest-emojis = ["rest"]
+## Stickers on `BotClient`
+rest-stickers = ["rest"]
+## Guild scheduled events on `BotClient`
+rest-scheduled-events = ["rest"]
+## Auto moderation rules on `BotClient`
+rest-automod = ["rest"]
+## Audit log on `BotClient`
+rest-audit-log = ["rest"]
+## Webhooks: management on `BotClient`, `WebhookClient` for executing
+rest-webhooks = ["rest"]
+## Entitlements and SKU subscriptions on `BotClient`
+rest-monetization = ["rest"]
+## Poll voters and ending polls on `BotClient`
+rest-polls = ["rest"]
+## Soundboard sounds on `BotClient`
+rest-soundboard = ["rest"]
+## The app's own settings on `BotClient`
+rest-application = ["rest"]
+## What most bots need
+tier1 = ["rest", "rest-commands", "rest-messages", "rest-users", "rest-channels", "rest-guilds", "rest-members", "rest-roles"]
+## Every Endpoint
+full = ["tier1", "rest-bans", "rest-threads", "rest-invites", "rest-emojis", "rest-stickers", "rest-scheduled-events", "rest-automod", "rest-audit-log", "rest-webhooks", "rest-monetization", "rest-polls", "rest-soundboard", "rest-application"]
+## Spans and events through `tracing` (`interaction`, `background_work`, `event`, `rest`). No
+## subscriber is installed; the Adapter or application chooses one.
+tracing = ["dep:tracing"]
+## Native blocking Transport for deploy-time tools (not for wasm)
+reqwest = ["rest", "dep:reqwest"]
+
+[dev-dependencies]
+futures = { version = "0.3.34", default-features = false, features = ["executor"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

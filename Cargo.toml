@@ -1,33 +1,35 @@
-[package]
-name = "composure"
-edition.workspace = true
-version = "0.0.2"
-rust-version.workspace = true
-readme = "README.md"
-description = "Discord bot framework for running on the edge"
-repository = "https://github.com/BlueFrog130/composure-rs"
-keywords = ["discord", "bot", "edge", "serverless", "wasm"]
-license = "Apache-2.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-bitflags = "2.13.2"
-ed25519-dalek = "3.0.0"
-hex = "0.4.3"
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
-serde_repr = "0.1.21"
-strum = { version = "0.28.0", features = ["derive"] }
-
-[dev-dependencies]
-
 [workspace]
-members = ["commands", "api", "adapters/cloudflare", "adapters/cloudflare/example"]
+resolver = "3"
+members = [
+    "crates/composure",
+    "crates/macros",
+    "crates/commands",
+    "crates/sync",
+    "crates/adapters/cloudflare",
+    "crates/adapters/cloudflare/bench",
+    "crates/adapters/tokio",
+    "examples/bot",
+    "examples/cloudflare",
+    "examples/tokio",
+]
 
 [workspace.package]
+# The published crates share one version, bumped by knope from .changeset/ (see knope.toml)
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
+license = "Apache-2.0"
+repository = "https://github.com/BlueFrog130/composure-rs"
+homepage = "https://github.com/BlueFrog130/composure-rs"
+
+# The published crates, as they depend on each other; `version` is kept in step by knope
+[workspace.dependencies]
+composure = { path = "crates/composure", version = "0.1.0" }
+composure_macros = { path = "crates/macros", version = "0.1.0" }
+composure_commands = { path = "crates/commands", version = "0.1.0" }
+composure_sync = { path = "crates/sync", version = "0.1.0" }
+composure_adapter_cloudflare = { path = "crates/adapters/cloudflare", version = "0.1.0" }
+composure_adapter_tokio = { path = "crates/adapters/tokio", version = "0.1.0" }
 
 [profile.release]
 lto = true
@@ -37,3 +39,11 @@ codegen-units = 1
 [profile.release.package."*"]
 codegen-units = 1
 opt-level = "z"
+
+# Signature checking without `web-crypto`: on workerd a 1 KB verify takes ~132 us at "z", ~103 us
+# at 3, for ~15 KB of bundle (bench/). Parsing stays at "z": "s"/3 save a few us for 75-180 KB.
+[profile.release.package.curve25519-dalek]
+opt-level = 3
+
+[profile.release.package.sha2]
+opt-level = 3

@@ -1,0 +1,5 @@
+error: the prefix cannot contain `:` or `\`
+ --> tests/ui/component_bad_prefix.rs:3:13
+  |
+3 | #[component("a:b")]
+  |             ^^^^^

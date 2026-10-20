@@ -1,0 +1,47 @@
+name: Change file
+
+# Every PR adds a change file to .changeset/ (`knope document-change`, see CONTRIBUTING.md) so
+# the next release notes it, unless it is labeled `no changeset` (docs, CI, refactors, ...)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# A label added right after a push races the push's run: keep only the newest
+concurrency:
+  group: change-file-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  change-file:
+    name: Change file
+    # The release PR consumes change files instead of adding one
+    if: github.head_ref != 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Require a change file
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # The PR's labels now, not when the event fired, so re-runs see a label added since
+          if gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx 'no changeset'; then
+            echo "Labeled \`no changeset\`"
+            exit 0
+          fi
+          added=$(git diff --name-only --diff-filter=A "origin/${{ github.base_ref }}...HEAD" -- '.changeset/*.md')
+          if [ -n "$added" ]; then
+            echo "Change files:"
+            echo "$added"
+          else
+            echo "::error::Add a change file for the changelog with \`knope document-change\` (see CONTRIBUTING.md), or label the PR \`no changeset\` if it needs no release note."
+            exit 1
+          fi

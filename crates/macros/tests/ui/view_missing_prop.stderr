@@ -1,0 +1,11 @@
+error[E0599]: no method named `build` found for struct `__CardBuilder<std::string::String, __Card_missing_likes>` in the current scope
+ --> tests/ui/view_missing_prop.rs:9:13
+  |
+3 | #[view]
+  | ------- method `build` not found for this struct
+...
+9 |     let _ = rsx! { <Card title="x"/> };
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `__CardBuilder<std::string::String, __Card_missing_likes>`
+  |
+  = note: the method was found for `__CardBuilder<std::string::String, u32>`
+  = note: this error originates in the macro `rsx` (in Nightly builds, run with -Z macro-backtrace for more info)

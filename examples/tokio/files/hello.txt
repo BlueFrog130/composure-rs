@@ -1,0 +1,4 @@
+Hello from the server's disk!
+
+/file reads from this directory only (FILES_DIR, or examples/tokio/files by default).
+Drop any file in here and it shows up in /file's autocomplete.

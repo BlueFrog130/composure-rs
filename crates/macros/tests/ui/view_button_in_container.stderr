@@ -1,0 +1,5 @@
+error: `<Button>` goes in a `<Row>`, or in a `<Section>` as its accessory
+ --> tests/ui/view_button_in_container.rs:4:32
+  |
+4 |     let _ = rsx! { <Container><Button custom_id="x">"Loose"</Button></Container> };
+  |                                ^^^^^^

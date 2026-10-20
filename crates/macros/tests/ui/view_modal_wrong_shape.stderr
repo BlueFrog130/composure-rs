@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: `bool`: a text input submits a single value (String, Option<String>, or a Choice enum)
+ --> tests/ui/view_modal_wrong_shape.rs:9:58
+  |
+9 |         <Modal title="Form" on:submit:send=|_ctx, agree: bool| Ephemeral(format!("{agree}"))>
+  |                                                          ^^^^ evaluation of `Form::_` failed here

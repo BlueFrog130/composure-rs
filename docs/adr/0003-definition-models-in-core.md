@@ -1,0 +1,3 @@
+# Command Definition models live in core
+
+The Command Definition models (`ApplicationCommand`, options, choices) moved from `composure_commands` into `composure::definition`, though core is meant to stay small and they are only needed at Sync time. `#[command]` generates both a Command's handler and its Definition, so generated code must reach the models through the same crate as the runtime traits; with the models in `composure_commands` (which depends on core) there is no crate both can name without a dependency cycle or making every bot depend on two crates. The bundle cost is nil in practice: a worker never calls `definition()`, and LTO strips it (definition strings are absent from the release wasm). `composure_commands` keeps the builder and re-exports the models.

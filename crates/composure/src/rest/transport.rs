@@ -1,0 +1,159 @@
+use std::{borrow::Cow, fmt, sync::Arc, time::Duration};
+
+/// The Adapter-provided way to send one HTTP request and to sleep; the REST client's only contact
+/// with the platform (`worker::Fetch` on Cloudflare, `reqwest` natively).
+///
+/// Implementations send exactly the given request: no retries, no redirects to follow for Discord,
+/// no status handling. Non-2xx statuses are a normal [`RawResponse`], only failures to get any
+/// response at all are a [`TransportError`].
+///
+/// Futures are `Send` so REST calls can run on any thread (ADR 0012); single-threaded platforms
+/// wrap theirs (`worker::send::SendFuture` on Cloudflare).
+pub trait Transport: Send + Sync {
+    /// Sends `request` and returns Discord's response, whatever its status
+    fn send(
+        &self,
+        request: &Request,
+    ) -> impl Future<Output = Result<RawResponse, TransportError>> + Send;
+
+    /// Waits out a rate limit
+    fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
+}
+
+impl<T: Transport + ?Sized> Transport for &T {
+    async fn send(&self, request: &Request) -> Result<RawResponse, TransportError> {
+        (**self).send(request).await
+    }
+
+    async fn sleep(&self, duration: Duration) {
+        (**self).sleep(duration).await
+    }
+}
+
+impl<T: Transport + ?Sized> Transport for Arc<T> {
+    async fn send(&self, request: &Request) -> Result<RawResponse, TransportError> {
+        (**self).send(request).await
+    }
+
+    async fn sleep(&self, duration: Duration) {
+        (**self).sleep(duration).await
+    }
+}
+
+/// An HTTP method
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Method {
+    /// `GET`
+    Get,
+    /// `POST`
+    Post,
+    /// `PUT`
+    Put,
+    /// `PATCH`
+    Patch,
+    /// `DELETE`
+    Delete,
+}
+
+impl Method {
+    /// The method's name, e.g. `"GET"`
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Method::Get => "GET",
+            Method::Post => "POST",
+            Method::Put => "PUT",
+            Method::Patch => "PATCH",
+            Method::Delete => "DELETE",
+        }
+    }
+}
+
+impl fmt::Display for Method {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// One fully-built HTTP request: absolute URL, every header (including `Content-Type` when there is
+/// a body) and the encoded body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Request {
+    /// The method
+    pub method: Method,
+    /// The absolute URL
+    pub url: String,
+    /// Values are borrowed when constant (`User-Agent`, `Content-Type: application/json`)
+    pub headers: Vec<(&'static str, Cow<'static, str>)>,
+    /// The encoded body, if any
+    pub body: Option<Vec<u8>>,
+}
+
+impl Request {
+    /// The value of header `name`, matched case-insensitively
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_ref())
+    }
+}
+
+/// The response headers the client reads (rate limits) plus `content-type`. A Transport on a
+/// platform where reading headers is costly (each one crosses into JS on Workers) may keep only
+/// these in [`RawResponse::headers`].
+pub const DISCORD_HEADERS: &[&str] = &[
+    "content-type",
+    "retry-after",
+    "x-ratelimit-bucket",
+    "x-ratelimit-global",
+    "x-ratelimit-limit",
+    "x-ratelimit-remaining",
+    "x-ratelimit-reset",
+    "x-ratelimit-reset-after",
+    "x-ratelimit-scope",
+];
+
+/// An HTTP response as received, any status
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RawResponse {
+    /// The HTTP status
+    pub status: u16,
+    /// Header names as sent; looked up case-insensitively by [`RawResponse::header`]
+    pub headers: Vec<(String, String)>,
+    /// The body
+    pub body: Vec<u8>,
+}
+
+impl RawResponse {
+    /// The value of header `name`, matched case-insensitively
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
+    }
+
+    /// Whether the status is 2xx
+    pub fn is_success(&self) -> bool {
+        (200..300).contains(&self.status)
+    }
+}
+
+/// No response was received (network failure, platform error, ...)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransportError(pub String);
+
+impl TransportError {
+    /// An error described by `error`
+    pub fn new(error: impl fmt::Display) -> Self {
+        Self(error.to_string())
+    }
+}
+
+impl fmt::Display for TransportError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for TransportError {}

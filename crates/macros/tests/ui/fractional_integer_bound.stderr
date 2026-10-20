@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: option `n`: fractional `min`/`max` only apply to number (`f64`) options
+ --> tests/ui/fractional_integer_bound.rs:3:46
+  |
+3 | fn count(#[option("How many", min = 1.5)] n: u8) -> String {
+  |                                              ^^ evaluation of `_` failed here

@@ -1,0 +1,17 @@
+error: unknown setting; expected one of handlers, theme, events
+ --> tests/ui/app_settings.rs:9:23
+  |
+9 | #[app(handlers(ping), colors = 1)]
+  |                       ^^^^^^
+
+error: `handlers` is set twice
+  --> tests/ui/app_settings.rs:12:23
+   |
+12 | #[app(handlers(ping), handlers(ping))]
+   |                       ^^^^^^^^
+
+error: apps must be unit structs: `struct Bot;`
+  --> tests/ui/app_settings.rs:16:8
+   |
+16 | struct Fields(u32);
+   |        ^^^^^^

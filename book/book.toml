@@ -1,0 +1,24 @@
+# The Composure guide, published to GitHub Pages by .github/workflows/book.yml.
+# Preview with `mdbook serve book --open`. Its examples run as doctests in `cargo test`
+# (crates/composure/src/guide.rs includes every chapter).
+
+[book]
+title = "Composure"
+description = "Discord bots that live on the edge: the guide to Composure"
+language = "en"
+src = "src"
+
+[build]
+build-dir = "../target/book"
+
+[rust]
+edition = "2024"
+
+[output.html]
+site-url = "/composure-rs/"
+git-repository-url = "https://github.com/BlueFrog130/composure-rs"
+edit-url-template = "https://github.com/BlueFrog130/composure-rs/edit/main/book/{path}"
+
+[output.html.playground]
+# Examples use composure, which the playground doesn't have
+runnable = false

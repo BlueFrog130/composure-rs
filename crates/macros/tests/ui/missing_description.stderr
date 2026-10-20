@@ -1,0 +1,5 @@
+error: missing description: add a doc comment or `desc = "..."`
+ --> tests/ui/missing_description.rs:2:4
+  |
+2 | fn ping() -> &'static str {
+  |    ^^^^

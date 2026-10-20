@@ -1,0 +1,7 @@
+error[E0609]: no field `accent` on type `composure::types::Container`
+ --> tests/ui/view_unknown_attribute.rs:4:31
+  |
+4 |     let _ = rsx! { <Container accent=0xff>"Hi"</Container> };
+  |                               ^^^^^^ unknown field
+  |
+  = note: available fields are: `t`, `id`, `components`, `accent_color`, `spoiler`

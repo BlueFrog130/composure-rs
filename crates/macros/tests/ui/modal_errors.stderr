@@ -1,0 +1,19 @@
+error: missing title: add `#[modal(title = "...")]`
+ --> tests/ui/modal_errors.rs:4:8
+  |
+4 | struct NoTitle {
+  |        ^^^^^^^
+
+error: modal handlers take the form (a `#[derive(Modal)]` type) after `ctx`
+ --> tests/ui/modal_errors.rs:9:1
+  |
+9 | fn no_form(_ctx: ModalCtx) -> String {
+  | ^^
+
+warning: unused import: `command::ModalCtx`
+ --> tests/ui/modal_errors.rs:1:31
+  |
+1 | use composure::{Modal, modal, command::ModalCtx};
+  |                               ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default

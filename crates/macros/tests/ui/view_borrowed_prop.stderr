@@ -1,0 +1,13 @@
+error: Props are owned (handlers decode them from the custom_id): use `String`, not `&str`
+ --> tests/ui/view_borrowed_prop.rs:4:16
+  |
+4 | fn Card(title: &str) -> View {
+  |                ^
+
+warning: unused imports: `command::View` and `rsx`
+ --> tests/ui/view_borrowed_prop.rs:1:17
+  |
+1 | use composure::{command::View, rsx, view};
+  |                 ^^^^^^^^^^^^^  ^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default

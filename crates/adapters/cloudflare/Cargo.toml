@@ -1,0 +1,40 @@
+[package]
+name = "composure_adapter_cloudflare"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.91"
+description = "Serve Composure Discord bots on Cloudflare Workers: Web Crypto signatures, wait_until Background Work, Workers Logs tracing"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["discord", "bot", "cloudflare", "workers", "wasm"]
+categories = ["wasm", "web-programming::http-server", "api-bindings"]
+exclude = ["bench"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+worker = "0.8.7"
+composure = { workspace = true, features = ["rest"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+futures = { version = "0.3.34", default-features = false }
+tracing = { version = "0.1.44", default-features = false, features = ["std"], optional = true }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["registry", "std"], optional = true }
+
+[features]
+default = ["web-crypto"]
+## Validate requests with Workers' Web Crypto (Ed25519) instead of ed25519-dalek: faster, smaller
+## bundle. On by default; without it (`default-features = false`) dalek is compiled in.
+web-crypto = ["composure/web-crypto"]
+## Log through `tracing` (Composure's spans included) and provide a Workers console subscriber,
+## `tracing::init()`. Without it the Adapter logs straight to the console.
+tracing = ["composure/tracing", "dep:tracing", "dep:tracing-subscriber"]
+
+[dev-dependencies]
+composure = { path = "../../composure", features = ["macros", "rest-users"] }
+futures = { version = "0.3.34", default-features = false, features = ["executor"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

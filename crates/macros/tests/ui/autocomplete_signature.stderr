@@ -1,0 +1,11 @@
+error: autocomplete handlers take an optional `ctx: Ctx` and then `input: &str`
+ --> tests/ui/autocomplete_signature.rs:4:1
+  |
+4 | fn no_input() -> Vec<String> {
+  | ^^
+
+error: autocomplete handlers take what the user typed as `input: &str`
+ --> tests/ui/autocomplete_signature.rs:9:10
+  |
+9 | fn owned(input: String) -> Vec<String> {
+  |          ^^^^^
