@@ -8,6 +8,15 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+# A label added right after a push races the push's run: keep only the newest
+concurrency:
+  group: change-file-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   change-file:
     name: Change file
@@ -15,16 +24,19 @@ jobs:
     if: github.head_ref != 'release'
     runs-on: ubuntu-latest
     steps:
-      - name: Skipped by label
-        if: contains(github.event.pull_request.labels.*.name, 'no changeset')
-        run: echo "Labeled \`no changeset\`"
       - uses: actions/checkout@v5
-        if: "!contains(github.event.pull_request.labels.*.name, 'no changeset')"
         with:
           fetch-depth: 0
       - name: Require a change file
-        if: "!contains(github.event.pull_request.labels.*.name, 'no changeset')"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
+          # The PR's labels now, not when the event fired, so re-runs see a label added since
+          if gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx 'no changeset'; then
+            echo "Labeled \`no changeset\`"
+            exit 0
+          fi
           added=$(git diff --name-only --diff-filter=A "origin/${{ github.base_ref }}...HEAD" -- '.changeset/*.md')
           if [ -n "$added" ]; then
             echo "Change files:"
