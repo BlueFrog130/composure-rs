@@ -75,7 +75,8 @@ impl<S> InteractionHandler<S> for NoHandler {}
 
 /// Routes an Interaction to the handler. Ping is answered with Pong. The handler's
 /// [`InteractionHandler::theme`] is applied to the response; render an `Err` with
-/// [`HandlerError::response_with`] and the same theme.
+/// [`HandlerError::response_with`] and the same theme. A Components V2 message that also sets
+/// `content`, `embeds` or a poll is an `Err`, since Discord would reject it.
 pub async fn dispatch<S, H: InteractionHandler<S>>(
     interaction: Interaction,
     handler: &H,
@@ -84,7 +85,12 @@ pub async fn dispatch<S, H: InteractionHandler<S>>(
     let span = span(&interaction);
     async move {
         debug!("interaction received");
-        let mut response = match route(interaction, handler, state).await {
+        let routed = route(interaction, handler, state).await;
+        let checked = routed.and_then(|response| {
+            super::response::check_components_v2(&response)?;
+            Ok(response)
+        });
+        let mut response = match checked {
             Ok(response) => response,
             Err(error) => {
                 error.trace("interaction failed");
@@ -257,5 +263,74 @@ impl<S: Sync, C: Route<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHa
 impl<C: CommandSetDefinition, F> CommandSetDefinition for WithFallback<C, F> {
     fn definitions() -> Vec<ScopedDefinition> {
         C::definitions()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::executor::block_on;
+    use serde_json::json;
+
+    use super::*;
+    use crate::types::{Component, MessageCallbackData};
+
+    /// Answers every Command with `data`
+    struct Answer(MessageCallbackData);
+
+    impl InteractionHandler<()> for Answer {
+        async fn command(
+            &self,
+            _command: ApplicationCommandInteraction,
+            _state: &(),
+        ) -> Result<InteractionResponse, HandlerError> {
+            Ok(InteractionResponse::ChannelMessageWithSource(
+                self.0.clone(),
+            ))
+        }
+    }
+
+    fn command() -> Interaction {
+        serde_json::from_value(json!({
+            "id": "2", "application_id": "1", "type": 2, "token": "tok", "version": 1,
+            "data": { "id": "4", "name": "x", "type": 1 },
+        }))
+        .unwrap()
+    }
+
+    fn v2() -> MessageCallbackData {
+        MessageCallbackData::components_v2(vec![Component::text("hi")])
+    }
+
+    #[test]
+    fn components_v2_with_content_embeds_or_poll_is_an_error() {
+        let cases = [
+            MessageCallbackData {
+                content: Some("hi".into()),
+                ..v2()
+            },
+            MessageCallbackData {
+                embeds: Some(vec![crate::types::Embed::new()]),
+                ..v2()
+            },
+        ];
+        for data in cases {
+            let error = block_on(dispatch(command(), &Answer(data), &())).unwrap_err();
+            assert!(error.to_string().contains("Components V2"), "{error}");
+        }
+    }
+
+    #[test]
+    fn components_v2_with_empty_content_passes() {
+        let data = MessageCallbackData {
+            content: Some(String::new()),
+            embeds: Some(Vec::new()),
+            ..v2()
+        };
+        assert!(block_on(dispatch(command(), &Answer(data), &())).is_ok());
+        let legacy = MessageCallbackData {
+            content: Some("hi".into()),
+            ..Default::default()
+        };
+        assert!(block_on(dispatch(command(), &Answer(legacy), &())).is_ok());
     }
 }
