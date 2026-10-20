@@ -4,6 +4,7 @@
 //! environment win. Logs go to stderr, filtered by `RUST_LOG` (default `info,composure=debug`).
 
 use composure_adapter_tokio::TokioInteractionBot;
+use composure_example_bot::Config;
 use composure_example_tokio::{DEFAULT_FILES_DIR, Server, TokioBot};
 use tracing_subscriber::EnvFilter;
 
@@ -17,10 +18,15 @@ async fn main() -> Result<(), composure_adapter_tokio::Error> {
         )
         .init();
 
+    // Bot Data, from the environment here; the `config` crate or any serde loader works the
+    // same way (`TokioInteractionBot::new(settings.get::<Credentials>("discord")?)` too)
+    let config = Config {
+        greeting: std::env::var("GREETING").unwrap_or_else(|_| "Hello".into()),
+    };
     let files_dir = std::env::var("FILES_DIR").unwrap_or_else(|_| DEFAULT_FILES_DIR.into());
     TokioInteractionBot::from_env()?
         .with_handler(TokioBot)
-        .with_data(Server::new(files_dir))
+        .with_data(Server::new(config, files_dir))
         .serve()
         .await
 }

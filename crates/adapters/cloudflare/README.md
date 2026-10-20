@@ -21,7 +21,7 @@ bots within the Workers free plan (100,000 requests a day).
 
 The adapter verifies the request signature against the `DISCORD_PUBLIC_KEY` secret, answers
 Discord's Ping, and dispatches everything else to your handler, passing a `Worker` (the
-worker's `Env` and `Context`) as State.
+worker's `Env`, `Context`, and your Bot Data) as State.
 
 ## Usage
 
@@ -46,7 +46,7 @@ fn hello(ctx: Ctx) -> String {
     format!("Hello, {name}!")
 }
 
-/// Read a var from wrangler.jsonc
+/// Read a var from wrangler.toml
 #[command]
 async fn greeting(ctx: Ctx<Worker>) -> Result<String> {
     Ok(ctx.state().var("GREETING")?.to_string())
@@ -77,12 +77,24 @@ async fn fetch(req: Request, env: Env, ctx: Context) -> Result<Response> {
 
 `Bot.with_fallback(handler)` sends components, modals, autocomplete, and commands the App does not handle to any `InteractionHandler`. Implement `InteractionHandler<Worker>` directly instead of using an App for full control.
 
+## Configuration
+
+The `Credentials` (public key, bot token, application id) come from the `DISCORD_PUBLIC_KEY`, `DISCORD_TOKEN` and `DISCORD_APPLICATION_ID` vars or secrets (`credentials(&env)`). Load them another way, other names or the Secrets Store, with `.with_credentials(async |env: Env| ..)`. Your own configuration is Bot Data: `.with_data(async |env: Env| ..)` builds it, Commands read it with `ctx.state().data()`, or `Ctx<impl HasData<Data = Config>>` to stay platform-agnostic. Both loaders run on an isolate's first request and are reused by the next ones; an error is logged, answered with 500, and retried. Bot Data is `Send + Sync`, so bindings (KV, D1) stay on the `Env`.
+
+```rust,ignore
+CloudflareInteractionBot::new(req, env, ctx)
+    .with_handler(Bot)
+    .with_data(async |env: Env| Ok(Config { greeting: env.var("GREETING")?.to_string() }))
+    .process()
+    .await
+```
+
 ## State and REST
 
-`Worker` derefs to `Env` and implements `composure::command::Platform`, which gives Commands:
+`Worker<T>` derefs to `Env` and implements `composure::command::Platform`, which gives Commands:
 
 - `ctx.client()`: the Interaction Client (follow-ups, the original response); needs no secret.
-- `ctx.bot()`: the Bot Client, from a `DISCORD_TOKEN` secret; an error when it is not set.
+- `ctx.bot()`: the Bot Client, from the Credentials' bot token; an error when there is none.
 - `ctx.defer(async |ctx| ..)`: replies with a Deferred Response and runs the closure with `wait_until`; its output edits the original response. `Ephemeral(ctx.defer(..))` defers ephemerally. Background Work must finish within Workers' post-response limit (about 30 seconds).
 
 Requests go through `FetchTransport` (Workers `fetch`). A response carrying files (`InteractionResponse::with_file`) is sent through the callback endpoint as multipart and the request is answered with 202.
@@ -93,7 +105,7 @@ Requests to `/events` (change with `.with_events_path(..)`) are Webhook Events: 
 
 ## Outside Interactions
 
-`bot_client(&env)` builds a Bot Client from the `DISCORD_TOKEN` secret and the `DISCORD_APPLICATION_ID` var, for cron triggers, queues, or other events:
+`bot_client(&env)` builds a Bot Client from the `DISCORD_TOKEN` secret and the `DISCORD_APPLICATION_ID` var, for cron triggers, queues, or other events (with Credentials loaded another way, `credentials.bot_client(FetchTransport)`):
 
 ```rust,ignore
 #[event(scheduled)]

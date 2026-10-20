@@ -19,8 +19,16 @@ Anything that answers an Interaction with a Response; the single contract every 
 _Avoid_: Command handler (when meaning the low-level contract)
 
 **State**:
-Platform-provided resources (bindings, secrets, env) an Adapter passes through to Commands.
+Platform-provided resources (bindings, secrets, env), plus the Bot Data, that an Adapter passes through to Commands.
 _Avoid_: Env (outside the Cloudflare Adapter)
+
+**Credentials**:
+What identifies and authorizes the Discord application: its public key (required, verifies Interactions), and optionally the bot token and application id. The only configuration Composure itself needs; where it is loaded from is the Adapter's (or the bot's) choice.
+_Avoid_: Config, settings, App config
+
+**Bot Data**:
+The bot author's own typed configuration and resources, built once and shared by every Interaction; reaches Commands through the State on every Adapter.
+_Avoid_: App data, user data, vars
 
 **Response**:
 What a Command returns to Discord for an Interaction; plain text, embeds, and full interaction responses all count.
@@ -63,7 +71,7 @@ _Avoid_: HTTP client, connector
 REST client authorized by an Interaction's token (follow-ups, editing the original response); needs no bot token and is always available to a Command.
 
 **Bot Client**:
-REST client authorized by the bot token; available only when the Adapter has a `DISCORD_TOKEN` secret.
+REST client authorized by the bot token; available only when the Credentials include one.
 _Avoid_: HTTP client, API client
 
 **Endpoint**:

@@ -13,9 +13,13 @@ use composure::{
     types::{File, InteractionResponse},
 };
 use composure_adapter_tokio::Host;
+use composure_example_bot::Config;
 
-/// What the commands read besides the Interaction, handed to `TokioInteractionBot::with_data`
+/// What the commands read besides the Interaction, handed to `TokioInteractionBot::with_data`:
+/// the Bot Data on tokio
 pub struct Server {
+    /// The shared commands' settings (`/greet`)
+    pub config: Config,
     /// When the process started, for `/uptime`
     pub started: Instant,
     /// The only directory `/file` reads from
@@ -24,11 +28,20 @@ pub struct Server {
 
 impl Server {
     /// Started now, serving `files_dir`
-    pub fn new(files_dir: impl Into<PathBuf>) -> Self {
+    pub fn new(config: Config, files_dir: impl Into<PathBuf>) -> Self {
         Self {
+            config,
             started: Instant::now(),
             files_dir: files_dir.into(),
         }
+    }
+}
+
+/// The shared commands take `Ctx<impl HasData<Data: AsRef<Config>>>`: this serves them from the
+/// server's data
+impl AsRef<Config> for Server {
+    fn as_ref(&self) -> &Config {
+        &self.config
     }
 }
 

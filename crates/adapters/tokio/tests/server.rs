@@ -12,7 +12,7 @@ use composure::{
     command::{EventCtx, EventHandler, HandlerError},
     types::Snowflake,
 };
-use composure_adapter_tokio::{Host, MAX_BODY, TokioInteractionBot};
+use composure_adapter_tokio::{Credentials, Host, MAX_BODY, TokioInteractionBot};
 use ed25519_dalek::{Signer, SigningKey};
 use serde_json::{Value, json};
 use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
@@ -85,7 +85,7 @@ impl Server {
         let url = format!("http://{}", listener.local_addr().unwrap());
         let (stop, stopped) = oneshot::channel();
         let key = SigningKey::from_bytes(&SEED);
-        let bot = TokioInteractionBot::new(&hex::encode(key.verifying_key().as_bytes()))
+        let bot = TokioInteractionBot::new(credentials(&key))
             .unwrap()
             .with_handler(Bot)
             .with_data(Seen::default())
@@ -228,17 +228,24 @@ async fn events_are_acknowledged_and_shutdown_waits_for_their_handling() {
 #[tokio::test(flavor = "multi_thread")]
 async fn host_bot_needs_a_token_and_an_application_id() {
     let key = SigningKey::from_bytes(&SEED);
-    let bot = TokioInteractionBot::new(&hex::encode(key.verifying_key().as_bytes())).unwrap();
+    let bot = TokioInteractionBot::new(credentials(&key)).unwrap();
     assert!(bot.host().bot().is_none());
-    let bot = bot
+    let bot = TokioInteractionBot::new(credentials(&key).with_bot_token("token")).unwrap();
+    assert!(bot.host().bot().is_none());
+    let credentials = credentials(&key)
         .with_bot_token("token")
         .with_application_id(Snowflake::from(1u64));
+    let bot = TokioInteractionBot::new(credentials).unwrap();
     assert!(bot.host().bot().is_some());
 }
 
 #[test]
 fn invalid_public_keys_fail_at_startup() {
-    assert!(TokioInteractionBot::new("not hex").is_err());
+    assert!(Credentials::new("not hex").is_err());
+}
+
+fn credentials(key: &SigningKey) -> Credentials {
+    Credentials::new(&hex::encode(key.verifying_key().as_bytes())).unwrap()
 }
 
 /// What `tokio::spawn` needs: an Interaction's whole dispatch, and Background Work holding a

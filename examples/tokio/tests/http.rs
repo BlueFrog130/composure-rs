@@ -11,9 +11,9 @@ use std::{convert::Infallible, net::SocketAddr, time::Duration};
 use bytes::Bytes;
 use common::RegressionBot;
 use composure_adapter_tokio::{
-    EventHandler, Host, HttpTransport, InteractionHandler, TokioInteractionBot,
+    Credentials, EventHandler, Host, HttpTransport, InteractionHandler, TokioInteractionBot,
 };
-use composure_example_bot::Bot;
+use composure_example_bot::{Bot, Config};
 use composure_example_tokio::{DEFAULT_FILES_DIR, Server, TokioBot};
 use http_body_util::{BodyExt, Full};
 use hyper::{Request, Response, body::Incoming, server::conn::http1, service::service_fn};
@@ -41,7 +41,7 @@ where
     H: InteractionHandler<Host<T>> + EventHandler<Host<T>> + Clone + Send + Sync + 'static,
     T: Send + Sync + 'static,
 {
-    let bot = TokioInteractionBot::new(&common::public_key())
+    let bot = TokioInteractionBot::new(Credentials::new(&common::public_key()).unwrap())
         .unwrap()
         .with_handler(handler)
         .with_data(data);
@@ -148,7 +148,7 @@ async fn regression_fixtures_over_http() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn the_example_bot_answers_ping() {
-    let (url, stop, task) = serve(Bot).await;
+    let (url, stop, task) = serve_with(Bot, config()).await;
     let body = json!({ "id": "1", "application_id": "1", "type": 1, "token": "t", "version": 1 })
         .to_string()
         .into_bytes();
@@ -159,6 +159,16 @@ async fn the_example_bot_answers_ping() {
     assert_eq!(response, Some(json!({ "type": 1 })));
     stop.send(()).unwrap();
     task.await.unwrap();
+}
+
+fn config() -> Config {
+    Config {
+        greeting: "Howdy".into(),
+    }
+}
+
+fn server() -> Server {
+    Server::new(config(), DEFAULT_FILES_DIR)
 }
 
 /// A signed interaction of `kind` (2 command, 4 autocomplete) for `name` with `options`
@@ -178,7 +188,7 @@ async fn invoke(url: &str, kind: u8, name: &str, options: Value) -> Value {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn server_commands() {
-    let (url, stop, task) = serve_with(TokioBot, Server::new(DEFAULT_FILES_DIR)).await;
+    let (url, stop, task) = serve_with(TokioBot, server()).await;
     let text = |name: &str| json!([{ "name": "name", "type": 3, "value": name }]);
 
     let hello = invoke(&url, 2, "file", text("hello.txt")).await;
@@ -204,6 +214,10 @@ async fn server_commands() {
         suggestions["data"]["choices"],
         json!([{ "name": "hello.txt", "value": "hello.txt" }])
     );
+
+    // A shared command, its Bot Data a part of the server's
+    let greet = invoke(&url, 2, "greet", json!([])).await;
+    assert_eq!(greet["data"]["content"], "Howdy from Composure!");
 
     let uptime = invoke(&url, 2, "uptime", json!([])).await;
     assert!(
@@ -232,10 +246,10 @@ fn sync_publishes_the_shared_commands_then_the_server_ones() {
 #[tokio::test(flavor = "multi_thread")]
 async fn primes_defers_then_edits_the_original_from_background_work() {
     let (discord, mut requests) = mock_discord().await;
-    let bot = TokioInteractionBot::new(&common::public_key())
+    let bot = TokioInteractionBot::new(Credentials::new(&common::public_key()).unwrap())
         .unwrap()
         .with_handler(TokioBot)
-        .with_data(Server::new(DEFAULT_FILES_DIR))
+        .with_data(server())
         .with_transport(HttpTransport::new().with_api_base(&discord));
     let (url, stop, task) = start(bot).await;
 

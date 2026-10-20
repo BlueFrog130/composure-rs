@@ -14,14 +14,14 @@ Serves the [example bot](../bot)'s shared commands from a Worker with `Cloudflar
 
 [`src/lib.rs`](src/lib.rs) `start` installs the adapter's `tracing` subscriber (feature `tracing`): `tracing::info!` in `/report`'s Background Work and the install welcome logs with the Interaction's or event's span fields, viewable with `npx wrangler tail` or in Workers Logs.
 
-[`src/lib.rs`](src/lib.rs) `scheduled`: a cron trigger (`triggers.crons` in `wrangler.jsonc`) posts a daily heartbeat to the `STATUS_CHANNEL_ID` var's channel with `bot_client(&env)`; it needs the `DISCORD_APPLICATION_ID` var.
+[`src/lib.rs`](src/lib.rs) `scheduled`: a cron trigger (`triggers.crons` in `wrangler.toml`) posts a daily heartbeat to the `STATUS_CHANNEL_ID` var's channel with `bot_client(&env)`; it needs the `DISCORD_APPLICATION_ID` var.
 
 ## Prerequisites
 
 - Node (for `npx wrangler`) and `cargo install worker-build@0.8.7`
 - A Discord application with a bot; note its **Application ID**, **Public Key**, and **Bot Token**
 
-Worker config is `wrangler.jsonc`. `/note` needs a KV namespace: `npx wrangler kv namespace create NOTES`, then put its id in `kv_namespaces` (`wrangler dev` simulates it locally without one).
+Worker config is `wrangler.toml`. `/note` needs a KV namespace: `npx wrangler kv namespace create NOTES`, then put its id in `kv_namespaces` (`wrangler dev` simulates it locally without one).
 
 ## Run locally
 

@@ -14,14 +14,14 @@ use std::{
 use bytes::Bytes;
 pub use composure::adapter::DEFAULT_EVENTS_PATH;
 pub use composure::command::{EventHandler, HandlerError, InteractionHandler, NoHandler};
+pub use composure::{Credentials, CredentialsError};
 use composure::{
     adapter::{
-        APPLICATION_ID_VAR, BOT_TOKEN_VAR, EventOutcome, FilesError, InteractionOutcome,
-        PUBLIC_KEY_VAR, SIGNATURE_HEADER, TIMESTAMP_HEADER, handle_event_with_key,
-        handle_interaction_with_key, send_with_files,
+        EventOutcome, FilesError, InteractionOutcome, SIGNATURE_HEADER, TIMESTAMP_HEADER,
+        handle_event_with_key, handle_interaction_with_key, send_with_files,
     },
     auth::PublicKey,
-    types::{InteractionResponse, Snowflake},
+    types::InteractionResponse,
 };
 pub use host::Host;
 use http_body_util::{BodyExt, Full, Limited};
@@ -48,10 +48,10 @@ pub const DEFAULT_GRACE: Duration = Duration::from_secs(30);
 /// Why the bot could not be configured or served
 #[derive(Debug)]
 pub enum Error {
-    /// A required environment variable is not set
-    MissingVar(&'static str),
+    /// The Credentials are missing or malformed
+    Credentials(CredentialsError),
 
-    /// An environment variable is set but unusable
+    /// An environment variable besides the Credentials (`PORT`) is set but unusable
     InvalidVar {
         /// The variable
         name: &'static str,
@@ -69,7 +69,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MissingVar(name) => write!(f, "{name} is not set"),
+            Self::Credentials(error) => write!(f, "{error}"),
             Self::InvalidVar { name, reason } => write!(f, "{name} is invalid: {reason}"),
             Self::InvalidPublicKey => f.write_str("the public key is not a valid Ed25519 key"),
             Self::Io(error) => write!(f, "{error}"),
@@ -80,9 +80,16 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Credentials(error) => Some(error),
             Self::Io(error) => Some(error),
             _ => None,
         }
+    }
+}
+
+impl From<CredentialsError> for Error {
+    fn from(error: CredentialsError) -> Self {
+        Self::Credentials(error)
     }
 }
 
@@ -120,23 +127,13 @@ pub struct TokioInteractionBot<H = NoHandler, T = ()> {
 }
 
 impl TokioInteractionBot {
-    /// Configured from the environment: `DISCORD_PUBLIC_KEY` (required), `DISCORD_TOKEN` and
-    /// `DISCORD_APPLICATION_ID` (optional, for REST), serving on `0.0.0.0:$PORT` (8080 without
-    /// `PORT`). Fails at once on a missing or invalid value.
+    /// Configured from the environment: the [`Credentials`] by their conventional names
+    /// (`DISCORD_PUBLIC_KEY`, required; `DISCORD_TOKEN` and `DISCORD_APPLICATION_ID`, optional,
+    /// for REST), serving on `0.0.0.0:$PORT` (8080 without `PORT`). Fails at once on a missing or
+    /// invalid value.
     pub fn from_env() -> Result<Self, Error> {
-        let public_key =
-            std::env::var(PUBLIC_KEY_VAR).map_err(|_| Error::MissingVar(PUBLIC_KEY_VAR))?;
-        let mut bot = Self::new(&public_key)?;
-        if let Some(token) = var(BOT_TOKEN_VAR)? {
-            bot = bot.with_bot_token(token);
-        }
-        if let Some(id) = var(APPLICATION_ID_VAR)? {
-            let id = id.parse::<Snowflake>().map_err(|_| Error::InvalidVar {
-                name: APPLICATION_ID_VAR,
-                reason: "not an id".into(),
-            })?;
-            bot = bot.with_application_id(id);
-        }
+        let credentials = Credentials::from_lookup(|name| std::env::var(name).ok())?;
+        let mut bot = Self::new(credentials)?;
         if let Some(port) = var("PORT")? {
             let port = port.parse::<u16>().map_err(|e| Error::InvalidVar {
                 name: "PORT",
@@ -147,15 +144,22 @@ impl TokioInteractionBot {
         Ok(bot)
     }
 
-    /// Configured in code with the application's hex public key; no bot token, serving on
-    /// `0.0.0.0:8080`
-    pub fn new(public_key: &str) -> Result<Self, Error> {
+    /// Serving on `0.0.0.0:8080` with `credentials`, loaded however the bot likes: in code,
+    /// with [`Credentials::from_lookup`], or deserialized (`config`, `figment`, `envy`, ...):
+    ///
+    /// ```ignore
+    /// let settings = config::Config::builder()
+    ///     .add_source(config::File::with_name("bot"))
+    ///     .build()?;
+    /// TokioInteractionBot::new(settings.get::<Credentials>("discord")?)?
+    /// ```
+    pub fn new(credentials: Credentials) -> Result<Self, Error> {
         // Natively the key is parsed by ed25519-dalek; the future is ready at once
-        let public_key = futures::executor::block_on(PublicKey::from_hex(public_key))
+        let public_key = futures::executor::block_on(PublicKey::from_hex(credentials.public_key()))
             .map_err(|_| Error::InvalidPublicKey)?;
         Ok(Self {
             public_key,
-            host: Host::new(None, None),
+            host: Host::new(credentials),
             handler: NoHandler,
             addr: SocketAddr::from(([0, 0, 0, 0], DEFAULT_PORT)),
             events_path: Cow::Borrowed(DEFAULT_EVENTS_PATH),
@@ -207,18 +211,6 @@ impl<H, T> TokioInteractionBot<H, T> {
         }
     }
 
-    /// The bot token for `ctx.bot()` and [`Host::bot`], without the `Bot ` prefix
-    pub fn with_bot_token(mut self, token: impl Into<String>) -> Self {
-        self.host.core_mut().bot_token = Some(token.into());
-        self
-    }
-
-    /// The application id for [`Host::bot`] (Interactions carry their own)
-    pub fn with_application_id(mut self, id: Snowflake) -> Self {
-        self.host.core_mut().application_id = Some(id);
-        self
-    }
-
     /// Sends REST requests through `transport`, e.g. one sharing the server's `reqwest::Client`
     pub fn with_transport(mut self, transport: HttpTransport) -> Self {
         self.host.core_mut().transport = transport;
@@ -251,7 +243,7 @@ impl<H, T> TokioInteractionBot<H, T> {
     }
 
     /// The State handlers will get, for REST and tasks outside Interactions ([`Host::bot`],
-    /// [`Host::spawn`]). Take it after configuring the token, application id, and Transport.
+    /// [`Host::spawn`]). Take it after [`with_transport`](Self::with_transport).
     pub fn host(&self) -> Host<T> {
         self.host.clone()
     }

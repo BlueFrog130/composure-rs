@@ -133,7 +133,8 @@ helpers to match.
 
 A [`BotClient`](crate::rest::BotClient) can also be built from any
 [`Transport`](crate::rest::Transport), a bot token and the application id, for cron jobs,
-queues or scripts: `BotClient::new(transport, &token, application_id)`. The Adapters provide one
+queues or scripts: `BotClient::new(transport, &token, application_id)`, or
+[`Credentials::bot_client(transport)`](crate::Credentials::bot_client). The Adapters provide one
 (`bot_client(&env)` on Workers, `host.bot()` on tokio), and the `reqwest` feature adds a blocking
 [`ReqwestTransport`](crate::rest::ReqwestTransport) for deploy-time tools. See
 [Platforms](crate::guide::platforms).

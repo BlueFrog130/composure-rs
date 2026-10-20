@@ -18,12 +18,6 @@ use crate::{
 pub const SIGNATURE_HEADER: &str = "X-Signature-Ed25519";
 /// Header carrying the timestamp the signature covers
 pub const TIMESTAMP_HEADER: &str = "X-Signature-Timestamp";
-/// Secret / environment variable holding the application's hex public key
-pub const PUBLIC_KEY_VAR: &str = "DISCORD_PUBLIC_KEY";
-/// Secret / environment variable holding the bot token, for the Bot Client
-pub const BOT_TOKEN_VAR: &str = "DISCORD_TOKEN";
-/// Variable holding the application id, for a Bot Client outside Interactions
-pub const APPLICATION_ID_VAR: &str = "DISCORD_APPLICATION_ID";
 /// Path Webhook Events are served on unless the Adapter is told otherwise; every other path
 /// serves Interactions
 pub const DEFAULT_EVENTS_PATH: &str = "/events";

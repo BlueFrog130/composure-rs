@@ -70,6 +70,7 @@ use std::{
 
 use composure::{
     command::ScopedDefinition,
+    credentials::{APPLICATION_ID_VAR, BOT_TOKEN_VAR},
     definition::{ApplicationCommand, CommandDetails},
     rest::{self, BotClient, CommandScope, ReqwestTransport},
     types::Snowflake,
@@ -130,9 +131,9 @@ impl SyncConfig {
     pub fn from_vars(vars: impl IntoIterator<Item = (String, String)>) -> Result<Self, SyncError> {
         let mut config = SyncConfig::default();
         for (key, value) in vars {
-            if key == "DISCORD_TOKEN" {
+            if key == BOT_TOKEN_VAR {
                 config.token = value;
-            } else if key == "DISCORD_APPLICATION_ID" {
+            } else if key == APPLICATION_ID_VAR {
                 config.application_id = value;
             } else if let Some(scope) = key.strip_prefix(SCOPE_PREFIX) {
                 let guilds = value
@@ -149,12 +150,12 @@ impl SyncConfig {
             }
         }
         if config.token.is_empty() {
-            return Err(SyncError::Config("DISCORD_TOKEN is not set".into()));
+            return Err(SyncError::Config(format!("{BOT_TOKEN_VAR} is not set")));
         }
         if config.application_id.is_empty() {
-            return Err(SyncError::Config(
-                "DISCORD_APPLICATION_ID is not set".into(),
-            ));
+            return Err(SyncError::Config(format!(
+                "{APPLICATION_ID_VAR} is not set"
+            )));
         }
         Ok(config)
     }

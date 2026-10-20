@@ -9,15 +9,7 @@ publish = false
 
 [dependencies]
 composure = { workspace = true, features = ["macros", "tier1"] }
-composure_adapter_cloudflare = { workspace = true, optional = true }
-composure_adapter_tokio = { workspace = true, optional = true }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
-
-[features]
-## `Vars` for the Cloudflare `Worker` State
-cloudflare = ["dep:composure_adapter_cloudflare"]
-## `Vars` for the tokio `Host` State
-tokio = ["dep:composure_adapter_tokio"]
 
 [dev-dependencies]
 ed25519-dalek = "3.0.0"

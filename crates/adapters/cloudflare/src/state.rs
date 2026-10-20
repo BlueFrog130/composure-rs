@@ -1,17 +1,28 @@
 use std::{ops::Deref, sync::Arc};
 
 use composure::{
-    adapter::{APPLICATION_ID_VAR as APPLICATION_ID, BOT_TOKEN_VAR as BOT_TOKEN_SECRET},
-    command::{BackgroundWork, HandlerError, Platform},
+    Credentials, CredentialsError,
+    command::{BackgroundWork, HandlerError, HasData, Platform},
+    credentials::BOT_TOKEN_VAR,
     rest::BotClient,
-    types::Snowflake,
 };
 use worker::{Context, Env, send::SendWrapper};
 
 use crate::FetchTransport;
 
-/// A Bot Client outside Interactions (cron triggers, queues, ...): the `DISCORD_TOKEN` secret and
-/// the `DISCORD_APPLICATION_ID` var (or secret), over [`FetchTransport`].
+/// The [`Credentials`] from the Worker's vars and secrets by their conventional names:
+/// `DISCORD_PUBLIC_KEY` (required), `DISCORD_TOKEN` and `DISCORD_APPLICATION_ID` (optional). What
+/// [`CloudflareInteractionBot`](crate::CloudflareInteractionBot) reads unless given
+/// [`with_credentials`](crate::CloudflareInteractionBot::with_credentials).
+pub fn credentials(env: &Env) -> Result<Credentials, CredentialsError> {
+    // `var` reads secrets too
+    Credentials::from_lookup(|name| env.var(name).ok().map(|var| var.to_string()))
+}
+
+/// A Bot Client outside Interactions (cron triggers, queues, ...) from [`credentials`]: the
+/// `DISCORD_TOKEN` secret and the `DISCORD_APPLICATION_ID` var (or secret), over
+/// [`FetchTransport`]. With Credentials loaded another way, use
+/// [`Credentials::bot_client`]`(FetchTransport)`.
 ///
 /// ```ignore
 /// #[event(scheduled)]
@@ -21,35 +32,65 @@ use crate::FetchTransport;
 /// }
 /// ```
 pub fn bot_client(env: &Env) -> worker::Result<BotClient<FetchTransport>> {
-    let token = env.secret(BOT_TOKEN_SECRET)?.to_string();
-    let application_id = env
-        .var(APPLICATION_ID)
-        .map(|var| var.to_string())
-        .or_else(|_| env.secret(APPLICATION_ID).map(|secret| secret.to_string()))?;
-    let application_id: Snowflake = application_id
-        .parse()
-        .map_err(|_| worker::Error::RustError(format!("{APPLICATION_ID} is not an id")))?;
-    Ok(BotClient::new(FetchTransport, &token, application_id))
+    credentials(env)
+        .map_err(|e| worker::Error::RustError(e.to_string()))?
+        .bot_client(FetchTransport)
+        .ok_or_else(|| {
+            worker::Error::RustError(
+                "a Bot Client needs DISCORD_TOKEN and DISCORD_APPLICATION_ID".into(),
+            )
+        })
 }
 
-/// The State Commands get on Workers: the worker's [`Env`] (also via `Deref`) plus its
-/// [`Context`], which runs Background Work with `wait_until`. Implements [`Platform`], so
-/// `ctx.client()`, `ctx.bot()` (with a `DISCORD_TOKEN` secret) and `ctx.defer(..)` work.
+/// The State Commands get on Workers: the worker's [`Env`] (also via `Deref`), its [`Context`],
+/// which runs Background Work with `wait_until`, and Bot Data `T` (from
+/// [`with_data`](crate::CloudflareInteractionBot::with_data); [`HasData`]). Implements
+/// [`Platform`], so `ctx.client()`, `ctx.bot()` (with a bot token) and `ctx.defer(..)` work.
 ///
 /// `Send + Sync` like every Platform (ADR 0012): the JS handles are in a [`SendWrapper`], which
 /// is sound because a Workers isolate runs on one thread.
-#[derive(Clone)]
-pub struct Worker {
+pub struct Worker<T = ()> {
     env: SendWrapper<Env>,
     ctx: Arc<SendWrapper<Context>>,
+    bot_token: Option<Arc<str>>,
+    data: Arc<T>,
+}
+
+impl<T> Clone for Worker<T> {
+    fn clone(&self) -> Self {
+        Self {
+            env: self.env.clone(),
+            ctx: self.ctx.clone(),
+            bot_token: self.bot_token.clone(),
+            data: self.data.clone(),
+        }
+    }
 }
 
 impl Worker {
-    /// The State for one request, from the `fetch` event's `env` and `ctx`
+    /// A State outside [`CloudflareInteractionBot`](crate::CloudflareInteractionBot), from an
+    /// event's `env` and `ctx`, with the `DISCORD_TOKEN` secret and no Bot Data
     pub fn new(env: Env, ctx: Context) -> Self {
+        let bot_token = env
+            .var(BOT_TOKEN_VAR)
+            .ok()
+            .map(|var| var.to_string().into());
+        Self::from_parts(env, ctx, bot_token, Arc::new(()))
+    }
+}
+
+impl<T> Worker<T> {
+    pub(crate) fn from_parts(
+        env: Env,
+        ctx: Context,
+        bot_token: Option<Arc<str>>,
+        data: Arc<T>,
+    ) -> Self {
         Self {
             env: SendWrapper::new(env),
             ctx: Arc::new(SendWrapper::new(ctx)),
+            bot_token,
+            data,
         }
     }
 
@@ -62,9 +103,14 @@ impl Worker {
     pub fn context(&self) -> &Context {
         &self.ctx
     }
+
+    /// The Bot Data, as built by [`with_data`](crate::CloudflareInteractionBot::with_data)
+    pub fn data(&self) -> &T {
+        &self.data
+    }
 }
 
-impl Deref for Worker {
+impl<T> Deref for Worker<T> {
     type Target = Env;
 
     fn deref(&self) -> &Env {
@@ -72,7 +118,7 @@ impl Deref for Worker {
     }
 }
 
-impl Platform for Worker {
+impl<T: Send + Sync + 'static> Platform for Worker<T> {
     type Transport = FetchTransport;
 
     fn transport(&self) -> FetchTransport {
@@ -88,10 +134,16 @@ impl Platform for Worker {
     }
 
     fn bot_token(&self) -> Option<String> {
-        self.env
-            .secret(BOT_TOKEN_SECRET)
-            .ok()
-            .map(|secret| secret.to_string())
+        self.bot_token.as_deref().map(str::to_owned)
+    }
+}
+
+/// Bot Data: `T`, as built by [`with_data`](crate::CloudflareInteractionBot::with_data)
+impl<T> HasData for Worker<T> {
+    type Data = T;
+
+    fn data(&self) -> &T {
+        &self.data
     }
 }
 

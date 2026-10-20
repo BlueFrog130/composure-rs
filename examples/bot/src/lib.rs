@@ -38,19 +38,3 @@ pub const THEME: Theme = Theme::new()
     events = Events
 )]
 pub struct Bot;
-
-/// Workers vars, from wrangler.jsonc
-#[cfg(feature = "cloudflare")]
-impl Vars for composure_adapter_cloudflare::Worker {
-    fn var(&self, name: &str) -> Option<String> {
-        self.env().var(name).ok().map(|var| var.to_string())
-    }
-}
-
-/// The server's environment variables
-#[cfg(feature = "tokio")]
-impl<T> Vars for composure_adapter_tokio::Host<T> {
-    fn var(&self, name: &str) -> Option<String> {
-        std::env::var(name).ok()
-    }
-}

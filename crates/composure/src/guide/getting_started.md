@@ -149,7 +149,8 @@ async fn fetch(req: Request, env: Env, ctx: Context) -> worker::Result<Response>
 ```
 
 Set the secrets with `wrangler secret put DISCORD_PUBLIC_KEY` (required) and `DISCORD_TOKEN`
-(for the bot client), deploy, and put `https://<worker>.workers.dev/` in the Developer Portal as
+(for the bot client), or load the [Credentials](crate::guide::platforms#credentials) another
+way with `.with_credentials(..)`; deploy, and put `https://<worker>.workers.dev/` in the Developer Portal as
 the Interactions Endpoint URL.
 
 ## A server, with tokio
@@ -166,12 +167,14 @@ async fn main() -> Result<(), composure_adapter_tokio::Error> {
 }
 ```
 
+`from_env` is one way to get the [Credentials](crate::guide::platforms#credentials):
+`TokioInteractionBot::new(credentials)` takes them from anywhere, the `config` crate included.
 It speaks plain HTTP: put it behind a TLS-terminating proxy or tunnel, and use that HTTPS URL as
 the Interactions Endpoint URL.
 
 Discord checks the URL when you save it (a signed Ping, which the Adapter answers), so the bot
-must be running first. See [Platforms](crate::guide::platforms) for State, platform-specific
-Commands and logging.
+must be running first. See [Platforms](crate::guide::platforms) for State, Bot Data (your own
+configuration), platform-specific Commands and logging.
 
 # Syncing Commands
 

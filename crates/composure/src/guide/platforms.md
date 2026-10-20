@@ -4,10 +4,10 @@ HTTP client, running Background Work, secrets) lives in the Adapter and reaches 
 
 | Adapter | State | Background Work | REST transport |
 |---|---|---|---|
-| [`composure_adapter_cloudflare`](https://docs.rs/composure_adapter_cloudflare) | `Worker`: the Worker's `Env` (vars, secrets, KV, D1, ...) and `Context` | `ctx.wait_until`, about 30 s after the response | `fetch` |
-| [`composure_adapter_tokio`](https://docs.rs/composure_adapter_tokio) | `Host<T>`: your data `T` (from `.with_data(..)`, also through `Deref`), the bot token, the HTTP client | a `tokio::spawn`ed task, awaited on shutdown | async `reqwest` |
+| [`composure_adapter_cloudflare`](https://docs.rs/composure_adapter_cloudflare) | `Worker<T>`: the Worker's `Env` (vars, secrets, KV, D1, ..., also through `Deref`), its `Context`, and your Bot Data `T` (from `.with_data(..)`) | `ctx.wait_until`, about 30 s after the response | `fetch` |
+| [`composure_adapter_tokio`](https://docs.rs/composure_adapter_tokio) | `Host<T>`: your Bot Data `T` (from `.with_data(..)`, also through `Deref`), the bot token, the HTTP client | a `tokio::spawn`ed task, awaited on shutdown | async `reqwest` |
 
-Both implement [`Platform`](crate::command::Platform), and answer every request the same way
+Both implement [`Platform`](crate::command::Platform) and [`HasData`](crate::command::HasData), and answer every request the same way
 because both run the shared pipeline in [`adapter`](crate::adapter): `401` for a bad signature,
 `400` for a body that is not an Interaction, the handler's response (or its ephemeral error
 message) as JSON, and responses with files through the callback endpoint then `202`.
@@ -19,41 +19,48 @@ State every Command it lists accepts. Keep Commands as general as they can be:
 
 - `ctx: Ctx` (or no `ctx`) when they only answer
 - `ctx: Ctx<impl Platform>` when they use REST or defer
-- `ctx: Ctx<impl YourTrait>` when they need something from the platform
+- `ctx: Ctx<impl HasData<Data = Config>>` when they read the bot's own configuration
+- `ctx: Ctx<impl YourTrait>` when they need something else from the platform
 
-The last one is how a Command reads configuration without depending on an Adapter: declare a
-trait for what it needs, implement it for each Adapter's State, and for a stand-in in tests.
+# Bot Data
+
+The bot's own configuration and resources (settings, a database pool, ...) are its **Bot
+Data**: one typed value, built once and shared by every Interaction. Each Adapter takes it with
+`.with_data(..)` and hands it to Commands through the State's
+[`HasData`](crate::command::HasData), so a Command reads it the same way on every platform, and
+the bot loads it however that platform likes: `config`, `figment`, `envy` or `std::env` on a
+server, the Worker's vars, secrets or KV on Workers.
 
 ```
-use composure::{command, command::{Ctx, HandlerError}};
+use composure::{command, command::{Ctx, HasData}};
 
-/// What `/greet` needs from the State
-pub trait Vars {
-    fn var(&self, name: &str) -> Option<String>;
+/// The bot's settings
+pub struct Config {
+    pub greeting: String,
 }
 
-/// Greet with the GREETING var
+/// Greet with the configured greeting
 #[command]
-fn greet(ctx: Ctx<impl Vars>) -> Result<String, HandlerError> {
-    let greeting = ctx.state().var("GREETING").ok_or_else(|| HandlerError::new("GREETING is not set"))?;
-    Ok(format!("{greeting} from Composure!"))
+fn greet(ctx: Ctx<impl HasData<Data = Config>>) -> String {
+    format!("{} from Composure!", ctx.state().data().greeting)
 }
 
-// In the bot, per Adapter:
+// Per Adapter:
 //
-// impl Vars for composure_adapter_cloudflare::Worker {
-//     fn var(&self, name: &str) -> Option<String> {
-//         self.env().var(name).ok().map(|var| var.to_string())
-//     }
-// }
+// // tokio: load it any way, e.g. `settings.get::<Config>("bot")?` with `config`
+// TokioInteractionBot::from_env()?.with_handler(Bot).with_data(config)
 //
-// impl<T> Vars for composure_adapter_tokio::Host<T> {
-//     fn var(&self, name: &str) -> Option<String> {
-//         std::env::var(name).ok()
-//     }
-// }
+// // Workers: built from the Env on an isolate's first request, then reused
+// CloudflareInteractionBot::new(req, env, ctx)
+//     .with_handler(Bot)
+//     .with_data(async |env: Env| Ok(Config { greeting: env.var("GREETING")?.to_string() }))
 # fn main() {}
 ```
+
+When one platform's Bot Data holds more than the shared Commands need (a server's own state),
+bound on a part of it, `Ctx<impl HasData<Data: AsRef<Config>>>`, and implement `AsRef<Config>`
+for each Bot Data type (`Config` itself included). In tests, implement `HasData` on the stand-in
+State. Bot Data must be `Send + Sync`; on Workers, bindings (KV, D1, ...) stay on the `Env`.
 
 A bot served on several platforms keeps its shared Commands in one App (or crate) generic like
 this, and each platform's binary lists that App in its own, next to Commands that only work
@@ -87,7 +94,13 @@ Workers run on one thread, but their JS handles are not `Send`: the Adapter's `W
 transport wrap them for you, and a handler awaiting a JS future itself (KV, D1, `fetch`) wraps
 it in `worker::send::SendFuture::new(..)`, or marks a helper `#[worker::send]`.
 
-# Configuration
+# Credentials
+
+What Composure itself needs is the application's [`Credentials`](crate::Credentials): the
+public key, and optionally the bot token and application id. Composure never reads them from
+anywhere itself: build them in code, from the conventional names with
+[`Credentials::from_lookup`](crate::Credentials::from_lookup), or deserialize them with any
+serde loader (fields `public_key`, `bot_token` or `token`, `application_id`).
 
 | Variable | Cloudflare | tokio | |
 |---|---|---|---|
@@ -95,6 +108,26 @@ it in `worker::send::SendFuture::new(..)`, or marks a helper `#[worker::send]`.
 | `DISCORD_TOKEN` | secret | env | The bot token, for [`ctx.bot()`](crate::command::Ctx::bot) |
 | `DISCORD_APPLICATION_ID` | var | env | For a bot client outside Interactions (cron, startup) |
 | `PORT` | | env | Port to serve on (8080) |
+
+Those are the defaults: `TokioInteractionBot::from_env()` and `CloudflareInteractionBot` read
+them. Otherwise, pass `Credentials` loaded another way:
+
+```rust,ignore
+// tokio, with the `config` crate: a `[discord]` table in bot.toml, or DISCORD__PUBLIC_KEY, ...
+let settings = config::Config::builder()
+    .add_source(config::File::with_name("bot"))
+    .add_source(config::Environment::default().separator("__"))
+    .build()?;
+TokioInteractionBot::new(settings.get::<Credentials>("discord")?)?
+
+// Workers: other names, the Secrets Store, ...; loaded on an isolate's first request
+CloudflareInteractionBot::new(req, env, ctx).with_credentials(async |env: Env| {
+    let token = env.secret_store("BOT_TOKEN")?.get().await?.unwrap_or_default();
+    Ok(Credentials::new(&env.var("PUBLIC_KEY")?.to_string())?.with_bot_token(token))
+})
+```
+
+`Debug` on `Credentials` never shows the token.
 
 Webhook Events are served on `/events` (change it with `.with_events_path(..)`), Interactions
 on every other path. The tokio Adapter also answers `GET /health`.
@@ -123,12 +156,15 @@ errors at DEBUG.
 A new platform needs little code: [`adapter`](crate::adapter) does the work every Adapter
 shares, so an Adapter only maps HTTP to it.
 
-1. Implement [`Platform`](crate::command::Platform) on the State: a
+1. Take [`Credentials`](crate::Credentials), and offer a loader for the platform's usual
+   source on top (by the conventional names through
+   [`Credentials::from_lookup`](crate::Credentials::from_lookup)).
+2. Implement [`Platform`](crate::command::Platform) on the State: a
    [`Transport`](crate::rest::Transport) (`send` a [`Request`](crate::rest::Request), `sleep`),
    a way to [`spawn`](crate::command::Platform::spawn) Background Work after the response, and
-   the bot token.
-2. Parse the public key once into a [`PublicKey`](crate::auth::PublicKey) and keep it.
-3. For each request, call
+   the bot token; and [`HasData`](crate::command::HasData) for the Bot Data.
+3. Parse the public key once into a [`PublicKey`](crate::auth::PublicKey) and keep it.
+4. For each request, call
    [`handle_interaction_with_key`](crate::adapter::handle_interaction_with_key) (or
    [`handle_event_with_key`](crate::adapter::handle_event_with_key) on the events path) with the
    two signature headers and the body, and turn the
@@ -137,7 +173,7 @@ shares, so an Adapter only maps HTTP to it.
    [`response()`](crate::adapter::InteractionOutcome::response) as JSON. When the response has
    [files](crate::types::InteractionResponse::files), send it with
    [`send_with_files`](crate::adapter::send_with_files) and answer `202` instead.
-4. Render handler errors with the handler's
+5. Render handler errors with the handler's
    [`theme()`](crate::command::InteractionHandler::theme), as the outcome already does.
 
 The two existing Adapters (`crates/adapters/` in the repository) are a few hundred lines each.

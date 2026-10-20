@@ -3,7 +3,7 @@
 
 use composure::{
     Choice, Ctx, app, autocomplete, command,
-    command::{Ephemeral, HandlerError},
+    command::{Ephemeral, HandlerError, HasData},
     group,
     types::{Embed, Message, User},
 };
@@ -76,20 +76,24 @@ pub fn fruit(#[option("Fruit", autocomplete = fruit_names)] name: &str) -> Strin
     format!("You picked {name}")
 }
 
-/// What `/greet` needs from the State: implemented for each Adapter's State in the crate root
-/// (`Worker` reads wrangler.jsonc vars, `Host` the process environment), a stand-in in tests
-pub trait Vars {
-    fn var(&self, name: &str) -> Option<String>;
+/// The bot's own settings, its Bot Data, loaded by each platform: from wrangler.toml vars on
+/// Workers (`with_data`), from the environment on tokio, part of the server's data there
+pub struct Config {
+    /// What `/greet` says
+    pub greeting: String,
 }
 
-/// Greet with the GREETING var
+/// So a State whose Bot Data is exactly a `Config` serves `/greet` too
+impl AsRef<Config> for Config {
+    fn as_ref(&self) -> &Config {
+        self
+    }
+}
+
+/// Greet with the configured greeting
 #[command]
-pub fn greet(ctx: Ctx<impl Vars>) -> Result<String, HandlerError> {
-    let greeting = ctx
-        .state()
-        .var("GREETING")
-        .ok_or_else(|| HandlerError::new("GREETING is not set"))?;
-    Ok(format!("{greeting} from Composure!"))
+pub fn greet(ctx: Ctx<impl HasData<Data: AsRef<Config>>>) -> String {
+    format!("{} from Composure!", ctx.state().data().as_ref().greeting)
 }
 
 /// Ban a member

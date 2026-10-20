@@ -343,8 +343,6 @@ name = "composure_example_bot"
 version = "0.1.0"
 dependencies = [
  "composure",
- "composure_adapter_cloudflare",
- "composure_adapter_tokio",
  "ed25519-dalek",
  "futures",
  "hex",

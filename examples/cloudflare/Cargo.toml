@@ -18,7 +18,7 @@ path = "src/bin/sync.rs"
 [dependencies]
 composure = { workspace = true, features = ["macros"] }
 composure_adapter_cloudflare = { workspace = true, features = ["tracing"] }
-composure_example_bot = { path = "../bot", features = ["cloudflare"] }
+composure_example_bot = { path = "../bot" }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 worker = "0.8.7"
 

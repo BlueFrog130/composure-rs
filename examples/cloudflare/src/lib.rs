@@ -7,7 +7,7 @@ pub mod notes;
 
 use composure::{app, types::Snowflake};
 use composure_adapter_cloudflare::{CloudflareInteractionBot, bot_client};
-use composure_example_bot::{Bot, THEME};
+use composure_example_bot::{Bot, Config, THEME};
 use notes::Note;
 use tracing::{Instrument, level_filters::LevelFilter};
 use worker::{Context, Env, Request, Response, ScheduleContext, ScheduledEvent, event};
@@ -27,11 +27,17 @@ fn start() {
 async fn fetch(req: Request, env: Env, ctx: Context) -> worker::Result<Response> {
     CloudflareInteractionBot::new(req, env, ctx)
         .with_handler(CloudflareBot)
+        // Bot Data, built on the isolate's first request: the GREETING var from wrangler.toml
+        .with_data(async |env: Env| {
+            Ok(Config {
+                greeting: env.var("GREETING")?.to_string(),
+            })
+        })
         .process()
         .await
 }
 
-/// Cron trigger (`triggers.crons` in wrangler.jsonc): posts a heartbeat to the channel in the
+/// Cron trigger (`triggers.crons` in wrangler.toml): posts a heartbeat to the channel in the
 /// `STATUS_CHANNEL_ID` var, if set, with the Bot Client from `bot_client`
 #[event(scheduled)]
 async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {

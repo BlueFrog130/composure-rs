@@ -67,6 +67,7 @@
 //! - [`rest`]: the REST client over an Adapter's [`Transport`](rest::Transport)
 //! - [`adapter`]: the request pipeline every Adapter shares (validate, parse, dispatch)
 //! - [`auth`]: Ed25519 request signature validation
+//! - [`credentials`]: [`Credentials`], what identifies the application, however the bot loads them
 //!
 //! # Feature flags
 //!
@@ -95,6 +96,7 @@ mod trace;
 pub mod adapter;
 pub mod auth;
 pub mod command;
+pub mod credentials;
 pub mod definition;
 #[cfg(all(feature = "macros", feature = "rest", any(doc, doctest)))]
 pub mod guide;
@@ -103,6 +105,7 @@ pub mod rest;
 pub mod types;
 
 pub use command::Ctx;
+pub use credentials::{Credentials, CredentialsError};
 
 /// Collects Routes into an App, the handler an Adapter serves. See
 /// [Getting started](crate::guide::getting_started) and [Platforms](crate::guide::platforms).

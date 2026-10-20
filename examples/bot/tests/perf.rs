@@ -10,6 +10,7 @@ use std::{
     alloc::{GlobalAlloc, Layout, System},
     cell::Cell,
     hint::black_box,
+    sync::LazyLock,
     time::{Duration, Instant},
 };
 
@@ -18,11 +19,11 @@ use composure::{
     auth::PublicKey,
 };
 use composure::{
-    command::{BackgroundWork, Platform, dispatch},
+    command::{BackgroundWork, HasData, Platform, dispatch},
     rest::{RawResponse, Request, Transport, TransportError},
     types::Interaction,
 };
-use composure_example_bot::{Bot, Vars};
+use composure_example_bot::{Bot, Config};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
 use serde_json::{Value, json};
@@ -88,9 +89,15 @@ impl Transport for NoTransport {
 #[derive(Clone)]
 struct Env;
 
-impl Vars for Env {
-    fn var(&self, _name: &str) -> Option<String> {
-        Some("Howdy".to_string())
+static CONFIG: LazyLock<Config> = LazyLock::new(|| Config {
+    greeting: "Howdy".into(),
+});
+
+impl HasData for Env {
+    type Data = Config;
+
+    fn data(&self) -> &Config {
+        &CONFIG
     }
 }
 

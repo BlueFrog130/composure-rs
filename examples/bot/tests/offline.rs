@@ -3,16 +3,18 @@
 //! and Background Work run on demand.
 
 use std::{
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
     time::Duration,
 };
 
 use composure::adapter::{handle_event, handle_interaction};
 use composure::{
-    command::{BackgroundWork, CommandSetDefinition, HandlerError, InteractionHandler, Platform},
+    command::{
+        BackgroundWork, CommandSetDefinition, HandlerError, HasData, InteractionHandler, Platform,
+    },
     rest::{Method, RawResponse, Request, Transport, TransportError},
 };
-use composure_example_bot::{Bot, THEME, Vars};
+use composure_example_bot::{Bot, Config, THEME};
 use ed25519_dalek::{Signer, SigningKey};
 use futures::executor::block_on;
 use serde_json::{Value, json};
@@ -55,9 +57,15 @@ struct TestEnv {
     work: Arc<Mutex<Vec<BackgroundWork>>>,
 }
 
-impl Vars for TestEnv {
-    fn var(&self, name: &str) -> Option<String> {
-        (name == "GREETING").then(|| "Howdy".to_string())
+static CONFIG: LazyLock<Config> = LazyLock::new(|| Config {
+    greeting: "Howdy".into(),
+});
+
+impl HasData for TestEnv {
+    type Data = Config;
+
+    fn data(&self) -> &Config {
+        &CONFIG
     }
 }
 

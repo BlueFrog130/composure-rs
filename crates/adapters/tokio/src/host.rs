@@ -1,9 +1,9 @@
 use std::{future::Future, ops::Deref, sync::Arc};
 
 use composure::{
-    command::{BackgroundWork, Platform},
+    Credentials,
+    command::{BackgroundWork, HasData, Platform},
     rest::BotClient,
-    types::Snowflake,
 };
 use tokio_util::task::TaskTracker;
 
@@ -23,8 +23,7 @@ pub struct Host<T = ()> {
 
 #[derive(Clone)]
 pub(crate) struct Core {
-    pub(crate) bot_token: Option<String>,
-    pub(crate) application_id: Option<Snowflake>,
+    pub(crate) credentials: Credentials,
     pub(crate) transport: HttpTransport,
     pub(crate) tracker: TaskTracker,
 }
@@ -39,11 +38,10 @@ impl<T> Clone for Host<T> {
 }
 
 impl Host {
-    pub(crate) fn new(bot_token: Option<String>, application_id: Option<Snowflake>) -> Self {
+    pub(crate) fn new(credentials: Credentials) -> Self {
         Self {
             core: Arc::new(Core {
-                bot_token,
-                application_id,
+                credentials,
                 transport: HttpTransport::new(),
                 tracker: TaskTracker::new(),
             }),
@@ -69,7 +67,7 @@ impl<T> Host<T> {
         &self.core.tracker
     }
 
-    /// Your data, as given to `with_data`
+    /// Your data (Bot Data), as given to `with_data`
     pub fn data(&self) -> &T {
         &self.data
     }
@@ -90,11 +88,7 @@ impl<T> Host<T> {
     /// });
     /// ```
     pub fn bot(&self) -> Option<BotClient<HttpTransport>> {
-        Some(BotClient::new(
-            self.transport(),
-            self.core.bot_token.as_deref()?,
-            self.core.application_id?,
-        ))
+        self.core.credentials.bot_client(self.transport())
     }
 
     /// Runs `work` as a task graceful shutdown waits for (up to the grace period), like
@@ -133,6 +127,15 @@ impl<T: Send + Sync + 'static> Platform for Host<T> {
     }
 
     fn bot_token(&self) -> Option<String> {
-        self.core.bot_token.clone()
+        self.core.credentials.bot_token().map(str::to_owned)
+    }
+}
+
+/// Bot Data: `T`, as given to `with_data`
+impl<T> HasData for Host<T> {
+    type Data = T;
+
+    fn data(&self) -> &T {
+        &self.data
     }
 }
