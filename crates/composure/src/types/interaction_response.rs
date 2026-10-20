@@ -214,6 +214,7 @@ impl MessageCallbackData {
     /// A [Components V2](https://discord.com/developers/docs/components/reference) message laid
     /// out by `components`. Leave `content`, `embeds` and `poll` unset: Discord rejects them
     /// alongside [`IS_COMPONENTS_V2`](MessageFlags::IsComponentsV2); use text displays instead.
+    /// Handler responses and deferred edits that set them fail with a [`HandlerError`](crate::command::HandlerError).
     pub fn components_v2(components: Vec<Component>) -> Self {
         MessageCallbackData {
             components: Some(components),

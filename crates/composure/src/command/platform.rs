@@ -3,14 +3,14 @@
 use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::{
-    rest::{BotClient, EditMessage, Error, InteractionClient, Transport},
+    rest::{BotClient, CreateFollowup, EditMessage, Error, InteractionClient, Transport},
     types::{
         ApplicationCommandInteractionData, DataInteraction, InteractionCommon, InteractionResponse,
         Member, MessageComponentData, MessageFlags, ModalSubmitData, Snowflake, User,
     },
 };
 
-use super::{CommandOutput, Ctx, HandlerError, IntoResponse, Theme};
+use super::{CommandOutput, Ctx, HandlerError, IntoResponse, Theme, response::check_components_v2};
 use crate::trace::Instrument;
 
 /// Background Work handed to the Adapter: runs after the response is sent; an `Err` is logged.
@@ -94,12 +94,12 @@ impl<'a, S: Platform, D: Clone + Send + Sync + 'static> Ctx<'a, S, D> {
         F: FnOnce(DeferredCtx<S, D>) -> Fut,
         Fut: Future<Output: CommandOutput> + Send + 'static,
     {
-        self.spawn_completion(work);
+        self.spawn_completion(work, Target::Original);
         Deferred(())
     }
 
     /// Runs `work` as Background Work, then edits the original response with its output
-    fn spawn_completion<F, Fut>(&self, work: F)
+    fn spawn_completion<F, Fut>(&self, work: F, on_error: Target)
     where
         F: FnOnce(DeferredCtx<S, D>) -> Fut,
         Fut: Future<Output: CommandOutput> + Send + 'static,
@@ -117,7 +117,7 @@ impl<'a, S: Platform, D: Clone + Send + Sync + 'static> Ctx<'a, S, D> {
         let span = info_span!("background_work");
         let work = async move {
             debug!("background work started");
-            let result = complete(client, output, theme).await;
+            let result = complete(client, output, theme, on_error).await;
             #[cfg(feature = "tracing")]
             match &result {
                 Ok(()) => debug!("background work done"),
@@ -130,37 +130,75 @@ impl<'a, S: Platform, D: Clone + Send + Sync + 'static> Ctx<'a, S, D> {
     }
 }
 
-/// Background Work's body: awaits the handler's output, then edits the original response with it
-/// (an error as its message). A failed edit, else the handler's error, is the result.
+/// Where Background Work's message goes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Target {
+    /// An edit of the original response: a deferred reply's loading message, or the component's
+    /// message
+    Original,
+    /// An ephemeral follow-up, leaving the component's message (and its state) as it was; an
+    /// error edit would also be rejected on a Components V2 message
+    Followup,
+}
+
+/// Background Work's body: awaits the handler's output, then edits the original response with
+/// it. An error goes where `on_error` says. A failed send, else the handler's error, is the
+/// result.
 async fn complete<T: Transport>(
     client: InteractionClient<T>,
     output: impl Future<Output: CommandOutput> + Send,
     theme: Option<&'static Theme>,
+    on_error: Target,
 ) -> Result<(), HandlerError> {
-    let (mut response, error) = match output.await.into_result() {
-        Ok(response) => (response, None),
-        Err(error) => (error.response_with(theme), Some(error)),
+    let error = match output.await.into_result().and_then(|response| {
+        check_components_v2(&response)?;
+        Ok(response)
+    }) {
+        Ok(response) => return send(&client, response, theme, Target::Original).await,
+        Err(error) => error,
     };
+    send(&client, error.response_with(theme), theme, on_error).await?;
+    Err(error)
+}
+
+/// Themes `response` and sends its message as an edit of the original response or a follow-up
+async fn send<T: Transport>(
+    client: &InteractionClient<T>,
+    mut response: InteractionResponse,
+    theme: Option<&'static Theme>,
+    target: Target,
+) -> Result<(), HandlerError> {
     if let Some(theme) = theme {
         theme.apply(&mut response);
     }
-    if let Some(data) = response.into_message_data() {
-        // Ephemerality was fixed by the deferred reply; edits cannot change it
-        let flags = data
-            .flags
-            .map(|flags| flags - MessageFlags::Ephemeral)
-            .filter(|flags| !flags.is_empty());
-        let edit = EditMessage {
-            flags,
-            ..EditMessage::from(&data)
+    let Some(data) = response.into_message_data() else {
+        return Ok(());
+    };
+    let result = match target {
+        Target::Original => {
+            // Ephemerality was fixed by the deferred reply; edits cannot change it
+            let flags = data
+                .flags
+                .map(|flags| flags - MessageFlags::Ephemeral)
+                .filter(|flags| !flags.is_empty());
+            let edit = EditMessage {
+                flags,
+                ..EditMessage::from(&data)
+            };
+            until_known(client, || client.edit_original(&edit)).await
+        }
+        Target::Followup => {
+            let followup = CreateFollowup::from(&data);
+            until_known(client, || client.create_followup(&followup)).await
+        }
+    };
+    result.map_err(|error| {
+        let action = match target {
+            Target::Original => "editing the original response",
+            Target::Followup => "sending the error follow-up",
         };
-        edit_original(&client, &edit).await.map_err(|error| {
-            HandlerError::new(format_args!(
-                "editing the original response failed: {error}"
-            ))
-        })?;
-    }
-    error.map_or(Ok(()), Err)
+        HandlerError::new(format_args!("{action} failed: {error}"))
+    })
 }
 
 /// Interaction data whose original response is a message that can be updated in place
@@ -177,26 +215,27 @@ mod private {
 
 impl<'a, S: Platform, D: Updatable + Clone + Send + Sync + 'static> Ctx<'a, S, D> {
     /// Acknowledges without a loading message (Discord type 6) and runs `work` as Background
-    /// Work; its output then replaces the message the component is on
+    /// Work; its output then replaces the message the component is on. An error leaves the
+    /// message as it was and is shown in an ephemeral follow-up instead.
     pub fn defer_update<F, Fut>(&self, work: F) -> DeferredUpdate
     where
         F: FnOnce(DeferredCtx<S, D>) -> Fut,
         Fut: Future<Output: CommandOutput> + Send + 'static,
     {
-        self.spawn_completion(work);
+        self.spawn_completion(work, Target::Followup);
         DeferredUpdate(())
     }
 }
 
-/// Retries while Discord has not yet seen the deferred reply: Background Work can start before
-/// the platform finishes sending it
-async fn edit_original<T: Transport>(
+/// Retries `request` while Discord has not yet seen the deferred reply: Background Work can
+/// start before the platform finishes sending it
+async fn until_known<T: Transport, R, Fut: Future<Output = Result<R, Error>>>(
     client: &InteractionClient<T>,
-    message: &EditMessage<'_>,
+    request: impl Fn() -> Fut,
 ) -> Result<(), Error> {
     const ATTEMPTS: u32 = 4;
     for attempt in 1.. {
-        match client.edit_original(message).await {
+        match request().await {
             Err(Error::Api(error)) if error.status == 404 && attempt < ATTEMPTS => {
                 debug!(attempt, "original response not found yet; retrying");
                 client
@@ -485,6 +524,71 @@ mod tests {
         assert_eq!(body["embeds"][0]["color"], Theme::DEFAULT.error);
         assert_eq!(body["embeds"][0]["description"], "nope");
         assert_eq!(body.get("flags"), None);
+    }
+
+    fn component() -> Arc<crate::types::MessageComponentInteraction> {
+        let payload = json!({
+            "id": "2", "application_id": "1", "type": 3, "token": "tok", "version": 1,
+            "user": { "id": "3", "username": "a", "discriminator": "0", "global_name": null, "avatar": null },
+            "data": { "custom_id": "roll", "component_type": 2 },
+        });
+        match serde_json::from_value(payload).unwrap() {
+            Interaction::MessageComponent(interaction) => Arc::new(interaction),
+            _ => unreachable!(),
+        }
+    }
+
+    const FOLLOWUP: &str = "https://discord.com/api/v10/webhooks/1/tok";
+
+    #[test]
+    fn defer_update_errors_are_ephemeral_followups() {
+        let platform = TestPlatform::default();
+        let interaction = component();
+        let ctx = Ctx::new(&interaction, &platform);
+        let _ = ctx.defer_update(async |_| Err::<String, _>(HandlerError::user("nope")));
+        assert_eq!(platform.run().unwrap_err().to_string(), "nope");
+        assert_eq!(
+            platform.edits(),
+            [(
+                FOLLOWUP.to_string(),
+                json!({ "content": "nope", "flags": MessageFlags::Ephemeral.bits() })
+            )]
+        );
+    }
+
+    #[test]
+    fn defer_update_output_edits_the_message() {
+        let platform = TestPlatform::default();
+        let interaction = component();
+        let _ = Ctx::new(&interaction, &platform).defer_update(async |_| "rolled");
+        platform.run().unwrap();
+        assert_eq!(
+            platform.edits(),
+            [(ORIGINAL.to_string(), json!({ "content": "rolled" }))]
+        );
+    }
+
+    #[test]
+    fn components_v2_output_with_content_is_an_error() {
+        let platform = TestPlatform::default();
+        let interaction = interaction();
+        let _ = Ctx::new(&interaction, &platform).defer(async |_| {
+            let mut response =
+                InteractionResponse::respond_with_components(vec![crate::types::Component::text(
+                    "hi",
+                )]);
+            response.message_data_mut().unwrap().content = Some("hi".into());
+            response
+        });
+        let error = platform.run().unwrap_err();
+        assert!(error.to_string().contains("Components V2"), "{error}");
+        assert_eq!(
+            platform.edits(),
+            [(
+                ORIGINAL.to_string(),
+                json!({ "content": "Something went wrong handling this interaction." })
+            )]
+        );
     }
 
     #[test]

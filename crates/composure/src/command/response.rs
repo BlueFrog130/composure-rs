@@ -140,6 +140,38 @@ impl<T: IntoResponse, E: Display + 'static> CommandOutput for Result<T, E> {
     }
 }
 
+/// Fails a Components V2 message that also sets `content`, `embeds` or a `poll`: Discord rejects
+/// it, for an initial response with a bare "This interaction failed". Empty `content` and
+/// `embeds` pass, since an edit clears them that way.
+pub(crate) fn check_components_v2(response: &InteractionResponse) -> Result<(), HandlerError> {
+    let Some(data) = response.message_data() else {
+        return Ok(());
+    };
+    if !data.is_components_v2() {
+        return Ok(());
+    }
+    let field = if data
+        .content
+        .as_ref()
+        .is_some_and(|content| !content.is_empty())
+    {
+        "content"
+    } else if data
+        .embeds
+        .as_ref()
+        .is_some_and(|embeds| !embeds.is_empty())
+    {
+        "embeds"
+    } else if data.poll.is_some() {
+        "a poll"
+    } else {
+        return Ok(());
+    };
+    Err(HandlerError::new(format_args!(
+        "a Components V2 message cannot have {field}; use text displays instead"
+    )))
+}
+
 /// A [`HandlerError`] as is, keeping its kind; anything else as a generic Handler error.
 /// The type check is resolved at compile time.
 pub(crate) fn into_handler_error<E: Display + 'static>(error: E) -> HandlerError {

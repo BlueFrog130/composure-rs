@@ -78,7 +78,9 @@ fn census(ctx: Ctx<impl Platform>) -> Ephemeral<Deferred> {
 
 For components (and modals opened from one),
 [`ctx.defer_update(work)`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.defer_update) acknowledges without any visible
-loading state and then replaces the message the component is on with `work`'s output:
+loading state and then replaces the message the component is on with `work`'s output. If `work`
+fails, the message is left as it was (buttons and state intact) and the error is shown in an
+ephemeral follow-up instead:
 
 ```rust
 use std::time::Duration;
