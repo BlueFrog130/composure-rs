@@ -15,7 +15,7 @@ members = [
 
 [workspace.package]
 # The published crates share one version, bumped by knope from .changeset/ (see knope.toml)
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.88"
 license = "Apache-2.0"
@@ -24,12 +24,12 @@ homepage = "https://github.com/BlueFrog130/composure-rs"
 
 # The published crates, as they depend on each other; `version` is kept in step by knope
 [workspace.dependencies]
-composure = { path = "crates/composure", version = "0.1.0" }
-composure_macros = { path = "crates/macros", version = "0.1.0" }
-composure_commands = { path = "crates/commands", version = "0.1.0" }
-composure_sync = { path = "crates/sync", version = "0.1.0" }
-composure_adapter_cloudflare = { path = "crates/adapters/cloudflare", version = "0.1.0" }
-composure_adapter_tokio = { path = "crates/adapters/tokio", version = "0.1.0" }
+composure = { path = "crates/composure", version = "0.1.1" }
+composure_macros = { path = "crates/macros", version = "0.1.1" }
+composure_commands = { path = "crates/commands", version = "0.1.1" }
+composure_sync = { path = "crates/sync", version = "0.1.1" }
+composure_adapter_cloudflare = { path = "crates/adapters/cloudflare", version = "0.1.1" }
+composure_adapter_tokio = { path = "crates/adapters/tokio", version = "0.1.1" }
 
 [profile.release]
 lto = true
