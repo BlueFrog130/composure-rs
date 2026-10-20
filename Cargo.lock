@@ -267,7 +267,7 @@ dependencies = [
 
 [[package]]
 name = "composure"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bitflags",
  "composure_macros",
@@ -287,7 +287,7 @@ dependencies = [
 
 [[package]]
 name = "composure_adapter_cloudflare"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "composure",
  "futures",
@@ -300,7 +300,7 @@ dependencies = [
 
 [[package]]
 name = "composure_adapter_tokio"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "composure",
@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "composure_commands"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "composure",
  "serde",
@@ -387,7 +387,7 @@ dependencies = [
 
 [[package]]
 name = "composure_macros"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "composure",
  "futures",
@@ -402,7 +402,7 @@ dependencies = [
 
 [[package]]
 name = "composure_sync"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "cliclack",
