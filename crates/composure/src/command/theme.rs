@@ -24,7 +24,7 @@ use crate::types::{Embed, EmbedAuthor, EmbedFooter, InteractionResponse};
 /// `error`-colored embed. Wrap a response in [`Unthemed`](super::Unthemed) to send it as is.
 /// Messages sent through REST are never changed: build them with the helpers.
 ///
-/// See the [Themes chapter](crate::guide::theming) of the guide.
+/// See the [Themes chapter](https://bluefrog130.github.io/composure-rs/theming.html) of the guide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Theme {
     /// Embeds without a semantic color, auto-filled embeds and container accents (`0xRRGGBB`)

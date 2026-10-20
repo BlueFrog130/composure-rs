@@ -21,7 +21,7 @@ talking to your bot.
 [![WASM](https://img.shields.io/badge/target-wasm32-654FF0?logo=webassembly&logoColor=white)](https://webassembly.org/)
 [![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 
-[Guide](https://docs.rs/composure/latest/composure/guide/index.html) ·
+[Guide](https://bluefrog130.github.io/composure-rs/) ·
 [API docs](https://docs.rs/composure) ·
 [Examples](https://github.com/BlueFrog130/composure-rs/tree/main/examples) ·
 [Crates](#crates)
@@ -111,7 +111,7 @@ pub fn Card(title: String, likes: u32) -> View {
 ```
 
 Clicking **Like** re-renders the message with new Props. Every Discord component has a tag,
-and every tag's attributes are [documented](https://docs.rs/composure/latest/composure/guide/views/index.html#tag-reference).
+and every tag's attributes are [documented](https://bluefrog130.github.io/composure-rs/views.html#tag-reference).
 
 ### Forms that arrive typed
 
@@ -186,7 +186,7 @@ cargo add composure_adapter_cloudflare   # or composure_adapter_tokio
 cargo add composure_sync                 # in a host-only `sync` binary
 ```
 
-Then follow [Getting started](https://docs.rs/composure/latest/composure/guide/getting_started/index.html):
+Then follow [Getting started](https://bluefrog130.github.io/composure-rs/getting_started.html):
 it takes you from an empty crate to a deployed bot.
 
 ## Crates
@@ -206,7 +206,7 @@ Crypto signature checks), so a Worker only ships what it uses. See
 
 ## Learn more
 
-- **[The guide](https://docs.rs/composure/latest/composure/guide/index.html)**: commands,
+- **[The guide](https://bluefrog130.github.io/composure-rs/)**: commands,
   responses, components and modals, Views, themes, REST and deferring, Webhook Events,
   platforms, testing. Every example in it is compiled and tested.
 - **[Examples](https://github.com/BlueFrog130/composure-rs/tree/main/examples)**: one bot using

@@ -15,8 +15,8 @@
 //! | [`rsx!`](macro@rsx) | Markup for message and modal layouts |
 //! | [`#[view]`](macro@view) | A layout rendered from Props, with inline handlers |
 //!
-//! The [Composure guide](https://docs.rs/composure/latest/composure/guide/index.html) explains
-//! each in depth; [Views](https://docs.rs/composure/latest/composure/guide/views/index.html#tag-reference)
+//! The [Composure guide](https://bluefrog130.github.io/composure-rs/) explains
+//! each in depth; [Views](https://bluefrog130.github.io/composure-rs/views.html#tag-reference)
 //! lists every `rsx!` tag and attribute.
 
 #![forbid(unsafe_code)]

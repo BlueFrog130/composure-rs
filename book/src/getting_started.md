@@ -1,7 +1,9 @@
+# Getting started
+
 From an empty crate to a bot answering `/hello`: define Commands, collect them in an App, serve
 the App with an Adapter, and sync its Commands with Discord.
 
-# How a bot works
+## How a bot works
 
 Discord sends every Interaction (a slash Command, a button click, a modal submit, an
 autocomplete request) as a signed HTTP `POST` to the bot's **Interactions Endpoint URL**. The
@@ -12,7 +14,7 @@ are cheap and start fast: a serverless platform like Cloudflare Workers, or any 
 Composure splits this in three:
 
 - **Your bot**, written against `composure`: Commands and handlers collected into an
-  [`#[app]`](crate::app). Platform-agnostic.
+  [`#[app]`](https://docs.rs/composure/latest/composure/attr.app.html). Platform-agnostic.
 - **An Adapter**, which serves the App on one platform: it reads the request, validates the
   signature, dispatches to the App, and writes the response.
   [`composure_adapter_cloudflare`](https://docs.rs/composure_adapter_cloudflare) and
@@ -20,7 +22,7 @@ Composure splits this in three:
 - **Sync** ([`composure_sync`](https://docs.rs/composure_sync)), run at deploy time, which
   registers the App's Command Definitions with Discord.
 
-# Setting up
+## Setting up
 
 Create an application in the [Developer Portal](https://discord.com/developers/applications)
 and note its **application id**, **public key** and (under *Bot*) **token**.
@@ -44,12 +46,12 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
 `macros` brings the attribute macros; `tier1` the REST client with the Endpoints most bots need.
-See [feature flags](crate#feature-flags) for the rest; leaving REST out keeps a Worker's bundle
+See [feature flags](https://docs.rs/composure/latest/composure/#feature-flags) for the rest; leaving REST out keeps a Worker's bundle
 smaller.
 
-# A first Command
+## A first Command
 
-```
+```rust
 use composure::{app, command, command::Ctx};
 
 /// Say hello
@@ -66,22 +68,22 @@ pub struct Bot;
 ```
 
 The function is the handler; the doc comment, the name and the parameters are the
-definition Discord shows. [Commands](crate::guide::commands) covers Options, Groups and more.
+definition Discord shows. [Commands](commands.md) covers Options, Groups and more.
 
-# Apps
+## Apps
 
-[`#[app(handlers(..))]`](crate::app) on a unit struct makes an App: the handler an Adapter
+[`#[app(handlers(..))]`](https://docs.rs/composure/latest/composure/attr.app.html) on a unit struct makes an App: the handler an Adapter
 serves and the set of Commands Sync registers. It lists, in any order and mix:
 
-- Commands ([`#[command]`](macro@crate::command)) and Groups ([`#[group]`](crate::group))
-- component and modal handlers ([`#[component]`](crate::component), [`#[modal]`](crate::modal))
-- Views with inline handlers ([`#[view]`](crate::view))
+- Commands ([`#[command]`](https://docs.rs/composure/latest/composure/attr.command.html)) and Groups ([`#[group]`](https://docs.rs/composure/latest/composure/attr.group.html))
+- component and modal handlers ([`#[component]`](https://docs.rs/composure/latest/composure/attr.component.html), [`#[modal]`](https://docs.rs/composure/latest/composure/attr.modal.html))
+- Views with inline handlers ([`#[view]`](https://docs.rs/composure/latest/composure/attr.view.html))
 - other Apps
 
 Apps nest, so each module of a bot can declare its own App next to its handlers, and the root
 App lists the modules':
 
-```
+```rust
 mod moderation {
     use composure::{app, command, types::User};
 
@@ -117,23 +119,23 @@ const THEME: composure::command::Theme = composure::command::Theme::new().with_p
 # fn main() {}
 ```
 
-`#[app]` also takes `theme = ..` ([Themes](crate::guide::theming)) and `events = ..`
-([Webhook Events](crate::guide::events)).
+`#[app]` also takes `theme = ..` ([Themes](theming.md)) and `events = ..`
+([Webhook Events](events.md)).
 
 Mistakes that would only show up at runtime fail to compile instead: two Commands with the same
 name and type, two handlers with the same `custom_id` prefix, more Commands in a
-[Scope](crate::guide::commands#scopes) than Discord allows, a sub-View with handlers that no App
+[Scope](commands.md#scopes) than Discord allows, a sub-View with handlers that no App
 lists, two Apps setting `events`.
 
-An App implements [`InteractionHandler`](crate::command::InteractionHandler) (what Adapters
-serve), [`EventHandler`](crate::command::EventHandler), and
-[`CommandSetDefinition`](crate::command::CommandSetDefinition) (what Sync registers).
+An App implements [`InteractionHandler`](https://docs.rs/composure/latest/composure/command/trait.InteractionHandler.html) (what Adapters
+serve), [`EventHandler`](https://docs.rs/composure/latest/composure/command/trait.EventHandler.html), and
+[`CommandSetDefinition`](https://docs.rs/composure/latest/composure/command/trait.CommandSetDefinition.html) (what Sync registers).
 Interactions nothing in the App handles get a default answer, or go to a fallback set with
-`Bot.with_fallback(handler)` ([Fallback](crate::guide::components#fallback)).
+`Bot.with_fallback(handler)` ([Fallback](components.md#fallback)).
 
-# Serving it
+## Serving it
 
-## Cloudflare Workers
+### Cloudflare Workers
 
 ```rust,ignore
 use composure_adapter_cloudflare::CloudflareInteractionBot;
@@ -149,11 +151,11 @@ async fn fetch(req: Request, env: Env, ctx: Context) -> worker::Result<Response>
 ```
 
 Set the secrets with `wrangler secret put DISCORD_PUBLIC_KEY` (required) and `DISCORD_TOKEN`
-(for the bot client), or load the [Credentials](crate::guide::platforms#credentials) another
+(for the bot client), or load the [Credentials](platforms.md#credentials) another
 way with `.with_credentials(..)`; deploy, and put `https://<worker>.workers.dev/` in the Developer Portal as
 the Interactions Endpoint URL.
 
-## A server, with tokio
+### A server, with tokio
 
 ```rust,ignore
 use composure_adapter_tokio::TokioInteractionBot;
@@ -167,16 +169,16 @@ async fn main() -> Result<(), composure_adapter_tokio::Error> {
 }
 ```
 
-`from_env` is one way to get the [Credentials](crate::guide::platforms#credentials):
+`from_env` is one way to get the [Credentials](platforms.md#credentials):
 `TokioInteractionBot::new(credentials)` takes them from anywhere, the `config` crate included.
 It speaks plain HTTP: put it behind a TLS-terminating proxy or tunnel, and use that HTTPS URL as
 the Interactions Endpoint URL.
 
 Discord checks the URL when you save it (a signed Ping, which the Adapter answers), so the bot
-must be running first. See [Platforms](crate::guide::platforms) for State, Bot Data (your own
+must be running first. See [Platforms](platforms.md) for State, Bot Data (your own
 configuration), platform-specific Commands and logging.
 
-# Syncing Commands
+## Syncing Commands
 
 Discord only shows Commands it has stored. [`composure_sync`](https://docs.rs/composure_sync)
 makes the stored ones match the App: from a host-only binary in your crate,
@@ -196,17 +198,17 @@ It prints a plan (Commands to create, update and delete, per target), and applie
 confirmation; `--dry-run`, `--check` (CI drift check), `--yes` (CI deploys) and `--guild <id>`
 (send everything to one test server) adjust that.
 
-Commands with a [Scope](crate::guide::commands#scopes) go to the guilds listed for it:
+Commands with a [Scope](commands.md#scopes) go to the guilds listed for it:
 `COMPOSURE_SCOPE_DEV=123,456` for `scope = "dev"`. Sync again whenever a Command's definition
 changes; handlers can change freely without it.
 
 On Workers, keep Sync out of the Worker build: put it in a `[[bin]]` that only builds on the
 host, as the repository's `examples/cloudflare` does.
 
-# Next steps
+## Next steps
 
-- [Commands](crate::guide::commands): Options, Choices, autocomplete, Groups, context menus
-- [Responses](crate::guide::responses): embeds, ephemeral messages, files, errors
-- [Views](crate::guide::views): rich Components V2 messages and modals in markup
-- [REST and deferring](crate::guide::deferring): calling Discord, answering slowly
+- [Commands](commands.md): Options, Choices, autocomplete, Groups, context menus
+- [Responses](responses.md): embeds, ephemeral messages, files, errors
+- [Views](views.md): rich Components V2 messages and modals in markup
+- [REST and deferring](deferring.md): calling Discord, answering slowly
 - The repository's `examples/` hold a complete bot served both ways.

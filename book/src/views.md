@@ -1,11 +1,13 @@
-A View is a message or modal layout written as markup with [`rsx!`](crate::rsx), and
-optionally a function of Props with [`#[view]`](crate::view) whose buttons, selects and modal
-submits are handled inline. Markup builds the same [`types`](crate::types) a hand-written
+# Views
+
+A View is a message or modal layout written as markup with [`rsx!`](https://docs.rs/composure/latest/composure/macro.rsx.html), and
+optionally a function of Props with [`#[view]`](https://docs.rs/composure/latest/composure/attr.view.html) whose buttons, selects and modal
+submits are handled inline. Markup builds the same [`types`](https://docs.rs/composure/latest/composure/types/) a hand-written
 response would, so everything here can also be done with
-[`Component`](crate::types::Component) constructors; markup is shorter, checks placement at
+[`Component`](https://docs.rs/composure/latest/composure/types/enum.Component.html) constructors; markup is shorter, checks placement at
 compile time, and keeps a component next to the code that answers it.
 
-```
+```rust
 use composure::{app, command, rsx, view, command::View};
 
 /// A card that counts its likes; the count is carried in the button's `custom_id`
@@ -47,14 +49,14 @@ message the button is on is re-rendered with them. Nothing is stored anywhere: `
 - [Themes](#themes): where colors come from
 - [Without `#[view]`](#without-view): markup in plain functions, sending Views through REST
 
-# Markup
+## Markup
 
-`rsx!` takes JSX-like markup and evaluates to a [`View`](crate::command::View) (a Components V2
-message) or, when its only root is `<Modal>`, a [`ModalView`](crate::command::ModalView). Both
-implement [`IntoResponse`](crate::command::IntoResponse), so a Command can return them
+`rsx!` takes JSX-like markup and evaluates to a [`View`](https://docs.rs/composure/latest/composure/command/struct.View.html) (a Components V2
+message) or, when its only root is `<Modal>`, a [`ModalView`](https://docs.rs/composure/latest/composure/command/struct.ModalView.html). Both
+implement [`IntoResponse`](https://docs.rs/composure/latest/composure/command/trait.IntoResponse.html), so a Command can return them
 directly.
 
-```
+```rust
 use composure::{command, rsx, command::View};
 
 /// Show a status panel
@@ -73,7 +75,7 @@ fn status() -> View {
 # fn main() {}
 ```
 
-## Tags
+### Tags
 
 PascalCase tags are either built-in (Discord's components, listed in the
 [tag reference](#tag-reference)) or the name of a `#[view]` function placed as a
@@ -98,12 +100,12 @@ A sub-View's markup may also be a single `<Button>` or select meant for a row.
 Discord's limits on counts (40 components in a message, 5 buttons in a row, 25 options in a
 select, ...) are not checked; Discord rejects the response.
 
-## Text
+### Text
 
 String literals are text. Adjacent literals and `{expressions}` join into one
-[`TextDisplay`](crate::types::TextDisplay), so these are the same:
+[`TextDisplay`](https://docs.rs/composure/latest/composure/types/struct.TextDisplay.html), so these are the same:
 
-```
+```rust
 # use composure::rsx;
 # let name = "Ada";
 # let a =
@@ -123,22 +125,22 @@ of a `<Section>`.
 Text cannot go in a `<Row>`. Bare words without quotes are a compile error
 (`put text in quotes`).
 
-## Expressions
+### Expressions
 
 `{expr}` evaluates Rust inside markup. Where components can go, the value is anything
-implementing [`IntoChildren`](crate::command::IntoChildren):
+implementing [`IntoChildren`](https://docs.rs/composure/latest/composure/command/trait.IntoChildren.html):
 
 | Value | Becomes |
 |---|---|
-| `&str`, `String`, `&String`, `char`, integers, floats, [`Snowflake`](crate::types::Snowflake), `format_args!(..)` | text, joined with adjacent text |
-| [`Component`](crate::types::Component) and every component struct ([`Container`](crate::types::Container), [`ButtonComponent`](crate::types::ButtonComponent), ...) | that component |
-| [`View`](crate::command::View), a `#[view]`'s Props | its components, in place |
+| `&str`, `String`, `&String`, `char`, integers, floats, [`Snowflake`](https://docs.rs/composure/latest/composure/types/struct.Snowflake.html), `format_args!(..)` | text, joined with adjacent text |
+| [`Component`](https://docs.rs/composure/latest/composure/types/enum.Component.html) and every component struct ([`Container`](https://docs.rs/composure/latest/composure/types/struct.Container.html), [`ButtonComponent`](https://docs.rs/composure/latest/composure/types/struct.ButtonComponent.html), ...) | that component |
+| [`View`](https://docs.rs/composure/latest/composure/command/struct.View.html), a `#[view]`'s Props | its components, in place |
 | `Option<T>` | nothing for `None` |
 | `Vec<T>`, arrays, iterator adapters (`map`, `filter`, `filter_map`, `flat_map`, `flatten`, `chain`, `take`, `skip`, `rev`, `once`, `vec::IntoIter`) | each item in order |
 
 So lists are a `map`, and conditionals are an `Option`:
 
-```
+```rust
 use composure::{rsx, command::View};
 
 fn shopping(items: &[&str], note: Option<&str>) -> View {
@@ -156,10 +158,10 @@ fn shopping(items: &[&str], note: Option<&str>) -> View {
 Other iterators (`Peekable`, `Zip`, ...) need `.collect::<Vec<_>>()` first.
 
 In text-only places (`<Text>`, a `<Button>`'s label, an `<Option>`'s label) the value is
-anything implementing [`IntoText`](crate::command::IntoText): strings, numbers, `Snowflake`, and
+anything implementing [`IntoText`](https://docs.rs/composure/latest/composure/command/trait.IntoText.html): strings, numbers, `Snowflake`, and
 `Option`s of them. Call `.to_string()` on other `Display` types.
 
-## Attributes
+### Attributes
 
 Attributes are written `name=value`; the value is a Rust expression (a literal, a variable, a
 call, a block `{..}`). A bare attribute is `true`: `<Button disabled>` is
@@ -170,7 +172,7 @@ Apart from the few attributes a tag handles itself (marked *special* in the
 the field of the same name on the component's struct. That means:
 
 - every public field of the component's type is an attribute, including `id`
-- the value is converted with [`IntoAttr`](crate::command::IntoAttr): a `&str` works for a
+- the value is converted with [`IntoAttr`](https://docs.rs/composure/latest/composure/command/trait.IntoAttr.html): a `&str` works for a
   `String` or `Option<String>` field, a `T` for an `Option<T>` field, `"👍"` for an emoji
 - an attribute the type does not have is a compile error naming the type
   (`no field `colour` on type `Container``)
@@ -178,16 +180,16 @@ the field of the same name on the component's struct. That means:
 Values that contain `<..>` (generics, closures with typed parameters) must be wrapped in
 braces, or the markup parser reads `<` as a tag: `options={Vec::<SelectOption>::new()}`.
 
-## Comments
+### Comments
 
 `<!-- comments -->` are allowed anywhere and produce nothing.
 
-# View functions
+## View functions
 
 `#[view]` turns a function returning `View` (or `ModalView`) into a component of its own. The
 parameters are its Props, which must be owned types:
 
-```
+```rust
 use composure::{rsx, view, command::View};
 
 /// A labeled progress bar
@@ -210,11 +212,11 @@ The macro keeps the function body and adds:
   `Progress { label, done, total, note }`. Returning it from a Command (or a handler) sends the
   View; `Progress { .. }.render()` gives the `View` itself.
 - a **builder**, `Progress::builder().label("Build").done(3).build()`, which is what markup
-  uses. Setters take anything [`IntoAttr`](crate::command::IntoAttr) converts, and leaving out
+  uses. Setters take anything [`IntoAttr`](https://docs.rs/composure/latest/composure/command/trait.IntoAttr.html) converts, and leaving out
   a required Prop is a compile error.
-- [`IntoResponse`](crate::command::IntoResponse), [`IntoChildren`](crate::command::IntoChildren),
-  [`Rerender`](crate::command::Rerender) for the Props, and the
-  [`ViewHandler`](crate::command::ViewHandler) running its inline handlers.
+- [`IntoResponse`](https://docs.rs/composure/latest/composure/command/trait.IntoResponse.html), [`IntoChildren`](https://docs.rs/composure/latest/composure/command/trait.IntoChildren.html),
+  [`Rerender`](https://docs.rs/composure/latest/composure/command/trait.Rerender.html) for the Props, and the
+  [`ViewHandler`](https://docs.rs/composure/latest/composure/command/trait.ViewHandler.html) running its inline handlers.
 
 Props:
 
@@ -225,11 +227,11 @@ Props:
 | `#[prop(default = expr)] name: T` | optional, `expr` when left out |
 | `children: View` | the tag's children (see [below](#children)); not usable in handlers |
 
-## Sub-Views
+### Sub-Views
 
 A View is placed in markup as a tag, with its Props as attributes:
 
-```
+```rust
 # use composure::{rsx, view, command::View};
 # #[view]
 # pub fn Progress(label: String, done: u32, #[prop(default = 10)] total: u32, note: Option<String>) -> View {
@@ -252,11 +254,11 @@ Tag names may be paths (`<widgets::Progress done=1 label="x"/>`). A sub-View wit
 handlers must be listed in the same `#[app]` as the View placing it (or in any App of the tree);
 forgetting it is a compile error from `#[app]`.
 
-## Children
+### Children
 
 A `children: View` Prop receives the markup between the tags, which lets a View wrap others:
 
-```
+```rust
 use composure::{rsx, view, command::View};
 
 /// A titled frame
@@ -281,7 +283,7 @@ let view = rsx! {
 # }
 ```
 
-# Inline handlers
+## Inline handlers
 
 An `on:<event>:<name>=closure` attribute gives a component its own handler, inside the View that
 renders it. The macro turns each into an arm of the View's handler, routed by the `custom_id`
@@ -291,14 +293,14 @@ renders it. The macro turns each into an arm of the View's handler, routed by th
   `#[view(prefix = "c")]` to save characters
 - `<name>` is the handler's name, unique within the View
 - `<state>` holds the Props the closure uses, found by reading its body (`format!("{name}")`
-  counts), encoded with [`custom_id`](crate::command::custom_id)
+  counts), encoded with [`custom_id`](https://docs.rs/composure/latest/composure/command/custom_id/)
 
 When the component is used, the Props are decoded and the closure runs with them in scope. Its
 return value answers the Interaction:
 
-- a View's Props or a [`View`](crate::command::View) (or a `Result` of one) **re-renders** the
-  message the component is on (an [`Update`](crate::command::Update))
-- anything else a Command can return ([`CommandOutput`](crate::command::CommandOutput)): a new
+- a View's Props or a [`View`](https://docs.rs/composure/latest/composure/command/struct.View.html) (or a `Result` of one) **re-renders** the
+  message the component is on (an [`Update`](https://docs.rs/composure/latest/composure/command/struct.Update.html))
+- anything else a Command can return ([`CommandOutput`](https://docs.rs/composure/latest/composure/command/trait.CommandOutput.html)): a new
   message, `Ephemeral(..)`, a `ModalView` to open a modal, `ctx.defer_update(..)`, ...
 
 | Event | Tags | Closure |
@@ -307,13 +309,13 @@ return value answers the Interaction:
 | `on:select:name` | selects | `move \|ctx, values: T\| ..` |
 | `on:submit:name` | `<Modal>` | `move \|ctx, field: T, ..\| ..` ([Modal Views](#modal-views)) |
 
-`ctx` is a [`ComponentCtx`](crate::command::ComponentCtx) (a
-[`ModalCtx`](crate::command::ModalCtx) for submits); write `_` when unused. Untyped, it works with
+`ctx` is a [`ComponentCtx`](https://docs.rs/composure/latest/composure/command/type.ComponentCtx.html) (a
+[`ModalCtx`](https://docs.rs/composure/latest/composure/command/type.ModalCtx.html) for submits); write `_` when unused. Untyped, it works with
 any State; annotate it to require one, as Commands do:
 `{move |ctx: ComponentCtx<impl Platform>| ..}` (braced, because of the `<..>`). Closures may be
 `async`.
 
-```
+```rust
 use composure::{rsx, view, command::{ComponentCtx, Ephemeral, Platform, View}};
 
 #[view]
@@ -335,7 +337,7 @@ pub fn Vote(question: String, yes: u32, no: u32) -> View {
 Things to know:
 
 - The `custom_id` is limited to 100 characters, prefix and handler name included. Past that,
-  answering with the View fails with a [`HandlerError`](crate::command::HandlerError) (the
+  answering with the View fails with a [`HandlerError`](https://docs.rs/composure/latest/composure/command/struct.HandlerError.html) (the
   error rides inside the View until then). Keep captured Props small: ids and counters, not
   text.
 - Captured Props must implement `serde::Serialize` and `DeserializeOwned`; integers, `bool`,
@@ -343,16 +345,16 @@ Things to know:
 - A `children` Prop cannot be captured: it is markup, not data.
 - List every View with inline handlers in an `#[app]`; that is how its `custom_id`s are routed.
 
-## Selects
+### Selects
 
 An `on:select` closure takes the selected values as its second parameter, typed with
-[`SelectValue`](crate::command::SelectValue): `String`, `Snowflake`, a resolved
-[`User`](crate::types::User), [`Role`](crate::types::Role) or
-[`PartialChannel`](crate::types::PartialChannel), or a `#[derive(Choice)]` enum, each alone
+[`SelectValue`](https://docs.rs/composure/latest/composure/command/trait.SelectValue.html): `String`, `Snowflake`, a resolved
+[`User`](https://docs.rs/composure/latest/composure/types/struct.User.html), [`Role`](https://docs.rs/composure/latest/composure/types/struct.Role.html) or
+[`PartialChannel`](https://docs.rs/composure/latest/composure/types/struct.PartialChannel.html), or a `#[derive(Choice)]` enum, each alone
 (one required selection), in an `Option` (none allowed) or a `Vec` (several; `max` then defaults
 to every option).
 
-```
+```rust
 use composure::{Choice, rsx, view, command::View};
 
 #[derive(Choice, Debug)]
@@ -373,22 +375,22 @@ pub fn Pizza(picked: String) -> View {
 # fn main() {}
 ```
 
-## Handlers defined elsewhere
+### Handlers defined elsewhere
 
 `on:click`, `on:select` and `on:submit` without a name point at a
-[`#[component]`](crate::component) or [`#[modal]`](crate::modal) handler instead, with the
+[`#[component]`](https://docs.rs/composure/latest/composure/attr.component.html) or [`#[modal]`](https://docs.rs/composure/latest/composure/attr.modal.html) handler instead, with the
 state to put in its `custom_id`: `on:click=vote(poll, true)` sets
 `custom_id = vote::custom_id(poll, true)`, and `on:click=refresh` calls
 `refresh::custom_id()`. These work in any `rsx!`, not only in `#[view]`s. Or set `custom_id=..`
 yourself and answer it however you like.
 
-# Modal Views
+## Modal Views
 
 A `#[view]` returning `ModalView` with a `<Modal>` root is a form. With an inline `on:submit`,
 each input's `name` matches one of the closure's parameters, which receive the submitted values
 typed:
 
-```
+```rust
 use composure::{Choice, app, command, rsx, view, command::{Ephemeral, ModalView}};
 
 #[derive(Choice, Debug)]
@@ -426,7 +428,7 @@ pub struct Bot;
 ```
 
 Returning the Props opens the modal. The parameter types (anything implementing
-[`ModalValue`](crate::command::ModalValue)) decide what each input requires, and mismatches are
+[`ModalValue`](https://docs.rs/composure/latest/composure/command/trait.ModalValue.html)) decide what each input requires, and mismatches are
 compile errors:
 
 | Type | Required | Inputs |
@@ -435,30 +437,30 @@ compile errors:
 | `Option<String>`, `Option<Choice>` | no | the same |
 | `bool` | no (checkboxes never are) | `<Checkbox>` |
 | `Snowflake`, `User`, `Role`, `PartialChannel` | yes | entity selects |
-| [`Attachment`](crate::types::Attachment) | yes | `<FileUpload>` |
+| [`Attachment`](https://docs.rs/composure/latest/composure/types/struct.Attachment.html) | yes | `<FileUpload>` |
 | `Option<..>` of those | no | the same |
 | `Vec<..>` of those, of `String`, of a Choice | no; several allowed | selects, `<CheckboxGroup>`, `<FileUpload>` |
 
 Every input needs a parameter and every parameter an input. Inputs in a modal never take
 `on:` attributes of their own; the `<Modal>`'s submit reads them all.
 
-A modal can also be submitted to a [`#[modal]`](crate::modal) handler (`on:submit=rename(id)`)
+A modal can also be submitted to a [`#[modal]`](https://docs.rs/composure/latest/composure/attr.modal.html) handler (`on:submit=rename(id)`)
 or answered by `custom_id=..`; inputs then need no matching parameters, and their `name` is the
 `custom_id` the handler reads them by.
 
 Modals have no color or accent, so [Themes](#themes) do not apply to them.
 
-# Tag reference
+## Tag reference
 
 Each tag builds the type named in its heading; its attributes are that type's public fields
 plus the *special* ones listed. `id` (an `i32`, unique within the message) is accepted by every
 tag except `<Modal>`, `<Item>` and `<Option>`, and is omitted below.
 
-## Layout
+### Layout
 
-### `<Container>`
+#### `<Container>`
 
-[`Container`](crate::types::Container): a frame around other components, like an embed, with an
+[`Container`](https://docs.rs/composure/latest/composure/types/struct.Container.html): a frame around other components, like an embed, with an
 optional accent bar. Top level only. Children: text, `<Text>`, `<Section>`, `<Gallery>`,
 `<File>`, `<Separator>`, `<Row>`, `{..}`.
 
@@ -471,9 +473,9 @@ optional accent bar. Top level only. Children: text, `<Text>`, `<Section>`, `<Ga
 <Container accent_color=0x5865F2 spoiler> .. </Container>
 ```
 
-### `<Section>`
+#### `<Section>`
 
-[`Section`](crate::types::Section): 1-3 text displays beside an accessory. Children: text and
+[`Section`](https://docs.rs/composure/latest/composure/types/struct.Section.html): 1-3 text displays beside an accessory. Children: text and
 `<Text>`, plus exactly one `<Button>` or `<Thumbnail>`, which becomes the accessory wherever it
 is placed among the children.
 
@@ -489,40 +491,40 @@ is placed among the children.
 </Section>
 ```
 
-### `<Text>` (alias `<TextDisplay>`)
+#### `<Text>` (alias `<TextDisplay>`)
 
-[`TextDisplay`](crate::types::TextDisplay): markdown. Children: text and `{..}` only. Bare text
+[`TextDisplay`](https://docs.rs/composure/latest/composure/types/struct.TextDisplay.html): markdown. Children: text and `{..}` only. Bare text
 outside a `<Text>` makes one too.
 
 | Attribute | Type | |
 |---|---|---|
 | `content` | `String` | *Special.* The text, instead of children |
 
-### `<Separator>`
+#### `<Separator>`
 
-[`Separator`](crate::types::Separator): vertical space, with a divider line by default. No
+[`Separator`](https://docs.rs/composure/latest/composure/types/struct.Separator.html): vertical space, with a divider line by default. No
 children.
 
 | Attribute | Type | |
 |---|---|---|
 | `small` / `large` | flag | *Special.* Small (default) or large spacing |
-| `spacing` | [`SeparatorSpacing`](crate::types::SeparatorSpacing) | The same, as a value |
+| `spacing` | [`SeparatorSpacing`](https://docs.rs/composure/latest/composure/types/enum.SeparatorSpacing.html) | The same, as a value |
 | `divider` | `bool` | `false` for space only, no line |
 
 ```text
 <Separator large divider=false/>
 ```
 
-### `<Row>` (alias `<ActionRow>`)
+#### `<Row>` (alias `<ActionRow>`)
 
-[`ActionRow`](crate::types::ActionRow): up to 5 `<Button>`s, or one select. Children: those and
+[`ActionRow`](https://docs.rs/composure/latest/composure/types/struct.ActionRow.html): up to 5 `<Button>`s, or one select. Children: those and
 `{..}`; no text.
 
-## Content
+### Content
 
-### `<Thumbnail>`
+#### `<Thumbnail>`
 
-[`Thumbnail`](crate::types::Thumbnail): a small image, as a `<Section>`'s accessory only. No
+[`Thumbnail`](https://docs.rs/composure/latest/composure/types/struct.Thumbnail.html): a small image, as a `<Section>`'s accessory only. No
 children.
 
 | Attribute | Type | |
@@ -531,14 +533,14 @@ children.
 | `description` | `String` | Alt text, max 1024 characters |
 | `spoiler` | `bool` | Blurs the image until clicked |
 
-### `<Gallery>` (alias `<MediaGallery>`)
+#### `<Gallery>` (alias `<MediaGallery>`)
 
-[`MediaGallery`](crate::types::MediaGallery): a grid of 1-10 images and videos. Children:
-`<Item>`s, and `{..}` of [`MediaGalleryItem`](crate::types::MediaGalleryItem)s.
+[`MediaGallery`](https://docs.rs/composure/latest/composure/types/struct.MediaGallery.html): a grid of 1-10 images and videos. Children:
+`<Item>`s, and `{..}` of [`MediaGalleryItem`](https://docs.rs/composure/latest/composure/types/struct.MediaGalleryItem.html)s.
 
-### `<Item>` (alias `<MediaGalleryItem>`)
+#### `<Item>` (alias `<MediaGalleryItem>`)
 
-[`MediaGalleryItem`](crate::types::MediaGalleryItem): one image or video in a `<Gallery>`. No
+[`MediaGalleryItem`](https://docs.rs/composure/latest/composure/types/struct.MediaGalleryItem.html): one image or video in a `<Gallery>`. No
 children.
 
 | Attribute | Type | |
@@ -555,35 +557,35 @@ children.
 </Gallery>
 ```
 
-### `<File>`
+#### `<File>`
 
-[`FileComponent`](crate::types::FileComponent): a file uploaded with the message, shown inline.
+[`FileComponent`](https://docs.rs/composure/latest/composure/types/struct.FileComponent.html): a file uploaded with the message, shown inline.
 No children. Attach the file to the response with
-[`InteractionResponse::with_file`](crate::types::InteractionResponse::with_file).
+[`InteractionResponse::with_file`](https://docs.rs/composure/latest/composure/types/enum.InteractionResponse.html#method.with_file).
 
 | Attribute | Type | |
 |---|---|---|
 | `url` | `impl Into<String>` | *Special, required.* `attachment://<filename>` |
 | `spoiler` | `bool` | Blurs the file until clicked |
 
-## Interactive
+### Interactive
 
-### `<Button>`
+#### `<Button>`
 
-[`ButtonComponent`](crate::types::ButtonComponent): in a `<Row>`, or as a `<Section>`'s
+[`ButtonComponent`](https://docs.rs/composure/latest/composure/types/struct.ButtonComponent.html): in a `<Row>`, or as a `<Section>`'s
 accessory. Children: the label, as text and `{..}`.
 
 | Attribute | Type | |
 |---|---|---|
 | `primary` / `secondary` / `success` / `danger` | flag | *Special.* The style: blurple, grey (the default), green, red |
-| `style` | [`ButtonStyle`](crate::types::ButtonStyle) | *Special.* The style, as a value |
+| `style` | [`ButtonStyle`](https://docs.rs/composure/latest/composure/types/enum.ButtonStyle.html) | *Special.* The style, as a value |
 | `on:click=handler(state..)` | | *Special.* Answered by a `#[component]` handler ([above](#handlers-defined-elsewhere)) |
 | `on:click:name=closure` | | *Special.* An [inline handler](#inline-handlers); `#[view]` only |
 | `custom_id` | `String` | Answered by whatever handles this `custom_id`; max 100 characters |
 | `url` | `String` | A link button (style `Link`), opening the URL; no `on:click` or `custom_id` |
-| `sku_id` | [`Snowflake`](crate::types::Snowflake) | A premium button (style `Premium`) offering the SKU; no label, emoji, `on:click` or `custom_id` |
+| `sku_id` | [`Snowflake`](https://docs.rs/composure/latest/composure/types/struct.Snowflake.html) | A premium button (style `Premium`) offering the SKU; no label, emoji, `on:click` or `custom_id` |
 | `label` | `String` | *Special.* The label, instead of children; max 80 characters |
-| `emoji` | `&str` or [`PartialEmoji`](crate::types::PartialEmoji) | Shown before the label: `"👍"`, or a custom emoji |
+| `emoji` | `&str` or [`PartialEmoji`](https://docs.rs/composure/latest/composure/types/struct.PartialEmoji.html) | Shown before the label: `"👍"`, or a custom emoji |
 | `disabled` | `bool` | Greyed out, not clickable |
 
 A button needs exactly one of `on:click`, `custom_id`, `url` or `sku_id`.
@@ -597,11 +599,11 @@ A button needs exactly one of `on:click`, `custom_id`, `url` or `sku_id`.
 </Row>
 ```
 
-### `<StringSelect>` (alias `<Select>`)
+#### `<StringSelect>` (alias `<Select>`)
 
-[`StringSelect`](crate::types::StringSelect): a dropdown of up to 25 text options. In a `<Row>`
+[`StringSelect`](https://docs.rs/composure/latest/composure/types/type.StringSelect.html): a dropdown of up to 25 text options. In a `<Row>`
 in messages, or a `<Label>` in modals. Children: `<Option>`s, and `{..}` of
-[`SelectOption`](crate::types::SelectOption)s.
+[`SelectOption`](https://docs.rs/composure/latest/composure/types/struct.SelectOption.html)s.
 
 | Attribute | Type | |
 |---|---|---|
@@ -618,10 +620,10 @@ in messages, or a `<Label>` in modals. Children: `<Option>`s, and `{..}` of
 
 In messages, a select needs `on:select` or `custom_id`.
 
-### `<Option>`
+#### `<Option>`
 
-[`SelectOption`](crate::types::SelectOption) in a select,
-[`GroupOption`](crate::types::GroupOption) in a `<RadioGroup>` or `<CheckboxGroup>`. Children:
+[`SelectOption`](https://docs.rs/composure/latest/composure/types/struct.SelectOption.html) in a select,
+[`GroupOption`](https://docs.rs/composure/latest/composure/types/struct.GroupOption.html) in a `<RadioGroup>` or `<CheckboxGroup>`. Children:
 the label, as text and `{..}`.
 
 | Attribute | Type | |
@@ -629,7 +631,7 @@ the label, as text and `{..}`.
 | `value` | `impl Into<String>` | *Special, required.* What is submitted when chosen; max 100 characters |
 | `label` | `String` | *Special.* The label, instead of children; max 100 characters |
 | `description` | `String` | A second line under the label; max 100 characters |
-| `emoji` | `&str` or [`PartialEmoji`](crate::types::PartialEmoji) | Selects only |
+| `emoji` | `&str` or [`PartialEmoji`](https://docs.rs/composure/latest/composure/types/struct.PartialEmoji.html) | Selects only |
 | `default` | `bool` | Chosen initially |
 
 ```text
@@ -639,18 +641,18 @@ the label, as text and `{..}`.
 </StringSelect>
 ```
 
-### `<UserSelect>`, `<RoleSelect>`, `<MentionableSelect>`, `<ChannelSelect>`
+#### `<UserSelect>`, `<RoleSelect>`, `<MentionableSelect>`, `<ChannelSelect>`
 
-[`UserSelect`](crate::types::UserSelect), [`RoleSelect`](crate::types::RoleSelect),
-[`MentionableSelect`](crate::types::MentionableSelect),
-[`ChannelSelect`](crate::types::ChannelSelect): pick users, roles, both, or channels, with
+[`UserSelect`](https://docs.rs/composure/latest/composure/types/type.UserSelect.html), [`RoleSelect`](https://docs.rs/composure/latest/composure/types/type.RoleSelect.html),
+[`MentionableSelect`](https://docs.rs/composure/latest/composure/types/type.MentionableSelect.html),
+[`ChannelSelect`](https://docs.rs/composure/latest/composure/types/type.ChannelSelect.html): pick users, roles, both, or channels, with
 Discord filling in the options. No children. The same attributes as `<StringSelect>` except
 `options`, plus:
 
 | Attribute | Type | |
 |---|---|---|
-| `default_values` | `Vec<`[`SelectDefaultValue`](crate::types::SelectDefaultValue)`>` | Preselected entities: `vec![SelectDefaultValue::user(id)]` |
-| `channel_types` | `Vec<`[`ChannelType`](crate::types::ChannelType)`>` | `<ChannelSelect>`: the kinds of channel offered |
+| `default_values` | `Vec<`[`SelectDefaultValue`](https://docs.rs/composure/latest/composure/types/struct.SelectDefaultValue.html)`>` | Preselected entities: `vec![SelectDefaultValue::user(id)]` |
+| `channel_types` | `Vec<`[`ChannelType`](https://docs.rs/composure/latest/composure/types/enum.ChannelType.html)`>` | `<ChannelSelect>`: the kinds of channel offered |
 
 ```text
 <Row>
@@ -661,12 +663,12 @@ Discord filling in the options. No children. The same attributes as `<StringSele
 </Row>
 ```
 
-## Modals
+### Modals
 
-### `<Modal>`
+#### `<Modal>`
 
-[`ModalCallbackData`](crate::types::ModalCallbackData), as a
-[`ModalView`](crate::command::ModalView). Must be the markup's only root. Children: text,
+[`ModalCallbackData`](https://docs.rs/composure/latest/composure/types/struct.ModalCallbackData.html), as a
+[`ModalView`](https://docs.rs/composure/latest/composure/command/struct.ModalView.html). Must be the markup's only root. Children: text,
 `<Text>` and `<Label>`s, at most 5 in total (Discord's limit).
 
 | Attribute | Type | |
@@ -678,9 +680,9 @@ Discord filling in the options. No children. The same attributes as `<StringSele
 
 A `<Modal>` needs exactly one of `on:submit` or `custom_id`, and takes no other attributes.
 
-### `<Label>`
+#### `<Label>`
 
-[`Label`](crate::types::Label): a title and optional description above one input. Children:
+[`Label`](https://docs.rs/composure/latest/composure/types/struct.Label.html): a title and optional description above one input. Children:
 exactly one `<TextInput>`, select, `<RadioGroup>`, `<CheckboxGroup>`, `<Checkbox>` or
 `<FileUpload>`.
 
@@ -692,33 +694,33 @@ exactly one `<TextInput>`, select, `<RadioGroup>`, `<CheckboxGroup>`, `<Checkbox
 Every input below takes `name="..."` (*special, required*, a string literal): its `custom_id`,
 matched to an `on:submit` parameter. None takes `on:` attributes.
 
-### `<TextInput>`
+#### `<TextInput>`
 
-[`TextInput`](crate::types::TextInput): free text. No children.
+[`TextInput`](https://docs.rs/composure/latest/composure/types/struct.TextInput.html): free text. No children.
 
 | Attribute | Type | |
 |---|---|---|
 | `paragraph` | flag | *Special.* Multi-line; single-line by default |
-| `style` | [`TextInputStyle`](crate::types::TextInputStyle) | *Special.* The same, as a value |
+| `style` | [`TextInputStyle`](https://docs.rs/composure/latest/composure/types/enum.TextInputStyle.html) | *Special.* The same, as a value |
 | `min_len` (or `min_length`) | `i32` | 0-4000 |
 | `max_len` (or `max_length`) | `i32` | 1-4000 |
 | `placeholder` | `String` | Shown while empty; max 100 characters |
 | `value` | `String` | Prefilled text; max 4000 characters |
 | `required` | `bool` | Set from the submit parameter's type |
 
-### `<RadioGroup>`
+#### `<RadioGroup>`
 
-[`RadioGroup`](crate::types::RadioGroup): pick one of 2-10 options. Children: `<Option>`s, and
-`{..}` of [`GroupOption`](crate::types::GroupOption)s.
+[`RadioGroup`](https://docs.rs/composure/latest/composure/types/struct.RadioGroup.html): pick one of 2-10 options. Children: `<Option>`s, and
+`{..}` of [`GroupOption`](https://docs.rs/composure/latest/composure/types/struct.GroupOption.html)s.
 
 | Attribute | Type | |
 |---|---|---|
 | `options` | a `#[derive(Choice)]` enum | *Special.* One option per variant |
 | `required` | `bool` | Set from the submit parameter's type |
 
-### `<CheckboxGroup>`
+#### `<CheckboxGroup>`
 
-[`CheckboxGroup`](crate::types::CheckboxGroup): pick any of 1-10 options. Children: as
+[`CheckboxGroup`](https://docs.rs/composure/latest/composure/types/struct.CheckboxGroup.html): pick any of 1-10 options. Children: as
 `<RadioGroup>`.
 
 | Attribute | Type | |
@@ -728,19 +730,19 @@ matched to an `on:submit` parameter. None takes `on:` attributes.
 | `max` (or `max_values`) | `u8` | 1-10 |
 | `required` | `bool` | Set from the submit parameter's type |
 
-### `<Checkbox>`
+#### `<Checkbox>`
 
-[`Checkbox`](crate::types::Checkbox): one yes/no, submitted as a `bool`. Never required. No
+[`Checkbox`](https://docs.rs/composure/latest/composure/types/struct.Checkbox.html): one yes/no, submitted as a `bool`. Never required. No
 children.
 
 | Attribute | Type | |
 |---|---|---|
 | `default` | `bool` | Checked initially |
 
-### `<FileUpload>`
+#### `<FileUpload>`
 
-[`FileUpload`](crate::types::FileUpload): attach files, submitted as
-[`Attachment`](crate::types::Attachment)s. No children.
+[`FileUpload`](https://docs.rs/composure/latest/composure/types/struct.FileUpload.html): attach files, submitted as
+[`Attachment`](https://docs.rs/composure/latest/composure/types/struct.Attachment.html)s. No children.
 
 | Attribute | Type | |
 |---|---|---|
@@ -749,17 +751,17 @@ children.
 | `file_types` | `Vec<String>` | Up to 10 of `"image"`, `"video"`, `"audio"`, or extensions like `".pdf"` |
 | `required` | `bool` | Set from the submit parameter's type |
 
-# Themes
+## Themes
 
-A View answered by a handler goes through the App's [`Theme`](crate::command::Theme) like any
+A View answered by a handler goes through the App's [`Theme`](https://docs.rs/composure/latest/composure/command/struct.Theme.html) like any
 message: every **top-level** `<Container>` without an `accent_color` gets the Theme's
 `primary` color, both when sent and when re-rendered by an inline handler. Containers that set
-`accent_color` keep it, and [`Unthemed`](crate::command::Unthemed) sends a View as is.
+`accent_color` keep it, and [`Unthemed`](https://docs.rs/composure/latest/composure/command/struct.Unthemed.html) sends a View as is.
 
 Use the Theme's colors explicitly through `ctx.theme()`, which handlers and Commands have, or by
 naming your `Theme` constant:
 
-```
+```rust
 use composure::{rsx, view, command::{Theme, View}};
 
 pub const THEME: Theme = Theme::new().with_primary(0xf5c2e7);
@@ -772,15 +774,15 @@ pub fn Alert(message: String, failed: bool) -> View {
 # fn main() {}
 ```
 
-See [Themes](crate::guide::theming) for everything a Theme fills in.
+See [Themes](theming.md) for everything a Theme fills in.
 
-# Without `#[view]`
+## Without `#[view]`
 
 `rsx!` works in any function; only inline handlers need `#[view]`. A plain function returning
 `View` is a good fit for layouts without state of their own, and for messages sent through REST,
 which take components rather than a response:
 
-```
+```rust
 use composure::{rsx, command::{View, custom_id::CustomIdError}, types::Component};
 
 fn announcement(text: &str) -> Result<Vec<Component>, CustomIdError> {
@@ -791,5 +793,5 @@ fn announcement(text: &str) -> Result<Vec<Component>, CustomIdError> {
 ```
 
 Send them with the Components V2 flag
-([`MessageFlags::IsComponentsV2`](crate::types::MessageFlags::IsComponentsV2)); REST bodies are
+([`MessageFlags::IsComponentsV2`](https://docs.rs/composure/latest/composure/types/struct.MessageFlags.html#associatedconstant.IsComponentsV2)); REST bodies are
 never themed.

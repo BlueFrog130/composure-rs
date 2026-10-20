@@ -1,0 +1,58 @@
+name: Book
+
+# Builds the guide (book/, an mdBook) on every PR and publishes it to GitHub Pages from main.
+# Its examples run as doctests in CI's `check` job. Pages must be set to deploy from GitHub
+# Actions (Settings > Pages > Source).
+
+on:
+  push:
+    branches: [main]
+    paths: [book/**, .github/workflows/book.yml]
+  pull_request:
+    branches: [main]
+    paths: [book/**, .github/workflows/book.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; don't cancel one in progress
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  MDBOOK_VERSION: v0.5.4
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install mdBook
+        run: |
+          mkdir -p "$RUNNER_TEMP/mdbook"
+          curl -sSL "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz --directory="$RUNNER_TEMP/mdbook"
+          echo "$RUNNER_TEMP/mdbook" >> "$GITHUB_PATH"
+      - run: mdbook build book
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          path: target/book
+
+  deploy:
+    name: Deploy
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -56,9 +56,9 @@ Mistakes are caught at compile time with errors that say what to do: a missing d
 an Option bound outside its type, two commands with the same name, a button in the wrong
 place, a modal input without a matching parameter.
 
-Learn them in [the guide](https://docs.rs/composure/latest/composure/guide/index.html); every
+Learn them in [the guide](https://bluefrog130.github.io/composure-rs/); every
 `rsx!` tag and attribute is in the
-[Views reference](https://docs.rs/composure/latest/composure/guide/views/index.html#tag-reference).
+[Views reference](https://bluefrog130.github.io/composure-rs/views.html#tag-reference).
 
 ## License
 

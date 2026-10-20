@@ -30,20 +30,21 @@
 //!
 //! # Where to start
 //!
-//! The [`guide`] walks through everything a bot does, chapter by chapter:
+//! The [guide](https://bluefrog130.github.io/composure-rs/) walks through everything a bot
+//! does, chapter by chapter:
 //!
 //! | Chapter | |
 //! |---|---|
-//! | [Getting started](guide::getting_started) | Crates, features, a first bot, serving it, syncing it |
-//! | [Commands](guide::commands) | `#[command]`, Options, Choices, Groups, context menus, autocomplete, Scopes |
-//! | [Responses](guide::responses) | What a handler can return; ephemeral messages, embeds, files, errors |
-//! | [Components and modals](guide::components) | Buttons, selects and forms with `#[component]`, `#[modal]`, `#[derive(Modal)]` |
-//! | [Views](guide::views) | `rsx!` markup and `#[view]`: every tag and attribute |
-//! | [Themes](guide::theming) | Consistent colors and branding on embeds and containers |
-//! | [REST and deferring](guide::deferring) | `ctx.bot()`, follow-ups, Deferred Responses, Background Work |
-//! | [Webhook Events](guide::events) | App installs, entitlements, lobby messages |
-//! | [Platforms](guide::platforms) | Adapters, State, platform-specific Commands, logging |
-//! | [Testing](guide::testing) | Running handlers without Discord |
+//! | [Getting started](https://bluefrog130.github.io/composure-rs/getting_started.html) | Crates, features, a first bot, serving it, syncing it |
+//! | [Commands](https://bluefrog130.github.io/composure-rs/commands.html) | `#[command]`, Options, Choices, Groups, context menus, autocomplete, Scopes |
+//! | [Responses](https://bluefrog130.github.io/composure-rs/responses.html) | What a handler can return; ephemeral messages, embeds, files, errors |
+//! | [Components and modals](https://bluefrog130.github.io/composure-rs/components.html) | Buttons, selects and forms with `#[component]`, `#[modal]`, `#[derive(Modal)]` |
+//! | [Views](https://bluefrog130.github.io/composure-rs/views.html) | `rsx!` markup and `#[view]`: every tag and attribute |
+//! | [Themes](https://bluefrog130.github.io/composure-rs/theming.html) | Consistent colors and branding on embeds and containers |
+//! | [REST and deferring](https://bluefrog130.github.io/composure-rs/deferring.html) | `ctx.bot()`, follow-ups, Deferred Responses, Background Work |
+//! | [Webhook Events](https://bluefrog130.github.io/composure-rs/events.html) | App installs, entitlements, lobby messages |
+//! | [Platforms](https://bluefrog130.github.io/composure-rs/platforms.html) | Adapters, State, platform-specific Commands, logging |
+//! | [Testing](https://bluefrog130.github.io/composure-rs/testing.html) | Running handlers without Discord |
 //!
 //! # Crates
 //!
@@ -81,7 +82,7 @@
 //! | `rest-bans`, `rest-threads`, `rest-invites`, `rest-emojis`, `rest-stickers`, `rest-scheduled-events`, `rest-automod`, `rest-audit-log`, `rest-webhooks`, `rest-monetization`, `rest-polls`, `rest-soundboard`, `rest-application` | The rest of Discord's Endpoints, one group each |
 //! | `tier1` | `rest` and the Endpoints most bots need (commands, messages, users, channels, guilds, members, roles) |
 //! | `full` | Every Endpoint |
-//! | `tracing` | Spans and events through [`tracing`](https://docs.rs/tracing); see [Platforms](guide::platforms#logging) |
+//! | `tracing` | Spans and events through [`tracing`](https://docs.rs/tracing); see [Platforms](https://bluefrog130.github.io/composure-rs/platforms.html#logging) |
 //! | `web-crypto` | Validate signatures with the host's Web Crypto on `wasm32-unknown-unknown` instead of compiling `ed25519-dalek` in |
 //! | `reqwest` | A blocking [`ReqwestTransport`](rest::ReqwestTransport) for deploy-time tools (not for WASM) |
 
@@ -98,8 +99,9 @@ pub mod auth;
 pub mod command;
 pub mod credentials;
 pub mod definition;
-#[cfg(all(feature = "macros", feature = "rest", any(doc, doctest)))]
-pub mod guide;
+// The guide (`book/`) as doctests
+#[cfg(all(feature = "macros", feature = "rest", doctest))]
+mod guide;
 #[cfg(feature = "rest")]
 pub mod rest;
 pub mod types;
@@ -108,57 +110,57 @@ pub use command::Ctx;
 pub use credentials::{Credentials, CredentialsError};
 
 /// Collects Routes into an App, the handler an Adapter serves. See
-/// [Getting started](crate::guide::getting_started) and [Platforms](crate::guide::platforms).
+/// [Getting started](https://bluefrog130.github.io/composure-rs/getting_started.html) and [Platforms](https://bluefrog130.github.io/composure-rs/platforms.html).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::app;
 
-/// Defines a Command from a function. See [Commands](crate::guide::commands).
+/// Defines a Command from a function. See [Commands](https://bluefrog130.github.io/composure-rs/commands.html).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::command;
 
-/// Groups Commands as subcommands. See [Commands](crate::guide::commands#groups).
+/// Groups Commands as subcommands. See [Commands](https://bluefrog130.github.io/composure-rs/commands.html#groups).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::group;
 
 /// Answers a component by `custom_id` prefix. See
-/// [Components and modals](crate::guide::components).
+/// [Components and modals](https://bluefrog130.github.io/composure-rs/components.html).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::component;
 
 /// Answers a modal submit by `custom_id` prefix. See
-/// [Components and modals](crate::guide::components#modals).
+/// [Components and modals](https://bluefrog130.github.io/composure-rs/components.html#modals).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::modal;
 
 /// Suggests values for an Option while the user types. See
-/// [Commands](crate::guide::commands#autocomplete).
+/// [Commands](https://bluefrog130.github.io/composure-rs/commands.html#autocomplete).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::autocomplete;
 
 /// An enum of fixed Choices, for Options, selects and radio groups. See
-/// [Commands](crate::guide::commands#choices).
+/// [Commands](https://bluefrog130.github.io/composure-rs/commands.html#choices).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::Choice;
 
-/// A form shown as a modal. See [Components and modals](crate::guide::components#forms).
+/// A form shown as a modal. See [Components and modals](https://bluefrog130.github.io/composure-rs/components.html#forms).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::Modal;
 
 /// Markup for message and modal layouts. Every tag and attribute is listed in
-/// [Views](crate::guide::views#tag-reference).
+/// [Views](https://bluefrog130.github.io/composure-rs/views.html#tag-reference).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::rsx;
 
-/// A layout rendered from Props, with inline handlers. See [Views](crate::guide::views).
+/// A layout rendered from Props, with inline handlers. See [Views](https://bluefrog130.github.io/composure-rs/views.html).
 #[cfg(feature = "macros")]
 #[doc(inline)]
 pub use composure_macros::view;

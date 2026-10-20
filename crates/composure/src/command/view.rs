@@ -34,7 +34,7 @@ use super::{
 
 /// A rendered message layout: Components V2 components, answered as a new message (or, from an
 /// inline handler, as an update of the message the component is on). Built by
-/// [`rsx!`](crate::rsx); see [Views](crate::guide::views).
+/// [`rsx!`](crate::rsx); see [Views](https://bluefrog130.github.io/composure-rs/views.html).
 ///
 /// A `custom_id` that could not be built (state past 100 characters) is kept inside and surfaces
 /// as a [`HandlerError`] when the View is answered with.

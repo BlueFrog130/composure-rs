@@ -44,8 +44,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      # Broken intra-doc links and missing docs fail the build; the guide's examples run as
-      # doctests in `check`
+      # Broken intra-doc links and missing docs fail the build; the guide's (book/) examples run
+      # as doctests in `check`
       - run: cargo doc --no-deps --all-features -p composure -p composure_macros -p composure_commands -p composure_sync -p composure_adapter_cloudflare -p composure_adapter_tokio
         env:
           RUSTDOCFLAGS: --cfg docsrs -D warnings

@@ -1,7 +1,7 @@
 # Composure example bot
 
 [![CI](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml)
-[![Docs.rs](https://img.shields.io/docsrs/composure?logo=docs.rs&label=guide)](https://docs.rs/composure/latest/composure/guide/index.html)
+[![Guide](https://img.shields.io/badge/guide-mdBook-blue?logo=mdbook)](https://bluefrog130.github.io/composure-rs/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
 
 A bot whose commands are each defined once with `#[command]` / `#[group]` / `#[derive(Choice)]` and collected with `#[app]`: each module lists its own in an App (`Basics`, `Api`, `Interactive`, `Views`), and `Bot` lists those with the theme and the Webhook Events. Nothing here depends on a platform. Each example lists `Bot` in its own App next to its platform's commands (`#[app(handlers(Bot, Note), theme = THEME)]`): [`examples/cloudflare`](../cloudflare) adds Workers KV notes, [`examples/tokio`](../tokio) adds local files, process data and blocking work, and each serves and syncs that App (the tests use `Bot` alone). `/greet` reads its greeting from the bot's Bot Data (`Config`) through `HasData`: Workers build it from the `GREETING` var with `with_data`, tokio from the environment, inside its own `Server` data (`AsRef<Config>`).

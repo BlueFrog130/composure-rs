@@ -14,9 +14,12 @@ cargo fmt --all
   snippets of the standard library's source: install it with `rustup component add rust-src`.
   After changing a macro error, regenerate them with
   `TRYBUILD=overwrite cargo test -p composure_macros --test commands` and review the diff.
-- Every public item needs docs (`#![warn(missing_docs)]`). The user guide lives in
-  `crates/composure/src/guide/`; its examples run as doctests. Preview the docs as docs.rs builds
+- Every public item needs docs (`#![warn(missing_docs)]`). Preview the docs as docs.rs builds
   them with `RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --no-deps --all-features -p composure --open`.
+- The user guide is an [mdBook](https://rust-lang.github.io/mdBook/) in `book/`, published to
+  GitHub Pages from `main`. Preview it with `mdbook serve book --open`; its examples run as
+  doctests in `cargo test` (`crates/composure/src/guide.rs`). Link to API items with docs.rs
+  URLs, and to other chapters with relative `.md` links.
 - Design decisions are recorded in `docs/adr/`, terms in `CONTEXT.md`.
 
 ## Change files

@@ -4,7 +4,7 @@ use crate::types::{Container, Embed, InteractionResponse, MessageFlags};
 
 use super::HandlerError;
 
-/// A value a Command can answer with. See [Responses](crate::guide::responses) for the types
+/// A value a Command can answer with. See [Responses](https://bluefrog130.github.io/composure-rs/responses.html) for the types
 /// implementing it.
 pub trait IntoResponse: Sized {
     /// The Response; a failure to build it (see [`try_into_response`](Self::try_into_response))

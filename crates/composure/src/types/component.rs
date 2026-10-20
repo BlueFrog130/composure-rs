@@ -391,7 +391,7 @@ impl Component {
 }
 
 /// [Action Row](https://discord.com/developers/docs/components/reference#action-row): a row of up
-/// to 5 buttons, or one select. In markup: [`<Row>`](crate::guide::views#row-alias-actionrow).
+/// to 5 buttons, or one select. In markup: [`<Row>`](https://bluefrog130.github.io/composure-rs/views.html#row-alias-actionrow).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ActionRow {
     #[serde(rename = "type")]
@@ -419,7 +419,7 @@ impl ActionRow {
 
 /// [Button](https://discord.com/developers/docs/components/reference#button): in an
 /// [`ActionRow`], or as a [`Section`]'s accessory. In markup:
-/// [`<Button>`](crate::guide::views#button).
+/// [`<Button>`](https://bluefrog130.github.io/composure-rs/views.html#button).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ButtonComponent {
     #[serde(rename = "type")]
@@ -520,8 +520,8 @@ pub enum ButtonStyle {
 /// [Select menu](https://discord.com/developers/docs/components/reference#string-select): in an
 /// [`ActionRow`] in messages, or a [`Label`] in modals. `T` is the component type; use the
 /// aliases [`StringSelect`], [`UserSelect`], [`RoleSelect`], [`MentionableSelect`] and
-/// [`ChannelSelect`]. In markup: [`<StringSelect>`](crate::guide::views#stringselect-alias-select),
-/// [`<UserSelect>` and the other entity selects](crate::guide::views#userselect-roleselect-mentionableselect-channelselect).
+/// [`ChannelSelect`]. In markup: [`<StringSelect>`](https://bluefrog130.github.io/composure-rs/views.html#stringselect-alias-select),
+/// [`<UserSelect>` and the other entity selects](https://bluefrog130.github.io/composure-rs/views.html#userselect-roleselect-mentionableselect-channelselect).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SelectMenu<const T: u8> {
     /// [Type](https://discord.com/developers/docs/interactions/message-components#component-object-component-types) of select menu component (text: 3, user: 5, role: 6, mentionable: 7, channels: 8)
@@ -632,7 +632,7 @@ impl SelectDefaultValue {
 }
 
 /// [Select option](https://discord.com/developers/docs/components/reference#string-select-select-option-structure)
-/// of a [`StringSelect`]. In markup: [`<Option>`](crate::guide::views#option).
+/// of a [`StringSelect`]. In markup: [`<Option>`](https://bluefrog130.github.io/composure-rs/views.html#option).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SelectOption {
     /// User-facing name of the option; max 100 characters
@@ -674,7 +674,7 @@ impl SelectOption {
 }
 
 /// [Text Input](https://discord.com/developers/docs/components/reference#text-input): free text in
-/// a modal, inside a [`Label`]. In markup: [`<TextInput>`](crate::guide::views#textinput).
+/// a modal, inside a [`Label`]. In markup: [`<TextInput>`](https://bluefrog130.github.io/composure-rs/views.html#textinput).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TextInput {
     #[serde(rename = "type")]
@@ -748,7 +748,7 @@ impl TextInput {
 
 /// [Text Display](https://discord.com/developers/docs/components/reference#text-display): markdown,
 /// in Components V2 messages and modals. In markup:
-/// [`<Text>`](crate::guide::views#text-alias-textdisplay), or bare text.
+/// [`<Text>`](https://bluefrog130.github.io/composure-rs/views.html#text-alias-textdisplay), or bare text.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TextDisplay {
     #[serde(rename = "type")]
@@ -776,7 +776,7 @@ impl TextDisplay {
 
 /// [Container](https://discord.com/developers/docs/components/reference#container): top-level
 /// component of a Components V2 message, grouping others in a frame with an optional accent bar.
-/// In markup: [`<Container>`](crate::guide::views#container).
+/// In markup: [`<Container>`](https://bluefrog130.github.io/composure-rs/views.html#container).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Container {
     #[serde(rename = "type")]
@@ -826,7 +826,7 @@ impl Container {
 }
 
 /// [Section](https://discord.com/developers/docs/components/reference#section): text beside an
-/// accessory, in Components V2 messages. In markup: [`<Section>`](crate::guide::views#section).
+/// accessory, in Components V2 messages. In markup: [`<Section>`](https://bluefrog130.github.io/composure-rs/views.html#section).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Section {
     #[serde(rename = "type")]
@@ -942,7 +942,7 @@ impl<'de> Deserialize<'de> for UnfurledMediaFlags {
 }
 
 /// [Thumbnail](https://discord.com/developers/docs/components/reference#thumbnail): a small image
-/// as a [`Section`]'s accessory. In markup: [`<Thumbnail>`](crate::guide::views#thumbnail).
+/// as a [`Section`]'s accessory. In markup: [`<Thumbnail>`](https://bluefrog130.github.io/composure-rs/views.html#thumbnail).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Thumbnail {
     #[serde(rename = "type")]
@@ -991,7 +991,7 @@ impl Thumbnail {
 }
 
 /// [Media Gallery](https://discord.com/developers/docs/components/reference#media-gallery): a grid
-/// of images and videos. In markup: [`<Gallery>`](crate::guide::views#gallery-alias-mediagallery).
+/// of images and videos. In markup: [`<Gallery>`](https://bluefrog130.github.io/composure-rs/views.html#gallery-alias-mediagallery).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MediaGallery {
     #[serde(rename = "type")]
@@ -1019,7 +1019,7 @@ impl MediaGallery {
 
 /// [Media Gallery Item](https://discord.com/developers/docs/components/reference#media-gallery-media-gallery-item-structure):
 /// one image or video of a [`MediaGallery`]. In markup:
-/// [`<Item>`](crate::guide::views#item-alias-mediagalleryitem).
+/// [`<Item>`](https://bluefrog130.github.io/composure-rs/views.html#item-alias-mediagalleryitem).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MediaGalleryItem {
     /// An image or video
@@ -1058,7 +1058,7 @@ impl MediaGalleryItem {
 }
 
 /// [File](https://discord.com/developers/docs/components/reference#file): one file uploaded with
-/// the message, shown inline. In markup: [`<File>`](crate::guide::views#file).
+/// the message, shown inline. In markup: [`<File>`](https://bluefrog130.github.io/composure-rs/views.html#file).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FileComponent {
     #[serde(rename = "type")]
@@ -1107,7 +1107,7 @@ impl FileComponent {
 
 /// [Separator](https://discord.com/developers/docs/components/reference#separator): vertical
 /// space between components, with a divider line by default. In markup:
-/// [`<Separator>`](crate::guide::views#separator).
+/// [`<Separator>`](https://bluefrog130.github.io/composure-rs/views.html#separator).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Separator {
     #[serde(rename = "type")]
@@ -1201,7 +1201,7 @@ into_component! {
 }
 
 /// [Label](https://discord.com/developers/docs/components/reference#label): a title (and
-/// description) above one modal input. In markup: [`<Label>`](crate::guide::views#label).
+/// description) above one modal input. In markup: [`<Label>`](https://bluefrog130.github.io/composure-rs/views.html#label).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Label {
     #[serde(rename = "type")]
@@ -1244,7 +1244,7 @@ impl Label {
 
 /// [File Upload](https://discord.com/developers/docs/components/reference#file-upload) in a modal;
 /// the submit carries attachment ids, resolved in `resolved.attachments`. In markup:
-/// [`<FileUpload>`](crate::guide::views#fileupload).
+/// [`<FileUpload>`](https://bluefrog130.github.io/composure-rs/views.html#fileupload).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FileUpload {
     #[serde(rename = "type")]
@@ -1291,7 +1291,7 @@ impl FileUpload {
 }
 
 /// One choice of a [`RadioGroup`] or [`CheckboxGroup`]. In markup:
-/// [`<Option>`](crate::guide::views#option).
+/// [`<Option>`](https://bluefrog130.github.io/composure-rs/views.html#option).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GroupOption {
     /// Max 100 characters
@@ -1323,7 +1323,7 @@ impl GroupOption {
 
 /// [Radio Group](https://discord.com/developers/docs/components/reference#radio-group): pick one
 /// of 2-10 options; the submit carries the value (or null). In markup:
-/// [`<RadioGroup>`](crate::guide::views#radiogroup).
+/// [`<RadioGroup>`](https://bluefrog130.github.io/composure-rs/views.html#radiogroup).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RadioGroup {
     #[serde(rename = "type")]
@@ -1360,7 +1360,7 @@ impl RadioGroup {
 
 /// [Checkbox Group](https://discord.com/developers/docs/components/reference#checkbox-group): pick
 /// any of 1-10 options; the submit carries the selected values. In markup:
-/// [`<CheckboxGroup>`](crate::guide::views#checkboxgroup).
+/// [`<CheckboxGroup>`](https://bluefrog130.github.io/composure-rs/views.html#checkboxgroup).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CheckboxGroup {
     #[serde(rename = "type")]
@@ -1407,7 +1407,7 @@ impl CheckboxGroup {
 
 /// [Checkbox](https://discord.com/developers/docs/components/reference#checkbox): a single
 /// yes/no; cannot be required. The submit carries a boolean. In markup:
-/// [`<Checkbox>`](crate::guide::views#checkbox).
+/// [`<Checkbox>`](https://bluefrog130.github.io/composure-rs/views.html#checkbox).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Checkbox {
     #[serde(rename = "type")]

@@ -1,13 +1,15 @@
+# Testing
+
 Bots built with Composure are tested in plain `cargo test`, without Discord or a platform: a
 Command is a function, an App is a handler that takes a parsed Interaction, and an Adapter's
 State can be replaced by a stand-in.
 
-# Calling the function
+## Calling the function
 
 `#[command]` and the handler macros keep the function as written, so its logic is a unit test
 away:
 
-```
+```rust
 use composure::command;
 
 /// Repeat some text
@@ -21,13 +23,13 @@ assert_eq!(echo("ab", Some(2)), "abab");
 # }
 ```
 
-# Dispatching an Interaction
+## Dispatching an Interaction
 
-[`dispatch`](crate::command::dispatch) runs an App the way an Adapter does: route the
+[`dispatch`](https://docs.rs/composure/latest/composure/command/fn.dispatch.html) runs an App the way an Adapter does: route the
 Interaction, call the handler, apply the Theme. Build the Interaction from the JSON Discord would
 send, and pass any State the App accepts (`&()` for Apps whose Commands take `Ctx`):
 
-```
+```rust
 use composure::{app, command, command::dispatch, types::Interaction};
 use serde_json::json;
 
@@ -59,13 +61,13 @@ Components and modal submits work the same way, with their `custom_id` in `data`
 the handler's `custom_id(..)` function so the test follows the encoding). Any executor runs the
 future; handlers do not depend on a runtime.
 
-# A stand-in Platform
+## A stand-in Platform
 
 Commands taking `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) run against any State
 implementing it. A test State records the REST requests through its
-[`Transport`](crate::rest::Transport) and keeps Background Work to run when the test says so:
+[`Transport`](https://docs.rs/composure/latest/composure/rest/trait.Transport.html) and keeps Background Work to run when the test says so:
 
-```
+```rust
 use std::{sync::{Arc, Mutex}, time::Duration};
 use composure::{
     command::{BackgroundWork, Platform},
@@ -110,17 +112,17 @@ impl Platform for TestPlatform {
 ```
 
 Dispatch with `&TestPlatform::default()`, check the immediate response (a deferral, say), run
-the queued [`BackgroundWork`](crate::command::BackgroundWork), then assert on the recorded
+the queued [`BackgroundWork`](https://docs.rs/composure/latest/composure/command/type.BackgroundWork.html), then assert on the recorded
 requests: the edit of the original response, the follow-ups, the bot calls.
 
-# Signed requests
+## Signed requests
 
-[`adapter::handle_interaction`](crate::adapter::handle_interaction) and
-[`handle_event`](crate::adapter::handle_event) run the whole Adapter pipeline (signature check,
+[`adapter::handle_interaction`](https://docs.rs/composure/latest/composure/adapter/fn.handle_interaction.html) and
+[`handle_event`](https://docs.rs/composure/latest/composure/adapter/fn.handle_event.html) run the whole Adapter pipeline (signature check,
 parsing, dispatch, error rendering) without a platform, and return the HTTP status and body an
 Adapter would send. Sign test payloads with a key of your own:
 
-```
+```rust
 use composure::{adapter::{InteractionOutcome, handle_interaction}, app, command};
 use ed25519_dalek::{Signer, SigningKey};
 
@@ -151,13 +153,13 @@ assert!(matches!(forged, InteractionOutcome::Unauthorized));
 # }
 ```
 
-# Definitions
+## Definitions
 
 What Sync would register is available without Discord too:
-[`CommandSetDefinition::definitions`](crate::command::CommandSetDefinition::definitions) on an
+[`CommandSetDefinition::definitions`](https://docs.rs/composure/latest/composure/command/trait.CommandSetDefinition.html#tymethod.definitions) on an
 App lists every Command Definition with its Scope, ready to compare against a snapshot.
 
-```
+```rust
 use composure::{app, command, command::CommandSetDefinition};
 
 /// Ping
