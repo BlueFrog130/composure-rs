@@ -6,8 +6,7 @@
 mod common;
 
 use common::RegressionBot;
-use composure::adapter::handle_interaction;
-use futures::executor::block_on;
+use composure::{adapter::handle_interaction, testing::block_on};
 
 #[test]
 fn signed_interactions() {

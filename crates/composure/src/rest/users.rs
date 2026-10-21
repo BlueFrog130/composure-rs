@@ -60,8 +60,7 @@ mod tests {
         block_on(c.create_dm(user)).unwrap();
         let sent: Vec<_> = c
             .transport()
-            .requests
-            .borrow()
+            .requests()
             .iter()
             .map(|r| (r.method, r.url.rsplit("v10").next().unwrap().to_string()))
             .collect();

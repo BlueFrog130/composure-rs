@@ -10,6 +10,9 @@ use std::{convert::Infallible, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use common::RegressionBot;
+use composure::testing::{
+    self, APPLICATION_ID, INTERACTION_TOKEN, ResponseExt, SignedRequest, TestKey,
+};
 use composure_adapter_tokio::{
     Credentials, EventHandler, Host, HttpTransport, InteractionHandler, TokioInteractionBot,
 };
@@ -146,15 +149,22 @@ async fn regression_fixtures_over_http() {
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }
 
+/// [`post`]s a signed request
+async fn post_signed(url: &str, request: SignedRequest) -> (u16, Option<Value>) {
+    post(
+        url,
+        Some(request.signature),
+        Some(request.timestamp),
+        request.body,
+    )
+    .await
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn the_example_bot_answers_ping() {
     let (url, stop, task) = serve_with(Bot, config()).await;
-    let body = json!({ "id": "1", "application_id": "1", "type": 1, "token": "t", "version": 1 })
-        .to_string()
-        .into_bytes();
-    let signature = common::sign(common::TIMESTAMP, &body);
-    let (status, response) =
-        post(&url, Some(signature), Some(common::TIMESTAMP.into()), body).await;
+    let body = json!({ "id": "1", "application_id": "1", "type": 1, "token": "t", "version": 1 });
+    let (status, response) = post_signed(&url, TestKey::default().signed(body.to_string())).await;
     assert_eq!(status, 200);
     assert_eq!(response, Some(json!({ "type": 1 })));
     stop.send(()).unwrap();
@@ -171,17 +181,9 @@ fn server() -> Server {
     Server::new(config(), DEFAULT_FILES_DIR)
 }
 
-/// A signed interaction of `kind` (2 command, 4 autocomplete) for `name` with `options`
-async fn invoke(url: &str, kind: u8, name: &str, options: Value) -> Value {
-    let body = json!({
-        "id": "1", "application_id": "1", "type": kind, "token": "t", "version": 1,
-        "user": { "id": "5", "username": "a", "discriminator": "0", "global_name": null, "avatar": null },
-        "data": { "id": "2", "name": name, "type": 1, "options": options },
-    })
-    .to_string()
-    .into_bytes();
-    let signature = common::sign(common::TIMESTAMP, &body);
-    let (status, response) = post(url, Some(signature), Some(common::TIMESTAMP.into()), body).await;
+/// The response to the Interaction `body`, signed and sent over HTTP, which must be a 200
+async fn invoke(url: &str, body: Vec<u8>) -> Value {
+    let (status, response) = post_signed(url, TestKey::default().signed(body)).await;
     assert_eq!(status, 200, "{response:?}");
     response.unwrap()
 }
@@ -189,43 +191,41 @@ async fn invoke(url: &str, kind: u8, name: &str, options: Value) -> Value {
 #[tokio::test(flavor = "multi_thread")]
 async fn server_commands() {
     let (url, stop, task) = serve_with(TokioBot, server()).await;
-    let text = |name: &str| json!([{ "name": "name", "type": 3, "value": name }]);
+    let file = |name: &str| testing::command("file").option("name", name).body();
 
-    let hello = invoke(&url, 2, "file", text("hello.txt")).await;
-    let content = hello["data"]["content"].as_str().unwrap();
+    let hello = invoke(&url, file("hello.txt")).await;
+    let content = hello.text().unwrap();
     assert!(
         content.contains("Hello from the server's disk!"),
         "{content}"
     );
-    assert_eq!(hello["data"]["flags"], 64);
+    assert!(hello.is_ephemeral());
 
     // Nothing outside the files directory, however it is spelled
     for name in ["../Cargo.toml", "..", ".env", "missing.txt"] {
-        let refused = invoke(&url, 2, "file", text(name)).await;
-        let description = refused["data"]["embeds"][0]["description"]
-            .as_str()
-            .unwrap();
-        assert_eq!(description, format!("There is no file named `{name}`."));
+        let refused = invoke(&url, file(name)).await;
+        assert_eq!(
+            refused.embeds()[0]["description"],
+            format!("There is no file named `{name}`.")
+        );
     }
 
-    let focused = json!([{ "name": "name", "type": 3, "value": "HE", "focused": true }]);
-    let suggestions = invoke(&url, 4, "file", focused).await;
+    let suggestions = invoke(
+        &url,
+        testing::autocomplete("file").focused("name", "HE").body(),
+    )
+    .await;
     assert_eq!(
-        suggestions["data"]["choices"],
-        json!([{ "name": "hello.txt", "value": "hello.txt" }])
+        suggestions.choices(),
+        [json!({ "name": "hello.txt", "value": "hello.txt" })]
     );
 
     // A shared command, its Bot Data a part of the server's
-    let greet = invoke(&url, 2, "greet", json!([])).await;
-    assert_eq!(greet["data"]["content"], "Howdy from Composure!");
+    let greet = invoke(&url, testing::command("greet").body()).await;
+    assert_eq!(greet.text().as_deref(), Some("Howdy from Composure!"));
 
-    let uptime = invoke(&url, 2, "uptime", json!([])).await;
-    assert!(
-        uptime["data"]["content"]
-            .as_str()
-            .unwrap()
-            .starts_with("Up for ")
-    );
+    let uptime = invoke(&url, testing::command("uptime").body()).await;
+    assert!(uptime.text().unwrap().starts_with("Up for "));
 
     stop.send(()).unwrap();
     task.await.unwrap();
@@ -254,8 +254,8 @@ async fn primes_defers_then_edits_the_original_from_background_work() {
     let (url, stop, task) = start(bot).await;
 
     // The HTTP reply is only the deferral: Discord shows "thinking..."
-    let up_to = json!([{ "name": "up_to", "type": 4, "value": 100 }]);
-    assert_eq!(invoke(&url, 2, "primes", up_to).await, json!({ "type": 5 }));
+    let primes = testing::command("primes").option("up_to", 100).body();
+    assert_eq!(invoke(&url, primes).await, json!({ "type": 5 }));
 
     // Then Background Work edits the original response: progress, then the result
     let mut next = async || {
@@ -264,16 +264,22 @@ async fn primes_defers_then_edits_the_original_from_background_work() {
             .expect("an edit within 5s")
             .unwrap()
     };
-    let original = "/webhooks/1/t/messages/@original";
+    let original = format!("/webhooks/{APPLICATION_ID}/{INTERACTION_TOKEN}/messages/@original");
     let (method, path, progress) = next().await;
-    assert_eq!((method.as_str(), path.as_str()), ("PATCH", original));
+    assert_eq!(
+        (method.as_str(), path.as_str()),
+        ("PATCH", original.as_str())
+    );
     assert_eq!(
         progress["content"],
         "Sieving up to 100 on a blocking thread..."
     );
 
     let (method, path, done) = next().await;
-    assert_eq!((method.as_str(), path.as_str()), ("PATCH", original));
+    assert_eq!(
+        (method.as_str(), path.as_str()),
+        ("PATCH", original.as_str())
+    );
     let embed = &done["embeds"][0];
     let description = embed["description"].as_str().unwrap();
     assert!(

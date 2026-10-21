@@ -345,8 +345,7 @@ mod tests {
         let base = "https://discord.com/api/v10";
         let sent: Vec<_> = c
             .transport()
-            .requests
-            .borrow()
+            .requests()
             .iter()
             .map(|r| (r.method, r.url.strip_prefix(base).unwrap().to_string()))
             .collect();

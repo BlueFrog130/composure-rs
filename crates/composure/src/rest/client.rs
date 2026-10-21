@@ -287,10 +287,7 @@ mod tests {
         let rest = Rest::new(transport, None);
         let response = get(&rest).unwrap();
         assert_eq!(response.model().unwrap()["ok"], true);
-        assert_eq!(
-            *rest.transport().sleeps.borrow(),
-            [Duration::from_millis(500)]
-        );
+        assert_eq!(rest.transport().sleeps(), [Duration::from_millis(500)]);
     }
 
     #[test]
@@ -305,7 +302,7 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
-        assert!(rest.transport().sleeps.borrow().is_empty());
+        assert!(rest.transport().sleeps().is_empty());
     }
 
     #[test]
@@ -318,20 +315,19 @@ mod tests {
             .respond(429, limited);
         let rest = Rest::new(transport, None);
         assert!(matches!(get(&rest), Err(Error::RateLimited(_))));
-        assert_eq!(rest.transport().requests.borrow().len(), 4);
+        assert_eq!(rest.transport().requests().len(), 4);
     }
 
     #[test]
     fn non_json_rate_limit_uses_retry_after_header() {
-        let transport = MockTransport::default();
-        transport.responses.borrow_mut().push_back(RawResponse {
+        let transport = MockTransport::default().respond_raw(RawResponse {
             status: 429,
             headers: vec![("Retry-After".into(), "1".into())],
             body: b"<html>".to_vec(),
         });
         let rest = Rest::new(transport, None);
         get(&rest).unwrap();
-        assert_eq!(*rest.transport().sleeps.borrow(), [Duration::from_secs(1)]);
+        assert_eq!(rest.transport().sleeps(), [Duration::from_secs(1)]);
     }
 
     #[test]

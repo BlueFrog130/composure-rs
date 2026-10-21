@@ -48,8 +48,11 @@ mod soundboard;
 mod spec;
 #[cfg(feature = "rest-stickers")]
 mod stickers;
+// The Endpoints' tests use the public `MockTransport`
 #[cfg(test)]
-pub(crate) mod testing;
+pub(crate) mod testing {
+    pub(crate) use crate::testing::MockTransport;
+}
 #[cfg(feature = "rest-threads")]
 mod threads;
 mod transport;

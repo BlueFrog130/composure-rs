@@ -87,6 +87,9 @@ full = ["tier1", "rest-bans", "rest-threads", "rest-invites", "rest-emojis", "re
 tracing = ["dep:tracing"]
 ## Native blocking Transport for deploy-time tools (not for wasm)
 reqwest = ["rest", "dep:reqwest"]
+## `composure::testing`: Interaction builders, `TestPlatform`, `MockTransport`, `TestKey`, for a
+## bot's tests (dev-dependencies)
+testing = ["rest"]
 
 [dev-dependencies]
 futures = { version = "0.3.34", default-features = false, features = ["executor"] }

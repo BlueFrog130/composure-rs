@@ -1,8 +1,14 @@
 # Testing
 
 Bots built with Composure are tested in plain `cargo test`, without Discord or a platform: a
-Command is a function, an App is a handler that takes a parsed Interaction, and an Adapter's
-State can be replaced by a stand-in.
+Command is a function, an App is a handler that takes a parsed Interaction, and
+[`composure::testing`](https://docs.rs/composure/latest/composure/testing/index.html) stands in
+for the rest. Turn it on for tests only:
+
+```toml
+[dev-dependencies]
+composure = { version = "0.2", features = ["testing"] }
+```
 
 ## Calling the function
 
@@ -23,108 +29,129 @@ assert_eq!(echo("ab", Some(2)), "abab");
 # }
 ```
 
-## Dispatching an Interaction
+## Running an Interaction
 
-[`dispatch`](https://docs.rs/composure/latest/composure/command/fn.dispatch.html) runs an App the way an Adapter does: route the
-Interaction, call the handler, apply the Theme. Build the Interaction from the JSON Discord would
-send, and pass any State the App accepts (`&()` for Apps whose Commands take `Ctx`):
+[`testing::answer`](https://docs.rs/composure/latest/composure/testing/fn.answer.html) runs an App the
+way an Adapter does: route the Interaction, call the handler, apply the Theme, and answer an error
+with the ephemeral message users would see. Build the Interaction with the module's builders, and
+read the response with [`ResponseExt`](https://docs.rs/composure/latest/composure/testing/trait.ResponseExt.html):
 
 ```rust
-use composure::{app, command, command::dispatch, types::Interaction};
-use serde_json::json;
+use composure::{
+    app, command,
+    testing::{self, ResponseExt, TestPlatform},
+};
 
 /// Repeat some text
 #[command]
-fn echo(#[option("What")] text: &str) -> String {
-    text.to_uppercase()
+fn echo(#[option("What")] text: &str, #[option("Times")] times: Option<u8>) -> String {
+    text.repeat(times.unwrap_or(1).into())
 }
 
 #[app(handlers(echo))]
 pub struct Bot;
 
 # fn main() {
-let interaction: Interaction = serde_json::from_value(json!({
-    "id": "2", "application_id": "1", "type": 2, "token": "token", "version": 1,
-    "user": { "id": "3", "username": "ada", "discriminator": "0", "global_name": null, "avatar": null },
-    "data": { "id": "4", "name": "echo", "type": 1,
-              "options": [{ "name": "text", "type": 3, "value": "hi" }] },
-}))
-.unwrap();
+let response = testing::answer(
+    &Bot,
+    testing::command("echo").option("text", "hi").option("times", 2),
+    &TestPlatform::new(),
+);
+assert_eq!(response.text().as_deref(), Some("hihi"));
+assert!(!response.is_ephemeral());
 
-let response = futures::executor::block_on(dispatch(interaction, &Bot, &())).unwrap();
-let json = serde_json::to_value(&response).unwrap();
-assert_eq!(json["data"]["content"], "HI");
+// `text` is required: the user gets an ephemeral error
+let response = testing::answer(&Bot, testing::command("echo"), &TestPlatform::new());
+assert!(response.is_ephemeral());
 # }
 ```
 
-Components and modal submits work the same way, with their `custom_id` in `data` (build it with
-the handler's `custom_id(..)` function so the test follows the encoding). Any executor runs the
-future; handlers do not depend on a runtime.
+[`testing::run`](https://docs.rs/composure/latest/composure/testing/fn.run.html) returns the
+handler's `Result` instead, to check the error itself. Every builder starts from what Discord
+sends: invoked by `testing::users::alice()` in a DM, unless told otherwise.
+
+| Builder | |
+|---|---|
+| `command("name")` | `.option("text", "hi")`, `.option("times", 3)`, `.user_option("who", &user)`, `.option_json(..)` for channels and roles; `.subcommand("ban")`, `.group("mod")` |
+| `user_command("Avatar", &user)`, `message_command("Quote", "text")` | Context menu Commands on a user or a message |
+| `autocomplete("name").focused("option", "typed")` | The user typing in an Option |
+| `component("custom_id")` | A button click; `.values(["red"])` for a select |
+| `modal("custom_id")` | A submit: `.field("title", "Hi")`, `.select("kind", ["Bug"])`, `.input(json!(..))` for any other input |
+| On every builder | `.by(&user)`, `.in_guild(id)`, `.permissions(..)`, `.locale("fr")`, `.channel(id)`, `.message(json!(..))`, `.json(\|json\| ..)` for anything else |
+
+Build `custom_id`s with the handler's `custom_id(..)` function, so the test follows the
+encoding: `testing::component(&counter::custom_id(4))`.
 
 ## A stand-in Platform
 
-Commands taking `Ctx<impl Platform>` (or `Ctx<impl YourTrait>`) run against any State
-implementing it. A test State records the REST requests through its
-[`Transport`](https://docs.rs/composure/latest/composure/rest/trait.Transport.html) and keeps Background Work to run when the test says so:
+Commands taking `Ctx<impl Platform>` (REST, deferring) or `Ctx<impl HasData<..>>` (Bot Data) run
+against [`TestPlatform`](https://docs.rs/composure/latest/composure/testing/struct.TestPlatform.html).
+It records REST requests in a [`MockTransport`](https://docs.rs/composure/latest/composure/testing/struct.MockTransport.html)
+(answering 200 `{}` unless told otherwise) and keeps Background Work until
+`run_background()`, so a test checks the immediate response, runs the work, then checks what was
+sent:
 
 ```rust
-use std::{sync::{Arc, Mutex}, time::Duration};
 use composure::{
-    command::{BackgroundWork, Platform},
-    rest::{RawResponse, Request, Transport, TransportError},
+    app, command,
+    command::{Ctx, Deferred, HandlerError, Platform},
+    rest::{EditMessage, Method},
+    testing::{self, ResponseExt, TestPlatform},
 };
 
-/// Records requests; answers every one with `{}`
-#[derive(Default)]
-struct Discord { requests: Mutex<Vec<Request>> }
-
-impl Transport for Discord {
-    async fn send(&self, request: &Request) -> Result<RawResponse, TransportError> {
-        self.requests.lock().unwrap().push(request.clone());
-        Ok(RawResponse { status: 200, headers: Vec::new(), body: b"{}".to_vec() })
-    }
-
-    async fn sleep(&self, _duration: Duration) {}
+/// Count to three
+#[command]
+fn countdown(ctx: Ctx<impl Platform>) -> Deferred {
+    ctx.defer(async |ctx| {
+        for n in ["3...", "2...", "1..."] {
+            let edit = EditMessage { content: Some(n), ..Default::default() };
+            ctx.client().edit_original(&edit).await?;
+        }
+        Ok::<_, HandlerError>("Liftoff!")
+    })
 }
 
-#[derive(Clone, Default)]
-struct TestPlatform {
-    discord: Arc<Discord>,
-    work: Arc<Mutex<Vec<BackgroundWork>>>,
-}
+#[app(handlers(countdown))]
+pub struct Bot;
 
-impl Platform for TestPlatform {
-    type Transport = Arc<Discord>;
+# fn main() {
+let platform = TestPlatform::new();
+let response = testing::answer(&Bot, testing::command("countdown"), &platform);
+assert_eq!(response.response_type(), 5); // deferred: "thinking..."
+assert!(platform.transport().requests().is_empty());
 
-    fn transport(&self) -> Arc<Discord> {
-        self.discord.clone()
-    }
-
-    fn spawn(&self, work: BackgroundWork) {
-        self.work.lock().unwrap().push(work); // run later with block_on
-    }
-
-    fn bot_token(&self) -> Option<&str> {
-        Some("test-token")
-    }
-}
-# fn main() {}
+platform.run_background().unwrap();
+let transport = platform.transport();
+assert_eq!(transport.sent().len(), 4);
+assert_eq!(transport.sent()[0].0, Method::Patch);
+assert_eq!(transport.body(3)["content"], "Liftoff!");
+# }
 ```
 
-Dispatch with `&TestPlatform::default()`, check the immediate response (a deferral, say), run
-the queued [`BackgroundWork`](https://docs.rs/composure/latest/composure/command/type.BackgroundWork.html), then assert on the recorded
-requests: the edit of the original response, the follow-ups, the bot calls.
+- **Answers:** `MockTransport::new().respond(404, "..")` queues answers in order, and
+  `.answering(|request| ..)` answers by route, for canned reads or other APIs the bot calls.
+  Pass it in with `.with_transport(..)`.
+- **Bot Data:** `.with_data(config)` sets it, and `.with_bot_token(None)` removes the token
+  `ctx.bot()` uses.
+- **Your own traits:** a bot whose handlers need more from their State (a key-value store, say)
+  implements its trait on `TestPlatform<YourData>` in its own crate. An integration test can't:
+  the orphan rule forbids it. There, wrap a `TestPlatform` in a struct of your own that forwards
+  `Platform` and `HasData` to it and adds the rest.
 
 ## Signed requests
 
 [`adapter::handle_interaction`](https://docs.rs/composure/latest/composure/adapter/fn.handle_interaction.html) and
 [`handle_event`](https://docs.rs/composure/latest/composure/adapter/fn.handle_event.html) run the whole Adapter pipeline (signature check,
 parsing, dispatch, error rendering) without a platform, and return the HTTP status and body an
-Adapter would send. Sign test payloads with a key of your own:
+Adapter would send. A [`TestKey`](https://docs.rs/composure/latest/composure/testing/struct.TestKey.html)
+stands in for Discord's key:
 
 ```rust
-use composure::{adapter::{InteractionOutcome, handle_interaction}, app, command};
-use ed25519_dalek::{Signer, SigningKey};
+use composure::{
+    adapter::{InteractionOutcome, handle_interaction},
+    app, command,
+    testing::{self, TestKey, block_on},
+};
 
 /// Ping
 #[command]
@@ -134,24 +161,22 @@ fn ping() -> &'static str { "Pong" }
 pub struct Bot;
 
 # fn main() {
-let key = SigningKey::from_bytes(&[7; 32]);
-let public_key = hex::encode(key.verifying_key().to_bytes());
+let key = TestKey::default();
+let request = key.signed(testing::command("ping").body());
 
-let body = br#"{"id":"2","application_id":"1","type":1,"token":"t","version":1}"#;
-let timestamp = "1700000000";
-let signature = hex::encode(key.sign(&[timestamp.as_bytes(), body].concat()).to_bytes());
-
-let outcome = futures::executor::block_on(handle_interaction(
-    &public_key, Some(&signature), Some(timestamp), body, &Bot, &(),
+let outcome = block_on(handle_interaction(
+    &key.public_key(), Some(&request.signature), Some(&request.timestamp), &request.body, &Bot, &(),
 ));
-assert_eq!(outcome.status(), 200); // a Ping, answered with a Pong
+assert_eq!(outcome.status(), 200);
 
-let forged = futures::executor::block_on(handle_interaction(
-    &public_key, Some(&signature), Some("1700000001"), body, &Bot, &(),
+let forged = block_on(handle_interaction(
+    &key.public_key(), Some(&request.signature), Some("1700000001"), &request.body, &Bot, &(),
 ));
 assert!(matches!(forged, InteractionOutcome::Unauthorized));
 # }
 ```
+
+`request.headers()` gives both signature headers, to send to a running server.
 
 ## Definitions
 
@@ -175,6 +200,6 @@ assert_eq!(definitions[0].scope, Some("dev"));
 # }
 ```
 
-The repository's `examples/bot/tests/` go further: `offline.rs` runs every example Command
-against a stand-in Platform, `regression.rs` replays signed fixtures for every Interaction
-shape, and `perf.rs` holds each path to an allocation budget.
+The repository's tests go further:
+- **`examples/bot/tests/`:** `offline.rs` runs every example Command on a `TestPlatform`, `regression.rs` replays signed fixtures for every Interaction shape, and `perf.rs` holds each path to an allocation budget.
+- **`bots/composure/tests/offline.rs`:** wraps a `TestPlatform` to add the bot's own key-value store.

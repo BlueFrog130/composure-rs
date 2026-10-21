@@ -69,6 +69,8 @@
 //! - [`adapter`]: the request pipeline every Adapter shares (validate, parse, dispatch)
 //! - [`auth`]: Ed25519 request signature validation
 //! - [`credentials`]: [`Credentials`], what identifies the application, however the bot loads them
+//! - `testing` (`testing` feature): Interaction builders, a stand-in Platform and Transport,
+//!   signing keys, for testing a bot without Discord
 //!
 //! # Feature flags
 //!
@@ -85,6 +87,7 @@
 //! | `tracing` | Spans and events through [`tracing`](https://docs.rs/tracing); see [Platforms](https://bluefrog130.github.io/composure-rs/platforms.html#logging) |
 //! | `web-crypto` | Validate signatures with the host's Web Crypto on `wasm32-unknown-unknown` instead of compiling `ed25519-dalek` in |
 //! | `reqwest` | A blocking [`ReqwestTransport`](rest::ReqwestTransport) for deploy-time tools (not for WASM) |
+//! | `testing` | `rest` and `composure::testing`, for a bot's tests: Interaction builders, `TestPlatform`, `MockTransport`, `TestKey`; see [Testing](https://bluefrog130.github.io/composure-rs/testing.html) |
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
@@ -101,10 +104,13 @@ pub mod credentials;
 pub mod definition;
 mod outline;
 // The guide (`book/`) as doctests
-#[cfg(all(feature = "macros", feature = "rest", doctest))]
+#[cfg(all(feature = "macros", feature = "testing", doctest))]
 mod guide;
 #[cfg(feature = "rest")]
 pub mod rest;
+#[cfg(all(feature = "rest", any(test, feature = "testing")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
+pub mod testing;
 pub mod types;
 
 pub use command::Ctx;
