@@ -52,7 +52,7 @@ themed.
 There are two environments, each with its own Discord application and home-server channels
 under `[env.<env>]` in `wrangler.toml`:
 
-- **`production`** is deployed as the Worker `composure-bot-production`.
+- **`production`** is deployed as the Worker `composure-bot`.
 - **`dev`** only runs locally with `wrangler dev`, which simulates its KV namespace (no id).
 
 For production you need:
@@ -87,7 +87,7 @@ Then:
 
 6. In the Developer Portal:
    - Set the **Interactions Endpoint URL** to the Worker's URL
-     (`https://composure-bot-production.<subdomain>.workers.dev`).
+     (`https://composure-bot.<subdomain>.workers.dev`).
    - Set the **Webhook Events URL** to the same URL plus `/events`, and enable **Application
      Authorized**.
    - Under Installation, enable both **Guild Install** and **User Install**.

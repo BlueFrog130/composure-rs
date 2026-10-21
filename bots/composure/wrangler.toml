@@ -4,7 +4,7 @@ compatibility_date = "2026-10-01"
 
 # Two environments with their own Discord application and channels: `dev` only runs locally
 # (`npx wrangler dev --env dev`), `production` is deployed (`npx wrangler deploy --env
-# production`, as the Worker `composure-bot-production`). `vars` and `kv_namespaces` are not
+# production`, as the Worker `composure-bot`). `vars` and `kv_namespaces` are not
 # inherited from the top level, so each env lists its own.
 #
 # Secrets: `npx wrangler secret put <NAME> --env production`, and `.dev.vars` for dev:
@@ -38,6 +38,9 @@ GITHUB_REPO = "BlueFrog130/composure-rs"
 binding = "COMPOSURE"
 
 [env.production]
+# Without it wrangler appends the env: `composure-bot-production`
+name = "composure-bot"
+
 [env.production.vars]
 DISCORD_APPLICATION_ID = "1562278701016809502"
 ANNOUNCE_CHANNEL_ID = "1562278383138902097"
