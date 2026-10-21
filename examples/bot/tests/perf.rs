@@ -258,9 +258,10 @@ fn cases() -> Vec<Case> {
         case(
             "command /whoami (inline REST)",
             command("whoami", json!([])),
-            // Offline, so the request fails: the cost of the client and the error answer
+            // Offline, so the request fails: the cost of the client and the error answer, with the
+            // error's cause kept for the logs
             |r| assert_eq!(r["data"]["flags"], 64),
-            26,
+            28,
         ),
         case(
             "autocomplete /fruit",
