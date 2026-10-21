@@ -112,8 +112,8 @@ impl Platform for Env {
         drop(work);
     }
 
-    fn bot_token(&self) -> Option<String> {
-        Some("bot-token".to_string())
+    fn bot_token(&self) -> Option<&str> {
+        Some("bot-token")
     }
 }
 
@@ -256,6 +256,13 @@ fn cases() -> Vec<Case> {
             23,
         ),
         case(
+            "command /whoami (inline REST)",
+            command("whoami", json!([])),
+            // Offline, so the request fails: the cost of the client and the error answer
+            |r| assert_eq!(r["data"]["flags"], 64),
+            26,
+        ),
+        case(
             "autocomplete /fruit",
             {
                 let mut payload = command(
@@ -367,7 +374,9 @@ fn cases() -> Vec<Case> {
 /// Parse, dispatch, and serialize, as the Adapter does after the signature check
 fn answer(body: &[u8], env: &Env) -> Vec<u8> {
     let interaction: Interaction = serde_json::from_slice(body).unwrap();
-    let response = block_on(dispatch(interaction, &Bot, env)).unwrap();
+    // Errors are answered as the Adapters answer them
+    let response =
+        block_on(dispatch(interaction, &Bot, env)).unwrap_or_else(|error| error.response());
     serde_json::to_vec(&response).unwrap()
 }
 

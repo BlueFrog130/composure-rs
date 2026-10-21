@@ -126,8 +126,8 @@ impl<T: Send + Sync + 'static> Platform for Host<T> {
         });
     }
 
-    fn bot_token(&self) -> Option<String> {
-        self.core.credentials.bot_token().map(str::to_owned)
+    fn bot_token(&self) -> Option<&str> {
+        self.core.credentials.bot_token()
     }
 }
 

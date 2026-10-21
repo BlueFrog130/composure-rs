@@ -133,8 +133,8 @@ impl<T: Send + Sync + 'static> Platform for Worker<T> {
         });
     }
 
-    fn bot_token(&self) -> Option<String> {
-        self.bot_token.as_deref().map(str::to_owned)
+    fn bot_token(&self) -> Option<&str> {
+        self.bot_token.as_deref()
     }
 }
 

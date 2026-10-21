@@ -33,7 +33,7 @@ pub trait Platform: Clone + Send + Sync + 'static {
     fn spawn(&self, work: BackgroundWork);
 
     /// The bot token (`DISCORD_TOKEN`), without the `Bot ` prefix
-    fn bot_token(&self) -> Option<String>;
+    fn bot_token(&self) -> Option<&str>;
 }
 
 fn interaction_client<S: Platform>(
@@ -57,7 +57,7 @@ fn bot_client<S: Platform>(
         .ok_or_else(|| HandlerError::new("the bot token (DISCORD_TOKEN) is not configured"))?;
     Ok(BotClient::new(
         state.transport(),
-        &token,
+        token,
         common.application_id,
     ))
 }
@@ -377,7 +377,7 @@ mod tests {
             self.work.lock().unwrap().push(work);
         }
 
-        fn bot_token(&self) -> Option<String> {
+        fn bot_token(&self) -> Option<&str> {
             None
         }
     }
