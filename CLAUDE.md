@@ -21,7 +21,7 @@ cargo test -p composure_bench_cloudflare --release --test coldstart -- --ignored
 
 `cargo test --workspace` is offline. Live Discord API tests are `#[ignore]`d (`composure_sync --test api_regression`; they overwrite real commands and read `crates/sync/.env.test`, gitignored, with `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`).
 
-REST Endpoints are checked against Discord's OpenAPI spec vendored in `crates/composure/spec/` (pinned commit in `PINNED`; bump with `scripts/update-spec.sh`): `cargo test -p composure --features full --lib rest::spec -- --nocapture` also prints unimplemented routes.
+REST Endpoints are checked against Discord's OpenAPI spec vendored in `crates/composure/spec/` (pinned commit in `PINNED`; bump with `scripts/update-spec.sh`): `cargo test -p composure --features full --lib rest::spec -- --nocapture` also prints unimplemented routes, minus `OUT_OF_SCOPE` in `rest/spec.rs` (gateway, OAuth2/user-token, partner SDK, ...; prefix + reason, each checked to still match the spec).
 
 ## Workspace crates
 

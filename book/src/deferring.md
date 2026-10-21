@@ -7,7 +7,10 @@ that implements [`Platform`](https://docs.rs/composure/latest/composure/command/
 
 Enable the `rest` feature (the [`rest`](https://docs.rs/composure/latest/composure/rest/) client and Interaction Endpoints), plus the
 `rest-*` features for the [`BotClient`](https://docs.rs/composure/latest/composure/rest/struct.BotClient.html) Endpoints you call, or `tier1`
-for the common ones.
+for the common ones. Beyond `tier1` are groups such as Linked Roles metadata
+(`rest-role-connections`), onboarding and the welcome screen (`rest-onboarding`), stage
+instances (`rest-stage-instances`) and lobbies (`rest-lobbies`); `full` turns on every one. The
+[feature flags](https://docs.rs/composure/latest/composure/#feature-flags) list them all.
 
 ## Calling the API
 
