@@ -514,22 +514,6 @@ impl TagDef {
     pub fn has(&self, attr: &str) -> bool {
         self.attrs.iter().any(|a| a.name == attr)
     }
-
-    /// Whether `partial` is the start of a special attribute's name, as while it is typed. Field
-    /// names complete through the field assignment the attribute expands to, without the second
-    /// error an unresolved reference would add.
-    pub fn completes(&self, partial: &str) -> bool {
-        self.attrs
-            .iter()
-            .any(|a| !a.field && a.name.starts_with(partial))
-    }
-}
-
-/// Whether `partial` is the start of a tag name, as while it is typed
-pub fn completes(partial: &str) -> bool {
-    TAGS.iter().any(|tag| {
-        tag.name.starts_with(partial) || tag.aliases.iter().any(|a| a.starts_with(partial))
-    })
 }
 
 /// `composure::command::tags`: one module per tag with one const per attribute, all documented,

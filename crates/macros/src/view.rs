@@ -112,8 +112,6 @@ struct Gen {
     locals: HashSet<String>,
     /// Names bound in the `{..}` blocks around the markup being expanded
     enclosing: Vec<HashSet<String>>,
-    /// The invocation being expanded had parse errors: markup still being typed
-    incomplete: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -303,9 +301,6 @@ struct Attrs {
     tag: String,
     /// The built-in tag's table entry; `None` for a sub-View
     def: Option<&'static TagDef>,
-    /// `let _ = ::composure::command::tags::Tag::attr;` at each attribute's span, for the IDE to
-    /// complete and document attribute names (taken by the element being generated)
-    refs: TokenStream,
 }
 
 impl Attrs {
@@ -348,26 +343,10 @@ impl Attrs {
         }
         errors.finish()?;
         let def = tags::find(tag);
-        let mut refs = TokenStream::new();
-        if let Some(def) = def {
-            let module = Ident::new(def.name, Span::call_site());
-            for attr in &list {
-                // Known names, and the start of one while it is typed (which also fails as an
-                // unknown field, as it would anyway)
-                let key = &attr.key[0];
-                let name = key.to_string();
-                if def.has(&name) || def.completes(&name) {
-                    refs.extend(quote! {
-                        let _ = ::composure::command::tags::#module::#key;
-                    });
-                }
-            }
-        }
         Ok(Self {
             list,
             tag: tag.to_string(),
             def,
-            refs,
         })
     }
 
@@ -677,7 +656,6 @@ impl Gen {
             roots: Vec::new(),
             locals: HashSet::new(),
             enclosing: Vec::new(),
-            incomplete: false,
         }
     }
 
@@ -709,6 +687,7 @@ impl Gen {
     /// `ModalView` when nothing did), so `{..}` blocks keep type-checking in incomplete markup
     fn view(&mut self, tokens: TokenStream) -> TokenStream {
         let parser = rstml::Parser::new(rstml::ParserConfig::new().recover_block(true));
+        let completion = completion_refs(tokens.clone());
         let (nodes, diagnostics) = parser.parse_recoverable(tokens).split_vec();
         let incomplete = !diagnostics.is_empty();
         for diagnostic in diagnostics {
@@ -721,7 +700,6 @@ impl Gen {
                 }
             }
         }
-        let outer_incomplete = std::mem::replace(&mut self.incomplete, incomplete);
         self.pre.push(Vec::new());
         let root = self.var("root");
         self.roots.push(quote!((&mut #root)));
@@ -754,10 +732,13 @@ impl Gen {
             }
         };
         self.roots.pop();
-        self.incomplete = outer_incomplete;
         let pre = self.pre.pop().expect("pushed above");
         let c = cmd();
+        let mut docs = TokenStream::new();
+        attr_docs(&nodes, &mut docs);
         quote! {{
+            #docs
+            #completion
             #(#pre)*
             #[allow(unused_mut)]
             let mut #root = #c::MarkupRoot::default();
@@ -960,7 +941,6 @@ impl Gen {
         let span = el.name().span();
         let ty = tag_type(tag, el, false);
         let close = close_type(tag, el, false);
-        let refs = std::mem::take(&mut attrs.refs);
         let no_children = |el: &NodeElement<rstml::Infallible>| -> syn::Result<()> {
             match el.children.iter().find(|node| !is_comment(node)) {
                 Some(child) => err(child.span(), format!("`<{name}>` takes no children")),
@@ -977,7 +957,6 @@ impl Gen {
                 let components = self.level(&el.children, inner);
                 let assign = attrs.assign(&e, &[])?;
                 quote! {{
-                    #refs
                     #close
                     #[allow(unused_mut)]
                     let mut #e = #ty::new(#components);
@@ -994,7 +973,6 @@ impl Gen {
                 };
                 let assign = attrs.assign(&e, &[])?;
                 quote! {{
-                    #refs
                     #close
                     #[allow(unused_mut)]
                     let mut #e = #ty::new(#content);
@@ -1002,7 +980,7 @@ impl Gen {
                     #t::Component::TextDisplay(#e)
                 }}
             }
-            Tag::Section => self.section(el, attrs, ty, close, refs)?,
+            Tag::Section => self.section(el, attrs, ty, close)?,
             Tag::Thumbnail | Tag::File => {
                 no_children(el)?;
                 let (url_span, url) = attrs.media()?;
@@ -1013,7 +991,6 @@ impl Gen {
                 };
                 let media = quote_spanned!(url_span=> #c::IntoMedia::into_media(#url, #r));
                 quote! {{
-                    #refs
                     #close
                     #[allow(unused_mut)]
                     let mut #e = #ty::new(#media);
@@ -1037,7 +1014,6 @@ impl Gen {
                 };
                 let assign = attrs.assign(&e, &[])?;
                 quote! {{
-                    #refs
                     #close
                     #[allow(unused_mut)]
                     let mut #e = #ty::new();
@@ -1050,7 +1026,6 @@ impl Gen {
                 let items = self.gallery_items(el);
                 let assign = attrs.assign(&e, &[])?;
                 quote! {{
-                    #refs
                     #close
                     #[allow(unused_mut)]
                     let mut #e = #ty::new(#items);
@@ -1058,10 +1033,10 @@ impl Gen {
                     #t::Component::MediaGallery(#e)
                 }}
             }
-            Tag::Button => self.button(el, attrs, ty, close, refs)?,
-            tag if tag.is_select() => self.select(el, tag, attrs, ty, close, refs)?,
-            Tag::Label => self.label(el, attrs, ty, close, refs)?,
-            tag if tag.is_input() => self.input(el, tag, attrs, ty, close, refs)?,
+            Tag::Button => self.button(el, attrs, ty, close)?,
+            tag if tag.is_select() => self.select(el, tag, attrs, ty, close)?,
+            Tag::Label => self.label(el, attrs, ty, close)?,
+            tag if tag.is_input() => self.input(el, tag, attrs, ty, close)?,
             Tag::Item | Tag::Option | Tag::Modal => return err(span, tag.placement()),
             _ => unreachable!("every tag is handled"),
         })
@@ -1167,7 +1142,6 @@ impl Gen {
         mut attrs: Attrs,
         ty: TokenStream,
         close: TokenStream,
-        refs: TokenStream,
     ) -> syn::Result<TokenStream> {
         let t = types();
         // `Some(None)`: the accessory child had an error, recorded
@@ -1218,7 +1192,6 @@ impl Gen {
         let acc = self.var("accessory");
         let assign = attrs.assign(&e, &[])?;
         Ok(quote! {{
-            #refs
             #close
             let #inner = #components;
             let #acc = #accessory;
@@ -1232,7 +1205,6 @@ impl Gen {
     fn item(&mut self, el: &NodeElement<rstml::Infallible>) -> syn::Result<TokenStream> {
         let c = cmd();
         let mut attrs = Attrs::new(el, "Item")?;
-        let refs = std::mem::take(&mut attrs.refs);
         let ty = tag_type(Tag::Item, el, false);
         let close = close_type(Tag::Item, el, false);
         let (url_span, url) = attrs.media()?;
@@ -1241,7 +1213,6 @@ impl Gen {
         let media = quote_spanned!(url_span=> #c::IntoMedia::into_media(#url, #r));
         let assign = attrs.assign(&e, &[])?;
         Ok(quote! {{
-            #refs
             #close
             #[allow(unused_mut)]
             let mut #e = #ty::new(#media);
@@ -1256,7 +1227,6 @@ impl Gen {
         mut attrs: Attrs,
         ty: TokenStream,
         close: TokenStream,
-        refs: TokenStream,
     ) -> syn::Result<TokenStream> {
         let c = cmd();
         let t = types();
@@ -1329,7 +1299,6 @@ impl Gen {
         let e = self.var("e");
         let assign = attrs.assign(&e, &[])?;
         Ok(quote! {{
-            #refs
             #close
             #[allow(unused_mut)]
             let mut #e = #ty::new(
@@ -1557,7 +1526,6 @@ impl Gen {
         mut attrs: Attrs,
         ty: TokenStream,
         close: TokenStream,
-        refs: TokenStream,
     ) -> syn::Result<TokenStream> {
         let c = cmd();
         let t = types();
@@ -1645,7 +1613,6 @@ impl Gen {
         });
         let assign = attrs.assign(&e, &[("min", "min_values"), ("max", "max_values")])?;
         Ok(quote! {{
-            #refs
             #close
             #[allow(unused_mut)]
             let mut #e = #ty::new(
@@ -1740,7 +1707,6 @@ impl Gen {
     ) -> syn::Result<TokenStream> {
         let c = cmd();
         let mut attrs = Attrs::new(el, "Option")?;
-        let refs = std::mem::take(&mut attrs.refs);
         let ty = tag_type(Tag::Option, el, group);
         let close = close_type(Tag::Option, el, group);
         let value = attrs.required(&["value"], "what the option submits")?;
@@ -1773,7 +1739,6 @@ impl Gen {
             ))
         };
         Ok(quote! {{
-            #refs
             #close
             #[allow(unused_mut)]
             let mut #e = #new;
@@ -1790,14 +1755,12 @@ impl Gen {
             custom_id,
             title,
             params,
-            refs,
         } = self.recover(header).unwrap_or_else(|| {
             let empty = quote!(::std::string::String::new());
             ModalHeader {
                 custom_id: empty.clone(),
                 title: empty,
                 params: None,
-                refs: TokenStream::new(),
             }
         });
         self.modal = Some(ModalScope {
@@ -1821,7 +1784,6 @@ impl Gen {
         let data = modal_data(tag_type(Tag::Modal, el, false), quote!(#id), title);
         let close = close_type(Tag::Modal, el, false);
         quote! {
-            #refs
             #close
             let #id = #custom_id;
             let #v = #components;
@@ -1834,7 +1796,6 @@ impl Gen {
         let c = cmd();
         let empty = quote!(::std::string::String::new());
         let mut attrs = Attrs::new(el, "Modal")?;
-        let refs = std::mem::take(&mut attrs.refs);
         let title = attrs.required(&["title"], "shown at the top, max 45 characters");
         let title = match self.recover(title) {
             Some(title) => title.to_token_stream(),
@@ -1870,7 +1831,6 @@ impl Gen {
             custom_id,
             title,
             params,
-            refs,
         })
     }
 
@@ -1880,7 +1840,6 @@ impl Gen {
         mut attrs: Attrs,
         ty: TokenStream,
         close: TokenStream,
-        refs: TokenStream,
     ) -> syn::Result<TokenStream> {
         let c = cmd();
         let t = types();
@@ -1922,7 +1881,6 @@ impl Gen {
         let e = self.var("e");
         let assign = attrs.assign(&e, &[])?;
         Ok(quote! {{
-            #refs
             #close
             let #e = #input;
             #[allow(unused_mut)]
@@ -1982,7 +1940,6 @@ impl Gen {
         mut attrs: Attrs,
         ty_path: TokenStream,
         close: TokenStream,
-        refs: TokenStream,
     ) -> syn::Result<TokenStream> {
         let c = cmd();
         let t = types();
@@ -2041,7 +1998,6 @@ impl Gen {
                 let assign =
                     attrs.assign(&e, &[("min_len", "min_length"), ("max_len", "max_length")])?;
                 quote! {{
-                    #refs
                     #close
                     let mut #e = #ty_path::new(
                         ::std::string::String::from(#name),
@@ -2080,7 +2036,6 @@ impl Gen {
                 };
                 let assign = attrs.assign(&e, &[("min", "min_values"), ("max", "max_values")])?;
                 quote! {{
-                    #refs
                     #close
                     #[allow(unused_mut)]
                     let mut #e = #ty_path::new(#name, #options);
@@ -2096,7 +2051,6 @@ impl Gen {
                     .map(|ty| shape_check(ty, "CHECKED", "a checkbox submits a bool"));
                 let assign = attrs.assign(&e, &[])?;
                 quote! {{
-                    #refs
                     #close
                     #check
                     #[allow(unused_mut)]
@@ -2114,7 +2068,6 @@ impl Gen {
                 let assign = attrs.assign(&e, &[("min", "min_values"), ("max", "max_values")])?;
                 let many = many(10);
                 quote! {{
-                    #refs
                     #close
                     #[allow(unused_mut)]
                     let mut #e = #ty_path::new(#name);
@@ -2178,18 +2131,102 @@ impl Gen {
         {
             self.views.push(path.clone());
         }
-        // A tag name still being typed: complete it from the built-in tags too
-        let complete = match path.get_ident() {
-            Some(ident) if self.incomplete && tags::completes(&ident.to_string()) => {
-                quote!(use ::composure::command::tags::#ident as _;)
-            }
-            _ => TokenStream::new(),
-        };
-        Ok(quote! {{
-            #complete
+        Ok(quote! {
             #path::builder() #setters .build()
-        }})
+        })
     }
+}
+
+/// `let _ = ::composure::command::tags::Tag::attr;` at each known attribute's span, so rust-analyzer
+/// shows the attribute's docs on hover. Emitted for the whole markup, apart from generating it,
+/// so a tag with an error (half-typed) keeps them.
+fn attr_docs(nodes: &[Node], out: &mut TokenStream) {
+    for node in nodes {
+        match node {
+            Node::Element(el) => {
+                if let Ok(Kind::Tag(tag)) = classify(el) {
+                    let def = tag.def();
+                    let module = Ident::new(def.name, Span::call_site());
+                    for attribute in el.attributes() {
+                        if let NodeAttribute::Attribute(keyed) = attribute
+                            && let Ok(key) = attr_key(&keyed.key)
+                            && def.has(&key[0].to_string())
+                        {
+                            let key = &key[0];
+                            out.extend(quote!(let _ = ::composure::command::tags::#module::#key;));
+                        }
+                    }
+                }
+                attr_docs(&el.children, out);
+            }
+            Node::Fragment(fragment) => attr_docs(&fragment.children, out),
+            _ => {}
+        }
+    }
+}
+
+/// The identifier rust-analyzer inserts at the cursor to complete in a macro (`raCompletionMarker`;
+/// older versions `intellijRulezz`)
+fn is_completion_marker(ident: &Ident) -> bool {
+    let name = ident.to_string();
+    name.contains("raCompletionMarker") || name.contains("intellijRulezz")
+}
+
+/// Keywords an expression continues after, so a word after them is in an attribute's value
+const KEYWORDS: &[&str] = &[
+    "as", "async", "await", "break", "else", "if", "in", "let", "match", "move", "mut", "ref",
+    "return", "unsafe", "while",
+];
+
+/// When rust-analyzer expands the markup to complete at a cursor, a path into
+/// `composure::command::tags` holding the marker identifier, so the tags (after `<`) or the tag's
+/// attributes (inside an open tag) are offered. Read from the raw tokens, since half-typed markup
+/// often does not parse. Nothing is emitted outside completion.
+fn completion_refs(tokens: TokenStream) -> TokenStream {
+    let trees: Vec<TokenTree> = tokens.into_iter().collect();
+    let punct =
+        |i: usize, c: char| matches!(trees.get(i), Some(TokenTree::Punct(p)) if p.as_char() == c);
+    let mut out = TokenStream::new();
+    for (i, tree) in trees.iter().enumerate() {
+        let ident = match tree {
+            TokenTree::Group(group) => {
+                out.extend(completion_refs(group.stream()));
+                continue;
+            }
+            TokenTree::Ident(ident) if is_completion_marker(ident) => ident,
+            _ => continue,
+        };
+        // A tag name: `<Con|`, `</Con|`
+        if i >= 1 && (punct(i - 1, '<') || (i >= 2 && punct(i - 1, '/') && punct(i - 2, '<'))) {
+            out.extend(quote!(use ::composure::command::tags::#ident as _;));
+            continue;
+        }
+        // An attribute name follows the tag name or a whole attribute (`custom_id="x"`, `{..}`,
+        // `primary`); after punctuation it is in a value (`=..`, `move |_| ..`, `on:..`, `a.b`)
+        let after_attribute = match i.checked_sub(1).map(|j| &trees[j]) {
+            Some(TokenTree::Literal(_) | TokenTree::Group(_)) => true,
+            Some(TokenTree::Ident(prev)) => !KEYWORDS.contains(&prev.to_string().as_str()),
+            _ => false,
+        };
+        if !after_attribute {
+            continue;
+        }
+        let open = (0..i).rev().find_map(|j| match &trees[j] {
+            TokenTree::Punct(p) if p.as_char() == '>' => Some(None),
+            TokenTree::Punct(p) if p.as_char() == '<' => match trees.get(j + 1) {
+                Some(TokenTree::Ident(tag)) => Some(Some(tag.to_string())),
+                _ => Some(None),
+            },
+            _ => None,
+        });
+        if let Some(Some(tag)) = open
+            && let Some(def) = tags::find(&tag)
+        {
+            let module = Ident::new(def.name, Span::call_site());
+            out.extend(quote!(let _ = ::composure::command::tags::#module::#ident;));
+        }
+    }
+    out
 }
 
 /// Discord's limits that `rsx!` checks at compile time; the runtime check uses
@@ -2209,8 +2246,6 @@ struct ModalHeader {
     title: TokenStream,
     /// The inline `on:submit`'s typed parameters
     params: Option<Vec<(Ident, Type)>>,
-    /// References to the attributes' docs in `composure::command::tags`
-    refs: TokenStream,
 }
 
 /// What a level's element is
@@ -3047,6 +3082,70 @@ mod tests {
                 assert_eq!(Tag::parse(alias), Some(tag), "{alias}");
             }
         }
+    }
+
+    /// What rust-analyzer expands when completing at `$`: the marker identifier in place of the
+    /// cursor, in markup that often does not parse
+    fn completing(markup: &str) -> String {
+        let input = markup.replace('$', "raCompletionMarker");
+        expand_macro(TokenStream::from_str(&input).unwrap())
+            .to_string()
+            .replace(' ', "")
+    }
+
+    #[test]
+    fn tag_names_complete_from_the_tags_module() {
+        for markup in ["<Con$", "<Container><Con$</Container>", "<Row></Ro$"] {
+            let output = completing(markup);
+            assert!(
+                output.contains("use::composure::command::tags::")
+                    && output.contains("raCompletionMarkeras_;"),
+                "{markup}: {output}"
+            );
+        }
+    }
+
+    #[test]
+    fn attribute_names_complete_from_the_tag_module() {
+        for markup in [
+            "<Row><Button pri$</Row>",
+            "<Row><Button $</Row>",
+            "<Row><Button pri$ custom_id=\"x\">\"a\"</Button></Row>",
+            "<Row><Button primary custom_id=\"x\" dis$/></Row>",
+        ] {
+            let output = completing(markup);
+            assert!(
+                output.contains("let_=::composure::command::tags::Button::")
+                    && output.contains("raCompletionMarker;"),
+                "{markup}: {output}"
+            );
+        }
+        // Not in a value, an event name or text
+        for (markup, partial) in [
+            ("<Row><Button custom_id=a$>\"a\"</Button></Row>", "a"),
+            ("<Row><Button on:cl$>\"a\"</Button></Row>", "cl"),
+            ("<Text>{x$}</Text>", "x"),
+            (
+                "<Row><Button on:click=move |_| fo$>\"a\"</Button></Row>",
+                "fo",
+            ),
+            (
+                "<Row><Button on:click=move |_| return fo$>\"a\"</Button></Row>",
+                "fo",
+            ),
+        ] {
+            let output = completing(markup);
+            let marker = format!("::{partial}raCompletionMarker");
+            assert!(!output.contains(&marker), "{markup}: {output}");
+        }
+    }
+
+    #[test]
+    fn known_attributes_link_their_docs_even_in_a_tag_with_an_error() {
+        // A button without a handler is an error, so it is not generated
+        let output = completing("<Row><Button primary disabled>\"a\"</Button></Row>");
+        assert!(output.contains("tags::Button::primary;"), "{output}");
+        assert!(output.contains("tags::Button::disabled;"), "{output}");
     }
 
     #[test]
