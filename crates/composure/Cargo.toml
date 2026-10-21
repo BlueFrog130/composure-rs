@@ -20,7 +20,6 @@ hex = "0.4.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["raw_value"] }
 serde_repr = "0.1.21"
-strum = { version = "0.28.0", features = ["derive"] }
 composure_macros = { workspace = true, optional = true }
 reqwest = { version = "0.13.5", optional = true, features = ["blocking"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"], optional = true }
