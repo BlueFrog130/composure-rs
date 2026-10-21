@@ -2390,8 +2390,10 @@ fn tag_type(tag: Tag, el: &NodeElement<rstml::Infallible>, group: bool) -> Token
 
 fn spanned_type(tag: Tag, span: Span, group: bool) -> TokenStream {
     let name = if group { "GroupOption" } else { tag.def().ty };
+    // Only the type's name at the tag's span: the IDE picks one token for the tag, and the
+    // `composure`/`types` segments would make `<Button>` (built as `ButtonComponent`) a module
     let ident = Ident::new(name, span);
-    quote_spanned!(span=> ::composure::types::#ident)
+    quote!(::composure::types::#ident)
 }
 
 /// `let _: X;` at the closing tag's span, so `</X>` reaches the type too

@@ -532,7 +532,7 @@ pub fn starts(partial: &str) -> bool {
     })
 }
 
-/// `composure::command::tags`: one module per tag with one unit struct per attribute, all documented,
+/// `composure::command::tags`: one module per tag with one const per attribute, all documented,
 /// plus `ALL` for the guide's consistency test and an exhaustive pattern per type, so a field
 /// added to a component fails to compile until it is listed here
 pub fn expand_module() -> TokenStream {
@@ -546,7 +546,7 @@ pub fn expand_module() -> TokenStream {
             let doc = attr.doc;
             quote! {
                 #[doc = #doc]
-                pub struct #ident;
+                pub const #ident: () = ();
             }
         });
         let ty = Ident::new(tag.ty, Span::call_site());
@@ -560,7 +560,7 @@ pub fn expand_module() -> TokenStream {
         let check = format_ident!("__fields_{}", tag.name);
         modules.extend(quote! {
             #[doc = #doc]
-            #[allow(non_snake_case, non_camel_case_types)]
+            #[allow(non_snake_case, non_upper_case_globals)]
             pub mod #name {
                 #(#consts)*
             }
