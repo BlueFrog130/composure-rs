@@ -44,7 +44,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo install worker-build@0.8.7 --locked
       - run: cargo test -p composure_bot
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
