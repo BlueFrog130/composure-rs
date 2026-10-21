@@ -7,8 +7,9 @@
 //! Composure's spans put `interaction_id`, `interaction_type`, `name`, `guild_id`, `channel_id`
 //! and `user_id` on everything logged while handling an Interaction (its Background Work
 //! included), `event_type` while handling a Webhook Event, and `method` / `route` during REST
-//! calls. Handler errors are logged inside those spans with `error` and `error_kind` fields
-//! (ERROR for failures, WARN for unknown commands and invalid Options, DEBUG for user errors).
+//! calls. Handler errors are logged inside those spans with `error`, `error_kind` and (when the
+//! error has causes) `sources` fields (ERROR for failures, WARN for unknown commands and invalid
+//! Options, DEBUG for user errors).
 //!
 //! Install it once per isolate, from `#[event(start)]`:
 //!
@@ -374,7 +375,8 @@ mod tests {
         assert!(!line.to_string().contains("token"));
     }
 
-    struct Failing;
+    /// Answers every Command with the error it makes
+    struct Failing(fn() -> HandlerError);
 
     impl<S: Sync> InteractionHandler<S> for Failing {
         async fn command(
@@ -382,13 +384,13 @@ mod tests {
             _command: ApplicationCommandInteraction,
             _state: &S,
         ) -> Result<InteractionResponse, HandlerError> {
-            Err(HandlerError::new("boom"))
+            Err(self.0())
         }
     }
 
-    #[test]
-    fn handler_errors_are_logged_in_the_interaction_span() {
-        let interaction: Interaction = serde_json::from_value(json!({
+    /// `/ping`
+    fn ping() -> Interaction {
+        serde_json::from_value(json!({
             "id": "1100173248714518568",
             "application_id": "1052322265397739523",
             "type": 2,
@@ -397,10 +399,18 @@ mod tests {
             "channel_id": "1052322265397739526",
             "data": { "id": "1052358444704862218", "name": "ping", "type": 1 },
         }))
-        .unwrap();
+        .unwrap()
+    }
 
+    #[test]
+    fn handler_errors_are_logged_in_the_interaction_span() {
         let lines = lines(|| {
-            block_on(dispatch(interaction, &Failing, &())).unwrap_err();
+            block_on(dispatch(
+                ping(),
+                &Failing(|| HandlerError::new("boom")),
+                &(),
+            ))
+            .unwrap_err();
         });
 
         let line = message(&lines, "interaction failed");
@@ -414,5 +424,22 @@ mod tests {
         assert_eq!(field(line, "error").cloned(), str("boom"));
         assert_eq!(field(line, "error_kind").cloned(), str("handler"));
         assert_eq!(field(line, "message").cloned(), str("interaction failed"));
+        // Recorded only when there are causes
+        assert_eq!(field(line, "sources"), None);
+    }
+
+    #[test]
+    fn handler_errors_log_their_causes() {
+        let failing = Failing(|| {
+            HandlerError::new("request failed")
+                .with_source(std::io::Error::other("connection reset"))
+        });
+        let lines = lines(|| {
+            block_on(dispatch(ping(), &failing, &())).unwrap_err();
+        });
+
+        let line = message(&lines, "interaction failed");
+        assert_eq!(field(line, "error").cloned(), str("request failed"));
+        assert_eq!(field(line, "sources").cloned(), str("connection reset"));
     }
 }

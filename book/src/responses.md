@@ -179,6 +179,24 @@ fn roll(#[option("Dice, like 2d6")] dice: &str) -> Result<Ephemeral<String>, Han
 # fn main() {}
 ```
 
+A converted error keeps its causes (its [`source`](https://doc.rust-lang.org/std/error/trait.Error.html#method.source)
+chain) for the logs: `{}` prints only the message, as before, while `{:#}` and the `sources` log
+field show the rest, like `request failed: connection reset`.
+[`with_source`](https://docs.rs/composure/latest/composure/command/struct.HandlerError.html#method.with_source)
+adds a cause to an error you build yourself, without showing it to the user:
+
+```rust
+use composure::{command, command::HandlerError};
+
+/// Read the settings file
+#[command]
+fn settings() -> Result<String, HandlerError> {
+    std::fs::read_to_string("settings.toml")
+        .map_err(|error| HandlerError::user("Settings are unavailable.").with_source(error))
+}
+# fn main() {}
+```
+
 An unknown command or an Option that cannot be read usually means Discord's stored Commands
 are out of date: [Sync](getting_started.md#syncing-commands) again.
 
