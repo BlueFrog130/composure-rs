@@ -26,6 +26,7 @@ mod data;
 mod error;
 mod event;
 mod handler;
+mod limits;
 mod modal;
 mod option;
 #[cfg(feature = "rest")]

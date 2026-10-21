@@ -32,6 +32,7 @@ mod group;
 mod handler;
 mod meta;
 mod modal;
+mod tags;
 mod view;
 
 /// Makes a unit struct an App: the Interaction Handler routing to the Commands, Groups, Component
@@ -303,7 +304,13 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 ///
 /// Every error in the markup is reported, not just the first. A tag with an error is left out
 /// and the rest still expands (to `View::default()` when nothing parsed), so `{..}` blocks keep
-/// type-checking and completing in incomplete markup.
+/// type-checking and completing in incomplete markup. Discord's limits the markup shows (5
+/// buttons in a row, 3 texts in a section, 5 children in a modal, 25 options) are compile
+/// errors; the rest are checked when the View is answered with or sent.
+///
+/// A `View` is the whole message: `.ephemeral()`, `.allowed_mentions(..)`,
+/// `.suppress_notifications()` and `.file(..)` set the rest, and `<File>`, `<Thumbnail>` and
+/// `<Item>` given a `File` as `src` upload it with the message.
 ///
 /// | Tag | Builds | Attributes (every tag but `<Modal>`, `<Item>` and `<Option>` also takes `id`) |
 /// |---|---|---|
@@ -312,9 +319,9 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 /// | `<Text>` (`<TextDisplay>`) | `TextDisplay` | `content` (or text children) |
 /// | `<Separator>` | `Separator` | `small` / `large`, `spacing`, `divider` |
 /// | `<Row>` (`<ActionRow>`) | `ActionRow` | |
-/// | `<Thumbnail>` | `Thumbnail` | `url` (required), `description`, `spoiler` |
-/// | `<Gallery>` (`<MediaGallery>`) | `MediaGallery` | `<Item url=..>` children: `description`, `spoiler` |
-/// | `<File>` | `FileComponent` | `url` (required, `attachment://..`), `spoiler` |
+/// | `<Thumbnail>` | `Thumbnail` | `src`/`url` (required: a URL, a `File` to upload, an `&Attachment`), `description`, `spoiler` |
+/// | `<Gallery>` (`<MediaGallery>`) | `MediaGallery` | `<Item src=..>` children: `description`, `spoiler` |
+/// | `<File>` | `FileComponent` | `src`/`url` (required: a `File` to upload, or `attachment://..`), `spoiler` |
 /// | `<Button>` | `ButtonComponent` | `primary` / `secondary` / `success` / `danger`, `style`, `on:click`, `custom_id`, `url`, `sku_id`, `label`, `emoji`, `disabled` |
 /// | `<StringSelect>` (`<Select>`) | `StringSelect` | `on:select`, `custom_id`, `name` (modals), `options` (a Choice enum), `placeholder`, `min`, `max`, `disabled`, `required` |
 /// | `<UserSelect>`, `<RoleSelect>`, `<MentionableSelect>`, `<ChannelSelect>` | the entity selects | as `<StringSelect>` without `options`, plus `default_values`, `channel_types` |
@@ -361,4 +368,11 @@ pub fn view(args: TokenStream, item: TokenStream) -> TokenStream {
     view::expand_attr(args.into(), item.into())
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
+}
+
+/// `composure::command::tags`, generated from the tag table; invoked once by `composure`
+#[doc(hidden)]
+#[proc_macro]
+pub fn __view_tags(_input: TokenStream) -> TokenStream {
+    tags::expand_module().into()
 }

@@ -19,30 +19,42 @@
 
 use std::{
     cell::Cell,
-    fmt::{Display, Write},
+    fmt::{self, Display, Write},
 };
 
 use crate::types::{
-    Attachment, Component, InteractionResponse, MessageComponentData, ModalCallbackData,
-    PartialChannel, PartialEmoji, Role, Snowflake, User,
+    AllowedMentions, Attachment, Component, File, InteractionResponse, MessageCallbackData,
+    MessageComponentData, MessageFlags, ModalCallbackData, PartialChannel, PartialEmoji, Role,
+    Snowflake, User,
 };
 
 use super::{
     CommandOutput, ComponentCtx, HandlerError, IntoResponse, ModalChoice, ModalCtx, Update,
-    custom_id::CustomIdError,
+    custom_id::CustomIdError, limits,
 };
 
-/// A rendered message layout: Components V2 components, answered as a new message (or, from an
-/// inline handler, as an update of the message the component is on). Built by
-/// [`rsx!`](crate::rsx); see [Views](https://bluefrog130.github.io/composure-rs/views.html).
+/// A rendered message: Components V2 components plus the rest of the message (ephemeral,
+/// allowed mentions, files to upload), answered as a new message (or, from an inline handler, as
+/// an update of the message the component is on). Built by [`rsx!`](crate::rsx); see
+/// [Views](https://bluefrog130.github.io/composure-rs/views.html).
 ///
-/// A `custom_id` that could not be built (state past 100 characters) is kept inside and surfaces
-/// as a [`HandlerError`] when the View is answered with.
-#[derive(Debug, Clone, Default)]
+/// A `custom_id` that could not be built (state past 100 characters) is kept inside, and
+/// Discord's [limits](crate::types::limits) are checked when the View is answered with or sent:
+/// either surfaces as a [`ViewError`] (a [`HandlerError`] in handlers).
+#[derive(Debug, Clone)]
 #[must_use]
 pub struct View {
     components: Vec<Component>,
+    files: Vec<File>,
+    flags: MessageFlags,
+    allowed_mentions: Option<Box<AllowedMentions>>,
     error: Option<CustomIdError>,
+}
+
+impl Default for View {
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
 }
 
 impl View {
@@ -50,6 +62,9 @@ impl View {
     pub fn new(components: Vec<Component>) -> Self {
         Self {
             components,
+            files: Vec::new(),
+            flags: MessageFlags::empty(),
+            allowed_mentions: None,
             error: None,
         }
     }
@@ -59,12 +74,90 @@ impl View {
         &self.components
     }
 
-    /// The components, or the error building one of them; for messages sent through REST
+    /// The files uploaded with the message: added with [`file`](Self::file), or by `<File>`,
+    /// `<Thumbnail>` and `<Item>` given a [`File`]
+    pub fn files(&self) -> &[File] {
+        &self.files
+    }
+
+    /// The message flags set with [`ephemeral`](Self::ephemeral) and
+    /// [`suppress_notifications`](Self::suppress_notifications); `IS_COMPONENTS_V2` is added
+    /// when the message is sent
+    pub fn flags(&self) -> MessageFlags {
+        self.flags
+    }
+
+    /// Only the invoking user sees the message. Ignored when it updates a message, whose
+    /// ephemerality cannot change.
+    pub fn ephemeral(mut self) -> Self {
+        self.flags |= MessageFlags::Ephemeral;
+        self
+    }
+
+    /// The message does not trigger push and desktop notifications
+    pub fn suppress_notifications(mut self) -> Self {
+        self.flags |= MessageFlags::SuppressNotifications;
+        self
+    }
+
+    /// Who the message may ping
+    pub fn allowed_mentions(mut self, allowed_mentions: AllowedMentions) -> Self {
+        self.allowed_mentions = Some(Box::new(allowed_mentions));
+        self
+    }
+
+    /// Uploads `file` with the message; show it with `<File url="attachment://<name>">`, or give
+    /// the `File` to `<File>` directly
+    pub fn file(mut self, file: File) -> Self {
+        self.files.push(file);
+        self
+    }
+
+    #[cfg_attr(not(feature = "rest"), allow(dead_code))]
+    pub(crate) fn mentions(&self) -> Option<&AllowedMentions> {
+        self.allowed_mentions.as_deref()
+    }
+
+    /// The flags a REST body sends: `IS_COMPONENTS_V2`, plus ephemeral where the Endpoint takes
+    /// it
+    #[cfg_attr(not(feature = "rest"), allow(dead_code))]
+    pub(crate) fn message_flags(&self, ephemeral: bool) -> MessageFlags {
+        let flags = MessageFlags::IsComponentsV2 | self.flags;
+        if ephemeral {
+            flags
+        } else {
+            flags - MessageFlags::Ephemeral
+        }
+    }
+
+    /// Whether the View can be sent: its `custom_id`s were built and it is within Discord's
+    /// [limits](crate::types::limits)
+    pub fn check(&self) -> Result<(), ViewError> {
+        if let Some(error) = &self.error {
+            return Err(ViewError::CustomId(error.clone()));
+        }
+        limits::check_message(&self.components)
+    }
+
+    /// The components, or the error building one of them. Drops the files and flags; send a
+    /// View through REST with the bodies' `TryFrom<&View>` (`CreateMessage::try_from(&view)`)
+    /// instead.
     pub fn into_components(self) -> Result<Vec<Component>, CustomIdError> {
         match self.error {
             Some(error) => Err(error),
             None => Ok(self.components),
         }
+    }
+
+    /// The whole message, checked: components, `IS_COMPONENTS_V2` and the other flags, allowed
+    /// mentions, files
+    pub fn into_message_data(self) -> Result<MessageCallbackData, ViewError> {
+        self.check()?;
+        let mut data = MessageCallbackData::components_v2(self.components);
+        data.flags = Some(MessageFlags::IsComponentsV2 | self.flags);
+        data.allowed_mentions = self.allowed_mentions.map(|mentions| *mentions);
+        data.files = self.files;
+        Ok(data)
     }
 }
 
@@ -74,7 +167,7 @@ impl From<Vec<Component>> for View {
     }
 }
 
-/// A Components V2 message
+/// A Components V2 message, with the View's flags, mentions and files
 impl IntoResponse for View {
     fn into_response(self) -> InteractionResponse {
         self.try_into_response()
@@ -82,9 +175,56 @@ impl IntoResponse for View {
     }
 
     fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
-        self.into_components()
-            .map(InteractionResponse::respond_with_components)
+        self.into_message_data()
+            .map(InteractionResponse::ChannelMessageWithSource)
             .map_err(HandlerError::new)
+    }
+}
+
+/// Why a [`View`] or [`ModalView`] cannot be sent
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ViewError {
+    /// A `custom_id` could not be built
+    CustomId(CustomIdError),
+    /// Past one of Discord's [limits](crate::types::limits)
+    Limit {
+        /// What was counted, e.g. `"components in a message"`
+        what: &'static str,
+        /// The fewest allowed
+        min: usize,
+        /// The most allowed
+        max: usize,
+        /// How many there were
+        found: usize,
+    },
+}
+
+impl Display for ViewError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ViewError::CustomId(error) => error.fmt(f),
+            ViewError::Limit {
+                what,
+                min: 0,
+                max,
+                found,
+            } => write!(f, "{found} {what}, Discord allows at most {max}"),
+            ViewError::Limit {
+                what,
+                min,
+                max,
+                found,
+            } => write!(f, "{found} {what}, Discord allows {min} to {max}"),
+        }
+    }
+}
+
+impl std::error::Error for ViewError {}
+
+impl From<CustomIdError> for ViewError {
+    fn from(error: CustomIdError) -> Self {
+        ViewError::CustomId(error)
     }
 }
 
@@ -100,6 +240,15 @@ impl ModalView {
     /// The modal: title, `custom_id`, components
     pub fn data(&self) -> &ModalCallbackData {
         &self.data
+    }
+
+    /// Whether the modal can be opened: its `custom_id`s were built and it is within Discord's
+    /// [limits](crate::types::limits)
+    pub fn check(&self) -> Result<(), ViewError> {
+        if let Some(error) = &self.error {
+            return Err(ViewError::CustomId(error.clone()));
+        }
+        limits::check_modal(&self.data)
     }
 
     /// The modal, or the error building its `custom_id`
@@ -119,23 +268,107 @@ impl IntoResponse for ModalView {
     }
 
     fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
-        self.into_data()
-            .map(InteractionResponse::Modal)
-            .map_err(HandlerError::new)
+        self.check().map_err(HandlerError::new)?;
+        Ok(InteractionResponse::Modal(self.data))
     }
 }
 
-/// Components being collected by `rsx!` for one level of markup: adjacent text joins into one
-/// [`TextDisplay`](crate::types::TextDisplay), and the first `custom_id` error is kept.
+#[cfg(feature = "macros")]
+composure_macros::__view_tags!();
+
+/// What one `rsx!` invocation collects besides its components, shared by every markup level:
+/// the first `custom_id` error, files to upload, and the flags and mentions of placed Views
 #[doc(hidden)]
-#[derive(Debug, Default)]
-pub struct Children {
-    components: Vec<Component>,
-    text: Option<String>,
+#[derive(Debug)]
+pub struct MarkupRoot {
+    files: Vec<File>,
+    flags: MessageFlags,
+    allowed_mentions: Option<Box<AllowedMentions>>,
     error: Option<CustomIdError>,
 }
 
-impl Children {
+impl Default for MarkupRoot {
+    fn default() -> Self {
+        Self {
+            files: Vec::new(),
+            flags: MessageFlags::empty(),
+            allowed_mentions: None,
+            error: None,
+        }
+    }
+}
+
+impl MarkupRoot {
+    /// A `custom_id`, or an empty one with the error kept
+    pub fn id(&mut self, custom_id: Result<String, CustomIdError>) -> String {
+        custom_id.unwrap_or_else(|error| {
+            self.error.get_or_insert(error);
+            String::new()
+        })
+    }
+
+    /// A media URL, registering a [`File`] to upload
+    pub fn media(&mut self, media: impl IntoMedia) -> String {
+        media.into_media(self)
+    }
+
+    /// Takes over a placed View's files, flags, mentions and error, returning its components
+    fn merge(&mut self, view: View) -> Vec<Component> {
+        if self.error.is_none() {
+            self.error = view.error;
+        }
+        self.files.extend(view.files);
+        self.flags |= view.flags;
+        if self.allowed_mentions.is_none() {
+            self.allowed_mentions = view.allowed_mentions;
+        }
+        view.components
+    }
+
+    pub fn view(self, components: Vec<Component>) -> View {
+        View {
+            components,
+            files: self.files,
+            flags: self.flags,
+            allowed_mentions: self.allowed_mentions,
+            error: self.error,
+        }
+    }
+
+    pub fn modal(self, mut data: ModalCallbackData, components: Vec<Component>) -> ModalView {
+        data.components = Some(components);
+        ModalView {
+            data,
+            error: self.error,
+        }
+    }
+}
+
+/// Components being collected by `rsx!` for one level of markup with `{..}` children or placed
+/// Views: adjacent text joins into one [`TextDisplay`](crate::types::TextDisplay). Levels known
+/// at compile time skip it and build their `Vec` directly.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct Children<'r> {
+    components: Vec<Component>,
+    text: Option<String>,
+    root: &'r mut MarkupRoot,
+}
+
+impl<'r> Children<'r> {
+    pub fn new(root: &'r mut MarkupRoot) -> Self {
+        Self {
+            components: Vec::new(),
+            text: None,
+            root,
+        }
+    }
+
+    /// The invocation's [`MarkupRoot`]
+    pub fn root(&mut self) -> &mut MarkupRoot {
+        self.root
+    }
+
     pub fn text(&mut self, text: &str) {
         self.text.get_or_insert_with(String::new).push_str(text);
     }
@@ -145,53 +378,16 @@ impl Children {
         self.components.push(component);
     }
 
-    pub fn error(&mut self, error: Option<CustomIdError>) {
-        if self.error.is_none() {
-            self.error = error;
-        }
-    }
-
-    /// A `custom_id`, or an empty one with the error kept
-    pub fn id(&mut self, custom_id: Result<String, CustomIdError>) -> String {
-        custom_id.unwrap_or_else(|error| {
-            self.error(Some(error));
-            String::new()
-        })
-    }
-
-    /// The components of a nested level, taking over its error
-    pub fn nested(&mut self, mut children: Children) -> Vec<Component> {
-        children.flush();
-        self.error(children.error);
-        children.components
-    }
-
-    /// The text collected so far (text-only markup: button labels, options)
-    pub fn take_text(&mut self) -> String {
-        self.text.take().unwrap_or_default()
-    }
-
     fn flush(&mut self) {
         if let Some(text) = self.text.take() {
             self.components.push(Component::text(text));
         }
     }
 
-    pub fn view(mut self) -> View {
+    /// The level's components
+    pub fn finish(mut self) -> Vec<Component> {
         self.flush();
-        View {
-            components: self.components,
-            error: self.error,
-        }
-    }
-
-    pub fn modal(mut self, mut data: ModalCallbackData) -> ModalView {
-        self.flush();
-        data.components = Some(self.components);
-        ModalView {
-            data,
-            error: self.error,
-        }
+        self.components
     }
 }
 
@@ -203,20 +399,66 @@ impl Children {
 )]
 pub trait IntoChildren {
     /// Adds `self` to the markup level being built
-    fn push_into(self, children: &mut Children);
+    fn push_into(self, children: &mut Children<'_>);
 }
 
+/// Its components in place; its files, flags and mentions go to the enclosing View
 impl IntoChildren for View {
-    fn push_into(self, children: &mut Children) {
-        children.error(self.error);
-        for component in self.components {
+    fn push_into(self, children: &mut Children<'_>) {
+        for component in children.root.merge(self) {
             children.component(component);
         }
     }
 }
 
+/// What `<File>`, `<Thumbnail>` and `<Item>` show: a URL (or `attachment://<filename>`), a
+/// [`File`] to upload with the message (its `attachment://` URL is set for you), or a received
+/// [`Attachment`]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not media",
+    note = "use a URL (&str or String), a File to upload with the message, or an &Attachment"
+)]
+pub trait IntoMedia {
+    /// The media's URL; a file is registered on the View being built
+    fn into_media(self, root: &mut MarkupRoot) -> String;
+}
+
+impl IntoMedia for &str {
+    fn into_media(self, _root: &mut MarkupRoot) -> String {
+        self.to_string()
+    }
+}
+
+impl IntoMedia for String {
+    fn into_media(self, _root: &mut MarkupRoot) -> String {
+        self
+    }
+}
+
+impl IntoMedia for &String {
+    fn into_media(self, _root: &mut MarkupRoot) -> String {
+        self.clone()
+    }
+}
+
+/// Uploaded with the message, shown as `attachment://<name>`
+impl IntoMedia for File {
+    fn into_media(self, root: &mut MarkupRoot) -> String {
+        let url = format!("attachment://{}", self.name);
+        root.files.push(self);
+        url
+    }
+}
+
+/// An attachment Discord already has, by its URL
+impl IntoMedia for &Attachment {
+    fn into_media(self, _root: &mut MarkupRoot) -> String {
+        self.url.clone()
+    }
+}
+
 impl IntoChildren for Component {
-    fn push_into(self, children: &mut Children) {
+    fn push_into(self, children: &mut Children<'_>) {
         children.component(self);
     }
 }
@@ -224,7 +466,7 @@ impl IntoChildren for Component {
 macro_rules! into_children_component {
     ($($ty:ty),*) => {$(
         impl IntoChildren for $ty {
-            fn push_into(self, children: &mut Children) {
+            fn push_into(self, children: &mut Children<'_>) {
                 children.component(self.into());
             }
         }
@@ -314,8 +556,8 @@ text!(
 macro_rules! into_children_text {
     ($($ty:ty),*) => {$(
         impl IntoChildren for $ty {
-            fn push_into(self, children: &mut Children) {
-                let text = children.text.get_or_insert_with(String::new);
+            fn push_into(self, children: &mut Children<'_>) {
+                let text = children.text.get_or_insert_with(::std::string::String::new);
                 IntoText::push_text(self, text);
             }
         }
@@ -346,7 +588,7 @@ into_children_text!(
 );
 
 impl<T: IntoChildren> IntoChildren for Option<T> {
-    fn push_into(self, children: &mut Children) {
+    fn push_into(self, children: &mut Children<'_>) {
         if let Some(child) = self {
             child.push_into(children);
         }
@@ -354,7 +596,7 @@ impl<T: IntoChildren> IntoChildren for Option<T> {
 }
 
 impl<T: IntoChildren> IntoChildren for Vec<T> {
-    fn push_into(self, children: &mut Children) {
+    fn push_into(self, children: &mut Children<'_>) {
         for child in self {
             child.push_into(children);
         }
@@ -362,7 +604,7 @@ impl<T: IntoChildren> IntoChildren for Vec<T> {
 }
 
 impl<T: IntoChildren, const N: usize> IntoChildren for [T; N] {
-    fn push_into(self, children: &mut Children) {
+    fn push_into(self, children: &mut Children<'_>) {
         for child in self {
             child.push_into(children);
         }
@@ -375,7 +617,7 @@ macro_rules! into_children_iter {
         where
             ::core::iter::$ty<$($param),*>: Iterator<Item: IntoChildren>,
         {
-            fn push_into(self, children: &mut Children) {
+            fn push_into(self, children: &mut Children<'_>) {
                 for child in self {
                     child.push_into(children);
                 }
@@ -398,7 +640,7 @@ into_children_iter!(
 impl<I: Iterator, U: IntoIterator<Item: IntoChildren>, F: FnMut(I::Item) -> U> IntoChildren
     for ::core::iter::FlatMap<I, U, F>
 {
-    fn push_into(self, children: &mut Children) {
+    fn push_into(self, children: &mut Children<'_>) {
         for child in self {
             child.push_into(children);
         }
@@ -408,7 +650,7 @@ impl<I: Iterator, U: IntoIterator<Item: IntoChildren>, F: FnMut(I::Item) -> U> I
 impl<I: Iterator<Item: IntoIterator<Item: IntoChildren>>> IntoChildren
     for ::core::iter::Flatten<I>
 {
-    fn push_into(self, children: &mut Children) {
+    fn push_into(self, children: &mut Children<'_>) {
         for child in self {
             child.push_into(children);
         }
@@ -416,7 +658,7 @@ impl<I: Iterator<Item: IntoIterator<Item: IntoChildren>>> IntoChildren
 }
 
 impl<T: IntoChildren> IntoChildren for std::vec::IntoIter<T> {
-    fn push_into(self, children: &mut Children) {
+    fn push_into(self, children: &mut Children<'_>) {
         for child in self {
             child.push_into(children);
         }

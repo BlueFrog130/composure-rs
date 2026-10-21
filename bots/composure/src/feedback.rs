@@ -5,6 +5,7 @@
 use composure::{
     Choice, app, command,
     command::{Ephemeral, HandlerError, ModalCtx, ModalView, View},
+    rest::CreateMessage,
     rsx, view,
 };
 
@@ -71,7 +72,9 @@ async fn send(
         Kind::Feature => rsx! { <ui::Primary title=title.as_str()>{body}</ui::Primary> },
         Kind::Question => rsx! { <ui::Secondary title=title.as_str()>{body}</ui::Secondary> },
     };
-    ui::send(&ctx.bot()?, config.feedback_channel, report).await?;
+    ctx.bot()?
+        .create_message(config.feedback_channel, &CreateMessage::try_from(&report)?)
+        .await?;
     let issue = issue_url(&config.repo_url(), &title, &details);
     Ok(Ephemeral(rsx! {
         <ui::Success title="Thanks!">

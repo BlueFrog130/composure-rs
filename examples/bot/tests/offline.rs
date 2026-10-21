@@ -213,6 +213,14 @@ fn files_upload_as_multipart() {
     );
     assert_eq!(response.text().as_deref(), Some("Here's your file:"));
     assert_eq!(response.files().len(), 1);
+    assert_eq!(response.files()[0].name, "export.txt");
+    let json = response.json();
+    // Ephemeral, Components V2, the `<File>` pointing at the upload
+    assert_eq!(json["data"]["flags"], (1 << 15) | (1 << 6));
+    assert_eq!(
+        json["data"]["components"][1]["file"]["url"],
+        "attachment://export.txt"
+    );
 
     // In a deferred result: with the edit of the original response
     let env = platform();

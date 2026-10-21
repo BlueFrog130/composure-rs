@@ -306,7 +306,7 @@ fn cases() -> Vec<Case> {
                     "-# 3 likes"
                 );
             },
-            46,
+            45,
         ),
         case(
             "button review (opens a modal View)",

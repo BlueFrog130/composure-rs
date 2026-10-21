@@ -46,3 +46,44 @@ fn signed_interactions() {
 
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }
+
+/// A View with a `<File>` (the example's `/export`) through the signed pipeline: the response
+/// carries the file, so Adapters upload it through the callback endpoint, with the message
+/// pointing at the attachment
+#[test]
+fn view_with_a_file() {
+    use composure::testing::{self, TestKey, TestPlatform};
+    use composure_example_bot::{Bot, Config};
+    use serde_json::json;
+
+    let request = TestKey::default().signed(
+        testing::command("export")
+            .option("text", "hello file")
+            .body(),
+    );
+    let state = TestPlatform::new().with_data(Config {
+        greeting: "Howdy".into(),
+    });
+    let outcome = block_on(handle_interaction(
+        &common::public_key(),
+        Some(&request.signature),
+        Some(&request.timestamp),
+        &request.body,
+        &Bot,
+        &state,
+    ));
+    assert_eq!(outcome.status(), 200);
+    let response = outcome.response().expect("a response");
+    assert_eq!(response.files().len(), 1);
+    assert_eq!(response.files()[0].bytes, b"hello file");
+    assert_eq!(
+        serde_json::to_value(response).unwrap(),
+        json!({ "type": 4, "data": {
+            "flags": (1 << 15) | (1 << 6),
+            "components": [
+                { "type": 10, "content": "Here's your file:" },
+                { "type": 13, "file": { "url": "attachment://export.txt" } },
+            ],
+        } })
+    );
+}

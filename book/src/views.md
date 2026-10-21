@@ -45,6 +45,7 @@ message the button is on is re-rendered with them. Nothing is stored anywhere: `
 - [`#[view]`](#view-functions): Props, sub-Views, children
 - [Inline handlers](#inline-handlers): `on:click`, `on:select`, `on:submit`
 - [Modal Views](#modal-views): forms read back as typed parameters
+- [Message options](#message-options): ephemeral, allowed mentions, files
 - [Tag reference](#tag-reference): every tag and its attributes
 - [Styling](#styling): colors, tone Views, and how errors look
 - [Without `#[view]`](#without-view): markup in plain functions, sending Views through REST
@@ -97,8 +98,15 @@ Placement follows Discord's rules and is checked at compile time:
 
 A sub-View's markup may also be a single `<Button>` or select meant for a row.
 
-Discord's limits on counts (40 components in a message, 5 buttons in a row, 25 options in a
-select, ...) are not checked; Discord rejects the response.
+Discord's limits are checked, so breaking one is an error that names it instead of Discord's
+bare "This interaction failed". What the markup shows is checked at compile time: more than 5
+buttons in a `<Row>` (or a select with anything beside it), more than 3 texts in a `<Section>`,
+more than 5 children in a `<Modal>`, more than 25 `<Option>`s in a select (10 in a group) or 10
+`<Item>`s in a `<Gallery>`. The rest (40 components in a message, 4000 characters of text,
+`custom_id`s past 100 characters, button labels past 80, levels filled by `{..}`) is checked in
+one walk when the View is answered with or sent through REST, and fails as a
+[`ViewError`](https://docs.rs/composure/latest/composure/command/enum.ViewError.html) (a `HandlerError` in handlers). The limits are
+[`types::limits`](https://docs.rs/composure/latest/composure/types/limits/).
 
 ### Text
 
@@ -191,6 +199,12 @@ attribute, an unclosed or mismatched tag. A tag with an error is left out and th
 expanded, so the `{..}` blocks around it keep type-checking, and rust-analyzer keeps completing
 them while a tag is half-typed. A `#[view]` with markup errors still gets its Props, builder and
 handlers, so code using the View doesn't report errors of its own.
+
+Built-in tags expand to their types at the tag's own span, so hovering `<Container>` (or
+`</Container>`) shows the type's docs and go-to-definition opens it. rust-analyzer also completes
+tag names and the special attributes (`<Button pri` offers `primary`) and shows their docs on
+hover, from a hidden module the macro refers to; field attributes complete and document as the
+fields they set.
 
 ## View functions
 
@@ -351,6 +365,10 @@ Things to know:
 - Captured Props must implement `serde::Serialize` and `DeserializeOwned`; integers, `bool`,
   `String`, `Snowflake`, `Option`s, tuples, and `#[derive(Serialize, Deserialize)]` types do.
 - A `children` Prop cannot be captured: it is markup, not data.
+- A handler only sees Props. Using a local of the `#[view]` body (`let total = ..`) or a
+  closure's parameter around the markup (`{items.iter().map(|item| rsx! { .. })}`) is a compile
+  error at its use (`total` is not a Prop), as is a local that shadows a Prop. Make it a Prop, or
+  move the markup into a [sub-View](#sub-views) that takes it as one.
 - List every View with inline handlers in an `#[app]`; that is how its `custom_id`s are routed.
 
 ### Selects
@@ -456,6 +474,43 @@ A modal can also be submitted to a [`#[modal]`](https://docs.rs/composure/latest
 or answered by `custom_id=..`; inputs then need no matching parameters, and their `name` is the
 `custom_id` the handler reads them by.
 
+## Message options
+
+A View is the whole message, not just its components. These set the rest; they work on any
+View, `rsx!`'s output or a sub-View's (whose options and files go to the View it is placed in):
+
+| Method | |
+|---|---|
+| [`.ephemeral()`](https://docs.rs/composure/latest/composure/command/struct.View.html#method.ephemeral) | Only the invoking user sees it. An update keeps the message's ephemerality |
+| [`.allowed_mentions(..)`](https://docs.rs/composure/latest/composure/command/struct.View.html#method.allowed_mentions) | Who it may ping ([`AllowedMentions`](https://docs.rs/composure/latest/composure/types/struct.AllowedMentions.html)) |
+| [`.suppress_notifications()`](https://docs.rs/composure/latest/composure/command/struct.View.html#method.suppress_notifications) | No push or desktop notification |
+| [`.file(..)`](https://docs.rs/composure/latest/composure/command/struct.View.html#method.file) | Uploads a [`File`](https://docs.rs/composure/latest/composure/types/struct.File.html) with the message |
+
+`<File>`, `<Thumbnail>` and `<Item>` take a `File` as their `src` (or `url`): the View uploads it
+and points the component at `attachment://<name>`, so the names cannot drift apart.
+
+```rust
+use composure::{command, rsx, command::View, types::File};
+
+/// Get your text back as a file
+#[command]
+fn export(#[option("What to put in the file", max_len = 2000)] text: &str) -> View {
+    let file = File::new("export.txt", text.as_bytes()).content_type("text/plain");
+    rsx! {
+        <Text>"Here's your file:"</Text>
+        <File src={file}/>
+    }
+    .ephemeral()
+}
+# fn main() {
+#     let view = export("hi");
+#     assert_eq!(view.files()[0].name, "export.txt");
+# }
+```
+
+`Ephemeral(view)` still works, and a View with files is sent like any response with files (see
+[Files](responses.md#files)).
+
 ## Tag reference
 
 Each tag builds the type named in its heading; its attributes are that type's public fields
@@ -535,7 +590,7 @@ children.
 
 | Attribute | Type | |
 |---|---|---|
-| `url` | `impl Into<String>` | *Special, required.* An image URL, or `attachment://<filename>` for a file sent with the message |
+| `src` (or `url`) | a URL, a [`File`](https://docs.rs/composure/latest/composure/types/struct.File.html) or an `&`[`Attachment`](https://docs.rs/composure/latest/composure/types/struct.Attachment.html) | *Special, required.* An image URL (or `attachment://<filename>`), a `File` to upload with the message, or an attachment Discord has |
 | `description` | `String` | Alt text, max 1024 characters |
 | `spoiler` | `bool` | Blurs the image until clicked |
 
@@ -551,7 +606,7 @@ children.
 
 | Attribute | Type | |
 |---|---|---|
-| `url` | `impl Into<String>` | *Special, required.* A URL, or `attachment://<filename>` |
+| `src` (or `url`) | a URL, a [`File`](https://docs.rs/composure/latest/composure/types/struct.File.html) or an `&`[`Attachment`](https://docs.rs/composure/latest/composure/types/struct.Attachment.html) | *Special, required.* A URL (or `attachment://<filename>`), a `File` to upload with the message, or an attachment Discord has |
 | `description` | `String` | Alt text, max 1024 characters |
 | `spoiler` | `bool` | Blurs the media until clicked |
 
@@ -566,12 +621,12 @@ children.
 #### `<File>`
 
 [`FileComponent`](https://docs.rs/composure/latest/composure/types/struct.FileComponent.html): a file uploaded with the message, shown inline.
-No children. Attach the file to the response with
-[`InteractionResponse::with_file`](https://docs.rs/composure/latest/composure/types/enum.InteractionResponse.html#method.with_file).
+No children. Give it the [`File`](https://docs.rs/composure/latest/composure/types/struct.File.html) and the View uploads it
+([Message options](#message-options)).
 
 | Attribute | Type | |
 |---|---|---|
-| `url` | `impl Into<String>` | *Special, required.* `attachment://<filename>` |
+| `src` (or `url`) | a [`File`](https://docs.rs/composure/latest/composure/types/struct.File.html), or `impl Into<String>` | *Special, required.* The `File` to upload, or `attachment://<filename>` for one added with [`.file(..)`](https://docs.rs/composure/latest/composure/command/struct.View.html#method.file) |
 | `spoiler` | `bool` | Blurs the file until clicked |
 
 ### Interactive
@@ -826,19 +881,32 @@ the whole tree.
 ## Without `#[view]`
 
 `rsx!` works in any function; only inline handlers need `#[view]`. A plain function returning
-`View` is a good fit for layouts without state of their own, and for messages sent through REST,
-which take components rather than a response:
+`View` is a good fit for layouts without state of their own, and for messages sent through REST.
+The message bodies are built from a `&View` with `TryFrom`:
+[`CreateMessage`](https://docs.rs/composure/latest/composure/rest/struct.CreateMessage.html), [`CreateFollowup`](https://docs.rs/composure/latest/composure/rest/struct.CreateFollowup.html),
+[`EditMessage`](https://docs.rs/composure/latest/composure/rest/struct.EditMessage.html) and [`ExecuteWebhook`](https://docs.rs/composure/latest/composure/rest/struct.ExecuteWebhook.html). Each sets the
+components, the Components V2 flag, the View's other flags (ephemeral where the Endpoint takes
+it), its allowed mentions and its files, and fails before anything is sent when the View cannot
+be (a `custom_id` that could not be built, or past Discord's limits):
 
 ```rust
-use composure::{rsx, command::{View, custom_id::CustomIdError}, types::Component};
+use composure::{
+    command::HandlerError,
+    rest::{BotClient, CreateMessage, Transport},
+    rsx,
+    types::Snowflake,
+};
 
-fn announcement(text: &str) -> Result<Vec<Component>, CustomIdError> {
-    let view: View = rsx! { <Container>"📣 " {text}</Container> };
-    view.into_components()
+async fn announce<T: Transport>(
+    bot: &BotClient<T>,
+    channel: Snowflake,
+    text: &str,
+) -> Result<(), HandlerError> {
+    let view = rsx! { <Container>"📣 " {text}</Container> };
+    bot.create_message(channel, &CreateMessage::try_from(&view)?).await?;
+    Ok(())
 }
-# fn main() { assert_eq!(announcement("hi").unwrap().len(), 1); }
+# fn main() {}
 ```
 
-Send them with the Components V2 flag
-([`MessageFlags::IsComponentsV2`](https://docs.rs/composure/latest/composure/types/struct.MessageFlags.html#associatedconstant.IsComponentsV2)). Built from the same
-[tone Views](#styling) as your replies, they look alike.
+Built from the same [tone Views](#styling) as your replies, they look alike.

@@ -4,7 +4,10 @@ use composure::{
     Choice, app,
     command::{Ephemeral, HandlerError, IntoResponse, ModalView, Update, View, dispatch},
     component, rsx,
-    types::{Interaction, InteractionResponse},
+    types::{
+        AllowedMentions, ButtonStyle, Component, File, Interaction, InteractionResponse,
+        TextInputStyle,
+    },
     view,
 };
 use futures::executor::block_on;
@@ -375,4 +378,180 @@ fn too_long_custom_id_is_an_error() {
         .try_into_response();
     let error: HandlerError = result.unwrap_err();
     assert!(error.to_string().contains("custom_id is"), "{error}");
+}
+
+/// A report attached by a sub-View
+#[view]
+pub fn Report(name: String) -> View {
+    rsx! { <File src={File::new(name, b"a,b".to_vec())}/> }
+}
+
+#[test]
+fn files_are_uploaded_with_the_view() {
+    let view = rsx! { <File src={File::new("a.txt", b"hi".to_vec())} spoiler/> };
+    let response = view.into_response();
+    assert_eq!(response.files().len(), 1);
+    assert_eq!(response.files()[0].name, "a.txt");
+    let value = json(response);
+    assert_eq!(
+        value["data"]["components"][0]["file"]["url"],
+        "attachment://a.txt"
+    );
+    assert_eq!(value["data"]["flags"], 1 << 15);
+}
+
+#[test]
+fn sub_view_files_reach_the_response() {
+    let view = rsx! {
+        <Container>
+            <Report name="r.csv"/>
+            <Section>
+                <Text>"Avatar"</Text>
+                <Thumbnail src={File::new("me.png", vec![1])}/>
+            </Section>
+        </Container>
+    }
+    .file(File::new("extra.txt", vec![2]));
+    let names: Vec<_> = view.files().iter().map(|file| file.name.as_str()).collect();
+    assert_eq!(names, ["r.csv", "me.png", "extra.txt"]);
+    let response = view.into_response();
+    assert_eq!(response.files().len(), 3);
+    let value = json(response);
+    let container = &value["data"]["components"][0];
+    assert_eq!(
+        container["components"][0]["file"]["url"],
+        "attachment://r.csv"
+    );
+    assert_eq!(
+        container["components"][1]["accessory"]["media"]["url"],
+        "attachment://me.png"
+    );
+}
+
+#[test]
+fn ephemeral_views_keep_components_v2() {
+    let view = rsx! { <Text>"Only you"</Text> }
+        .ephemeral()
+        .suppress_notifications();
+    let value = json(view.clone().into_response());
+    assert_eq!(value["data"]["flags"], (1 << 15) | (1 << 6) | (1 << 12));
+    // An update cannot change ephemerality
+    let value = json(Update(view).into_response());
+    assert_eq!(value["type"], 7);
+    assert_eq!(value["data"]["flags"], (1 << 15) | (1 << 12));
+}
+
+#[test]
+fn allowed_mentions_are_sent() {
+    let view = rsx! { <Text>"<@1>"</Text> }.allowed_mentions(AllowedMentions {
+        parse: vec![],
+        roles: vec![],
+        users: vec![],
+        replied_user: false,
+    });
+    let value = json(view.into_response());
+    assert_eq!(value["data"]["allowed_mentions"]["parse"], json!([]));
+}
+
+#[test]
+fn views_past_discords_limits_are_errors() {
+    let buttons: Vec<_> = (0..6)
+        .map(|i| rsx! { <Button custom_id={i.to_string()}>"b"</Button> })
+        .collect();
+    let error = rsx! { <Row>{buttons}</Row> }
+        .try_into_response()
+        .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "6 buttons in a row, Discord allows at most 5"
+    );
+}
+
+/// Every special attribute, so the macro's table assertions run for each
+#[test]
+fn every_special_attribute_is_in_the_tag_table() {
+    let file = File::new("a.png", vec![1]);
+    let _ = rsx! {
+        <Section accessory={Component::text("x")}><Text content="c"/></Section>
+        <Separator small/>
+        <Separator large/>
+        <Gallery><Item src="https://example.com/a.png"/><Item url="https://example.com/b.png"/></Gallery>
+        <File url="attachment://a.png"/>
+        <Section><Text>"t"</Text><Thumbnail src={file}/></Section>
+        <Row>
+            <Button primary custom_id="a">"a"</Button>
+            <Button secondary custom_id="b" label="b"/>
+            <Button success custom_id="c">"c"</Button>
+            <Button danger custom_id="d">"d"</Button>
+            <Button style={ButtonStyle::Primary} url="https://example.com">"e"</Button>
+        </Row>
+        <Row>
+            <StringSelect custom_id="s" options=Color min=1 max=2>
+                <Option value="x" label="X"/>
+            </StringSelect>
+        </Row>
+    };
+    let _ = rsx! {
+        <Modal title="t" custom_id="m">
+            <Label text="a"><TextInput name="a" paragraph min_len=1 max_len=2/></Label>
+            <Label label="b"><TextInput name="b" style={TextInputStyle::Short}/></Label>
+            <Label text="c"><RadioGroup name="c" options=Color/></Label>
+            <Label text="d"><CheckboxGroup name="d" options=Color min=0 max=1/></Label>
+            <Label text="e"><FileUpload name="e" min=0 max=1/></Label>
+        </Modal>
+    };
+    let _ = rsx! {
+        <Modal title="t" custom_id="m">
+            <Label text="a"><Checkbox name="a"/></Label>
+            <Label text="b"><UserSelect name="b" min=0 max=1/></Label>
+        </Modal>
+    };
+}
+
+/// The guide's tag reference documents every tag and attribute the macro knows (and so
+/// `composure::command::tags` lists)
+#[test]
+fn the_guide_documents_every_tag_and_attribute() {
+    let guide = include_str!("../../../book/src/views.md").replace("\r\n", "\n");
+    let reference = guide
+        .split_once("## Tag reference")
+        .and_then(|(_, rest)| rest.split_once("\n## "))
+        .map(|(reference, _)| reference)
+        .expect("a tag reference");
+    let (intro, _) = reference.split_once("#### ").unwrap();
+    let sections: Vec<&str> = reference.split("#### ").skip(1).collect();
+    let section = |tag: &str| {
+        sections
+            .iter()
+            .find(|section| {
+                section
+                    .lines()
+                    .next()
+                    .unwrap()
+                    .contains(&format!("`<{tag}>`"))
+            })
+            .copied()
+            .unwrap_or_else(|| panic!("no section for `<{tag}>`"))
+    };
+    for (tag, attrs) in composure::command::tags::ALL {
+        let mut text = section(tag).to_string();
+        // Sections that say "as <StringSelect>" or "every input below"
+        match *tag {
+            "UserSelect" | "RoleSelect" | "MentionableSelect" | "ChannelSelect" => {
+                text += section("StringSelect")
+            }
+            "TextInput" | "RadioGroup" | "CheckboxGroup" | "Checkbox" | "FileUpload" => {
+                text += section("Label")
+            }
+            _ => {}
+        }
+        for attr in *attrs {
+            let documented = match *attr {
+                "id" => intro.contains("`id`"),
+                "on" => text.contains("`on:"),
+                attr => text.contains(&format!("`{attr}`")) || text.contains(&format!("`{attr}=")),
+            };
+            assert!(documented, "`{attr}` of `<{tag}>` is not in the guide");
+        }
+    }
 }
