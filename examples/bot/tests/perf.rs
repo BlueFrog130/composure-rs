@@ -21,11 +21,10 @@ use composure::{
 use composure::{
     command::{BackgroundWork, HasData, Platform, dispatch},
     rest::{RawResponse, Request, Transport, TransportError},
+    testing::{TestKey, block_on},
     types::Interaction,
 };
 use composure_example_bot::{Bot, Config};
-use ed25519_dalek::{Signer, SigningKey};
-use futures::executor::block_on;
 use serde_json::{Value, json};
 
 // ---------------------------------------------------------------------------
@@ -434,13 +433,10 @@ fn report() {
     }
 
     // Full Adapter path, signature included (ed25519-dalek on the host)
-    let key = SigningKey::from_bytes(&[7; 32]);
-    let public_key = hex::encode(key.verifying_key().as_bytes());
+    let key = TestKey::default();
+    let public_key = key.public_key();
     let body = &cases()[0].body;
-    let signature = hex::encode(
-        key.sign(&[b"1760000000".as_slice(), body].concat())
-            .to_bytes(),
-    );
+    let signature = key.sign("1760000000", body);
     let (allocs, _, _) = allocations(|| {
         block_on(handle_interaction(
             &public_key,

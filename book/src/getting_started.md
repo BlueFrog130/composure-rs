@@ -47,7 +47,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 `macros` brings the attribute macros; `tier1` the REST client with the Endpoints most bots need.
 See [feature flags](https://docs.rs/composure/latest/composure/#feature-flags) for the rest; leaving REST out keeps a Worker's bundle
-smaller.
+smaller. For tests, `testing` adds stand-ins for Discord and the platform ([Testing](testing.md)).
 
 ## A first Command
 

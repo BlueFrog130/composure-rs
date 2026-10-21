@@ -378,8 +378,7 @@ mod tests {
         block_on(c.delete_own_reaction(channel, message, "blob:7")).unwrap();
         let sent: Vec<_> = c
             .transport()
-            .requests
-            .borrow()
+            .requests()
             .iter()
             .map(|r| (r.method, r.url.rsplit("v10").next().unwrap().to_string()))
             .collect();

@@ -29,9 +29,7 @@ composure_sync.workspace = true
 dotenvy = "0.15.7"
 
 [dev-dependencies]
-ed25519-dalek = "3.0.0"
-futures = { version = "0.3.34", default-features = false, features = ["executor"] }
-hex = "0.4.3"
+composure = { path = "../../crates/composure", features = ["testing"] }
 
 # Cold-start settings, as in examples/cloudflare (see the adapter README's "Cold starts")
 [package.metadata.wasm-pack.profile.release]

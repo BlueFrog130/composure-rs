@@ -390,8 +390,7 @@ mod tests {
 
         fn edits(&self) -> Vec<(String, serde_json::Value)> {
             self.transport
-                .requests
-                .borrow()
+                .requests()
                 .iter()
                 .map(|r| {
                     let body = serde_json::from_slice(r.body.as_deref().unwrap()).unwrap();
@@ -427,7 +426,7 @@ mod tests {
             response,
             InteractionResponse::DeferredChannelMessageWithSource(None)
         ));
-        assert!(platform.transport.requests.borrow().is_empty());
+        assert!(platform.transport.requests().is_empty());
 
         platform.run().unwrap();
         assert_eq!(
@@ -474,10 +473,7 @@ mod tests {
         let _ = Ctx::new(&interaction, &platform).defer(async |_| "ok");
         platform.run().unwrap();
         assert_eq!(platform.edits().len(), 2);
-        assert_eq!(
-            *platform.transport.sleeps.borrow(),
-            [Duration::from_millis(250)]
-        );
+        assert_eq!(platform.transport.sleeps(), [Duration::from_millis(250)]);
     }
 
     const THEME: Theme = Theme::new().with_primary(0x123456).with_footer("Bot", None);

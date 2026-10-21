@@ -335,9 +335,6 @@ dependencies = [
  "composure_adapter_cloudflare",
  "composure_sync",
  "dotenvy",
- "ed25519-dalek",
- "futures",
- "hex",
  "serde",
  "serde_json",
  "tracing",
@@ -359,9 +356,6 @@ name = "composure_example_bot"
 version = "0.1.0"
 dependencies = [
  "composure",
- "ed25519-dalek",
- "futures",
- "hex",
  "serde_json",
  "tracing",
 ]
@@ -390,8 +384,6 @@ dependencies = [
  "composure_example_bot",
  "composure_sync",
  "dotenvy",
- "ed25519-dalek",
- "hex",
  "http-body-util",
  "hyper",
  "hyper-util",
