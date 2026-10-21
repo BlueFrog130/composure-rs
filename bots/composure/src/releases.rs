@@ -1,5 +1,6 @@
-//! Composure's releases, from the GitHub Releases API (knope writes each version's changelog
-//! section into its release). The cron trigger refreshes the copy in the [`Store`]; handlers read
+//! The `composure` crate's releases, from the GitHub Releases API (knope writes each version's
+//! changelog section into its release). Every crate is released on its own (ADR 0016); only
+//! `composure`'s are followed, and the shared `v<version>` releases up to 0.1.3. The cron trigger refreshes the copy in the [`Store`]; handlers read
 //! only that copy, fetching once if it is missing.
 
 use std::borrow::Cow;
@@ -15,7 +16,7 @@ pub const RELEASES_KEY: &str = "releases";
 /// One published release
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Release {
-    /// `0.1.2`, without the tag's `v`
+    /// `0.1.2`, without the tag's `composure/v` or `v`
     pub version: String,
     /// `2026-10-20`
     pub date: String,
@@ -36,7 +37,14 @@ struct GitHubRelease {
     prerelease: bool,
 }
 
-/// Published (not draft, not prerelease) releases from GitHub, newest first
+/// The version a `composure` release tag names: `composure/v0.1.4`, or `v0.1.3` from when every
+/// crate shared one; `None` for the other crates' tags
+fn composure_version(tag: &str) -> Option<&str> {
+    tag.strip_prefix("composure/v")
+        .or_else(|| tag.strip_prefix('v'))
+}
+
+/// Published (not draft, not prerelease) `composure` releases from GitHub, newest first
 pub async fn fetch(
     transport: &impl Transport,
     config: &Config,
@@ -54,9 +62,10 @@ pub async fn fetch(
         .into_iter()
         .filter(|release| !release.draft && !release.prerelease)
         .filter_map(|release| {
+            let version = composure_version(&release.tag_name)?.to_string();
             let published = release.published_at?;
             Some(Release {
-                version: release.tag_name.trim_start_matches('v').to_string(),
+                version,
                 date: published.get(..10).unwrap_or(&published).to_string(),
                 url: release.html_url,
                 notes: release.body.unwrap_or_default(),
@@ -249,6 +258,14 @@ mod tests {
             excerpt("```\ncode\n\nmore code", 12),
             ("```\ncode\n```".into(), true)
         );
+    }
+
+    #[test]
+    fn reads_composure_tags() {
+        assert_eq!(composure_version("composure/v0.1.4"), Some("0.1.4"));
+        assert_eq!(composure_version("v0.1.3"), Some("0.1.3"));
+        assert_eq!(composure_version("composure_macros/v0.1.4"), None);
+        assert_eq!(composure_version("composure_adapter_tokio/v0.2.0"), None);
     }
 
     #[test]

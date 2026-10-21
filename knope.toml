@@ -1,28 +1,61 @@
 # Releases with knope (https://knope.tech): every change worth a release note gets a change file
-# in .changeset/ (`knope document-change`). On main, CI turns pending change files into a release
-# PR (version bump, CHANGELOG.md); merging it tags, creates the GitHub release, and publishes the
-# crates. See CONTRIBUTING.md.
+# in .changeset/ (`knope document-change`) naming the crates it changes. On main, CI turns pending
+# change files into a release PR (version bumps, each crate's CHANGELOG.md); merging it publishes
+# the crates whose version changed, tags each `<crate>/v<version>` and creates its GitHub release.
+# See CONTRIBUTING.md and ADR 0016.
 #
-# The published crates share one version: [workspace.package] version in Cargo.toml, their
-# entries in [workspace.dependencies], and their Cargo.lock entries move together.
+# Each published crate is its own package with its own version: `version` in its Cargo.toml, its
+# entry in the root [workspace.dependencies] (what the other crates require of it) and in
+# Cargo.lock. knope doesn't bump dependents: a breaking change to a crate needs change files for
+# the crates that depend on it too, which scripts/check-change-files.sh enforces in CI.
 
-[package]
+[packages.composure]
 versioned_files = [
-    "Cargo.toml",
+    "crates/composure/Cargo.toml",
+    "Cargo.lock",
     { path = "Cargo.toml", dependency = "composure" },
-    { path = "Cargo.toml", dependency = "composure_macros" },
-    { path = "Cargo.toml", dependency = "composure_commands" },
-    { path = "Cargo.toml", dependency = "composure_sync" },
-    { path = "Cargo.toml", dependency = "composure_adapter_cloudflare" },
-    { path = "Cargo.toml", dependency = "composure_adapter_tokio" },
-    { path = "Cargo.lock", dependency = "composure" },
-    { path = "Cargo.lock", dependency = "composure_macros" },
-    { path = "Cargo.lock", dependency = "composure_commands" },
-    { path = "Cargo.lock", dependency = "composure_sync" },
-    { path = "Cargo.lock", dependency = "composure_adapter_cloudflare" },
-    { path = "Cargo.lock", dependency = "composure_adapter_tokio" },
 ]
-changelog = "CHANGELOG.md"
+changelog = "crates/composure/CHANGELOG.md"
+
+[packages.composure_macros]
+versioned_files = [
+    "crates/macros/Cargo.toml",
+    "Cargo.lock",
+    { path = "Cargo.toml", dependency = "composure_macros" },
+]
+changelog = "crates/macros/CHANGELOG.md"
+
+[packages.composure_commands]
+versioned_files = [
+    "crates/commands/Cargo.toml",
+    "Cargo.lock",
+    { path = "Cargo.toml", dependency = "composure_commands" },
+]
+changelog = "crates/commands/CHANGELOG.md"
+
+[packages.composure_sync]
+versioned_files = [
+    "crates/sync/Cargo.toml",
+    "Cargo.lock",
+    { path = "Cargo.toml", dependency = "composure_sync" },
+]
+changelog = "crates/sync/CHANGELOG.md"
+
+[packages.composure_adapter_cloudflare]
+versioned_files = [
+    "crates/adapters/cloudflare/Cargo.toml",
+    "Cargo.lock",
+    { path = "Cargo.toml", dependency = "composure_adapter_cloudflare" },
+]
+changelog = "crates/adapters/cloudflare/CHANGELOG.md"
+
+[packages.composure_adapter_tokio]
+versioned_files = [
+    "crates/adapters/tokio/Cargo.toml",
+    "Cargo.lock",
+    { path = "Cargo.toml", dependency = "composure_adapter_tokio" },
+]
+changelog = "crates/adapters/tokio/CHANGELOG.md"
 
 # `knope document-change`: write a change file for the current work
 [[workflows]]
@@ -44,7 +77,7 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "Command"
-command = "git commit -m \"chore: prepare release $version\""
+command = "git commit -m \"chore: prepare release\""
 
 [[workflows.steps]]
 type = "Command"
@@ -55,12 +88,14 @@ type = "CreatePullRequest"
 base = "main"
 
 [workflows.steps.title]
-template = "chore: prepare release $version"
+template = "chore: prepare release"
 
 [workflows.steps.body]
-template = "Merging this PR releases $version: it tags `v$version`, creates the GitHub release and publishes every crate to crates.io.\n\n$changelog"
+# `$version` and `$changelog` only exist with a single package: each crate's entry is in the diff
+template = "Merging this PR publishes every crate whose version changed to crates.io, tags it `<crate>/v<version>` and creates its GitHub release. The new versions and their changelog entries are in the diff."
 
-# CI, when the release PR is merged: tag and create the GitHub release
+# CI, when the release PR is merged and the crates are published: tag and create a GitHub release
+# for every crate whose version has no tag yet
 [[workflows]]
 name = "release"
 

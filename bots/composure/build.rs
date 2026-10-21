@@ -1,4 +1,4 @@
-//! Generates `$OUT_DIR/build_info.rs`: the workspace's Composure version, the git commit, and the
+//! Generates `$OUT_DIR/build_info.rs`: the `composure` crate's version, the git commit, and the
 //! `/docs` index of the guide (every chapter in `book/src/SUMMARY.md` and its headings).
 
 use std::{env, fmt::Write as _, fs, path::Path, process::Command};
@@ -9,10 +9,8 @@ fn main() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let book = root.join("book/src");
     println!("cargo::rerun-if-changed={}", book.display());
-    println!(
-        "cargo::rerun-if-changed={}",
-        root.join("Cargo.toml").display()
-    );
+    let manifest = root.join("crates/composure/Cargo.toml");
+    println!("cargo::rerun-if-changed={}", manifest.display());
     println!(
         "cargo::rerun-if-changed={}",
         root.join(".git/HEAD").display()
@@ -20,7 +18,7 @@ fn main() {
     println!("cargo::rerun-if-env-changed=GITHUB_SHA");
 
     let mut out = String::new();
-    let version = workspace_version(&fs::read_to_string(root.join("Cargo.toml")).unwrap());
+    let version = package_version(&fs::read_to_string(manifest).unwrap());
     writeln!(out, "pub const COMPOSURE_VERSION: &str = {version:?};").unwrap();
     writeln!(out, "pub const GIT_SHA: &str = {:?};", git_sha()).unwrap();
 
@@ -44,18 +42,18 @@ fn main() {
     fs::write(path, out).unwrap();
 }
 
-/// `version` under `[workspace.package]`
-fn workspace_version(manifest: &str) -> String {
+/// `version` under `[package]`
+fn package_version(manifest: &str) -> String {
     let mut in_package = false;
     for line in manifest.lines() {
         let line = line.trim();
         if line.starts_with('[') {
-            in_package = line == "[workspace.package]";
+            in_package = line == "[package]";
         } else if in_package && let Some(value) = line.strip_prefix("version = ") {
             return value.trim_matches('"').to_string();
         }
     }
-    panic!("no version in [workspace.package]");
+    panic!("no version in [package]");
 }
 
 /// The short commit: CI's `GITHUB_SHA`, else git, else "unknown"

@@ -2,9 +2,9 @@ name: Release
 
 # Releases are driven by change files in .changeset/ (see CONTRIBUTING.md):
 # - every push to main with pending change files opens or updates the release PR
-#   (knope bumps the shared version and writes CHANGELOG.md)
-# - when main holds a version without a `v<version>` tag (the release PR was merged), the crates
-#   are published to crates.io, then knope tags the commit and creates the GitHub release
+#   (knope bumps the version of each crate a change file names and writes its CHANGELOG.md)
+# - when a crate's version on main has no `<crate>/v<version>` tag (the release PR was merged),
+#   that crate is published to crates.io, then knope tags it and creates its GitHub release
 #
 # Secrets: CARGO_REGISTRY_TOKEN (crates.io token with publish-new and publish-update scopes).
 # Optional: RELEASE_TOKEN, a token with contents and pull-requests write access, so the release PR
@@ -67,44 +67,51 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Is this version released?
-        id: version
+      - name: Which crates are unreleased?
+        id: unreleased
+        # `crate@version` in dependency order, for every crate knope hasn't tagged at its version
         run: |
-          version=$(sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\(.*\)"/\1/p}' Cargo.toml)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          if git rev-parse --verify --quiet "refs/tags/v$version" > /dev/null; then
-            echo "v$version is already released"
-          else
-            echo "unreleased=true" >> "$GITHUB_OUTPUT"
-            echo "Releasing $version"
-          fi
+          metadata=$(cargo metadata --no-deps --format-version 1)
+          crates=""
+          for crate in composure_macros composure composure_commands composure_sync composure_adapter_cloudflare composure_adapter_tokio; do
+            version=$(jq -r --arg crate "$crate" '.packages[] | select(.name == $crate) | .version' <<< "$metadata")
+            if git rev-parse --verify --quiet "refs/tags/$crate/v$version" > /dev/null; then
+              echo "$crate $version is already released"
+            else
+              echo "Releasing $crate $version"
+              crates="$crates $crate@$version"
+            fi
+          done
+          echo "crates=${crates# }" >> "$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@stable
-        if: steps.version.outputs.unreleased == 'true'
+        if: steps.unreleased.outputs.crates != ''
       - uses: Swatinem/rust-cache@v2
-        if: steps.version.outputs.unreleased == 'true'
+        if: steps.unreleased.outputs.crates != ''
       - name: Publish to crates.io
-        if: steps.version.outputs.unreleased == 'true'
+        if: steps.unreleased.outputs.crates != ''
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
-        # In dependency order; crates already at this version are skipped, so a failed run can be
-        # re-run. `cargo publish` waits for each crate to be in the index before the next.
+          CRATES: ${{ steps.unreleased.outputs.crates }}
+        # Versions already on crates.io are skipped, so a failed run can be re-run. `cargo publish`
+        # waits for each crate to be in the index before the next.
         run: |
-          for crate in composure_macros composure composure_commands composure_sync composure_adapter_cloudflare composure_adapter_tokio; do
+          for release in $CRATES; do
+            crate=${release%@*}
+            version=${release#*@}
             status=$(curl -s -o /dev/null -w '%{http_code}' -A "composure-release (github.com/BlueFrog130/composure-rs)" \
-              "https://crates.io/api/v1/crates/$crate/$VERSION")
+              "https://crates.io/api/v1/crates/$crate/$version")
             if [ "$status" = "200" ]; then
-              echo "$crate $VERSION is already published"
+              echo "$crate $version is already published"
             else
               cargo publish -p "$crate"
             fi
           done
       - uses: knope-dev/action@v2.1.2
-        if: steps.version.outputs.unreleased == 'true'
+        if: steps.unreleased.outputs.crates != ''
         with:
           version: ${{ env.KNOPE_VERSION }}
-      - name: Tag and create the GitHub release
-        if: steps.version.outputs.unreleased == 'true'
+      - name: Tag and create the GitHub releases
+        if: steps.unreleased.outputs.crates != ''
         run: knope release --verbose
         env:
           GITHUB_TOKEN: ${{ github.token }}
