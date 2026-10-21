@@ -85,7 +85,7 @@ fn config(env: &Env) -> Result<Config, String> {
 /// Runs once per isolate: logs go to Workers Logs with each Interaction's span fields
 #[event(start)]
 fn start() {
-    composure_adapter_cloudflare::tracing::init_with_level(LevelFilter::DEBUG);
+    composure_adapter_cloudflare::tracing::init_with_level(LevelFilter::INFO);
 }
 
 #[event(fetch)]

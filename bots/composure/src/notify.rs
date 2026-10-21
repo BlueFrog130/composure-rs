@@ -225,12 +225,10 @@ pub async fn announce_new<T: Transport>(
     config: &Config,
 ) -> Result<Vec<String>, HandlerError> {
     let releases = releases::refresh(transport, store, config).await?;
-    tracing::info!(?releases);
     let announced = store
         .get(ANNOUNCED_KEY)
         .await?
         .and_then(|bytes| String::from_utf8(bytes).ok());
-    tracing::info!(?announced);
     let index = match announced {
         // First run: everything, oldest first
         None => releases.len(),
@@ -249,7 +247,6 @@ pub async fn announce_new<T: Transport>(
     };
     let mut done = Vec::new();
     for release in releases[..index].iter().rev() {
-        tracing::info!(?release.version);
         let announcement = Announcement {
             release: release.clone(),
         };
