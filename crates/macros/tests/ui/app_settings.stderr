@@ -1,4 +1,4 @@
-error: unknown setting; expected one of handlers, theme, events
+error: unknown setting; expected one of handlers, events, errors
  --> tests/ui/app_settings.rs:9:23
   |
 9 | #[app(handlers(ping), colors = 1)]

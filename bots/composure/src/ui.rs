@@ -5,18 +5,17 @@
 //! <ui::Error>"That release does not exist."</ui::Error>
 //! ```
 //!
-//! Each sets its accent color itself instead of leaving it to the Theme, so messages sent through
-//! REST (announcements, feedback), which are never themed, match the replies.
+//! Each sets its accent color from the consts below, so replies, deferred edits and messages sent
+//! through REST (announcements, feedback) look alike. Handler errors use [`render_error`], the
+//! App's `errors = ..`, in the same style.
 
 use composure::{
-    command::{HandlerError, View},
+    command::{Ephemeral, HandlerError, IntoResponse, View},
     rest::{BotClient, CreateMessage, Transport},
     rsx,
-    types::{Message, MessageFlags, Snowflake},
+    types::{InteractionResponse, Message, MessageFlags, Snowflake},
     view,
 };
-
-use crate::THEME;
 
 /// Posts `view` to `channel` as a Components V2 message
 pub async fn send<T: Transport>(
@@ -39,8 +38,23 @@ pub async fn send<T: Transport>(
     Ok(message)
 }
 
+/// Composure's brand color
+pub const PRIMARY: u32 = 0x7c5cff;
 /// Discord's grey, for neutral information
 pub const SECONDARY: u32 = 0x4e5058;
+/// Discord's green
+pub const SUCCESS: u32 = 0x57f287;
+/// Discord's yellow
+pub const WARNING: u32 = 0xfee75c;
+/// Discord's red
+pub const ERROR: u32 = 0xed4245;
+
+/// Handler errors as an ephemeral [`Error`] container: the App's `errors = ..`, so the
+/// framework's error replies look like the bot's own
+pub fn render_error(error: &HandlerError) -> InteractionResponse {
+    let message = error.user_message().to_string();
+    Ephemeral(panel(ERROR, None, rsx! { <Text>{message}</Text> })).into_response()
+}
 
 /// A container with `accent` and an optional `### title` above `children`
 fn panel(accent: u32, title: Option<String>, children: View) -> View {
@@ -55,7 +69,7 @@ fn panel(accent: u32, title: Option<String>, children: View) -> View {
 /// The brand color: pages, cards, announcements
 #[view]
 pub fn Primary(title: Option<String>, children: View) -> View {
-    panel(THEME.primary, title, children)
+    panel(PRIMARY, title, children)
 }
 
 /// Neutral information: status, notices for maintainers
@@ -67,17 +81,17 @@ pub fn Secondary(title: Option<String>, children: View) -> View {
 /// Something worked
 #[view]
 pub fn Success(title: Option<String>, children: View) -> View {
-    panel(THEME.success, title, children)
+    panel(SUCCESS, title, children)
 }
 
 /// Worked, with a catch
 #[view]
 pub fn Warning(title: Option<String>, children: View) -> View {
-    panel(THEME.warning, title, children)
+    panel(WARNING, title, children)
 }
 
-/// Something failed, said in the bot's words (handler errors are themed embeds in the same color)
+/// Something failed, said in the bot's words; [`render_error`] answers handler errors the same way
 #[view]
 pub fn Error(title: Option<String>, children: View) -> View {
-    panel(THEME.error, title, children)
+    panel(ERROR, title, children)
 }

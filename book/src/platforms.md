@@ -186,6 +186,6 @@ shares, so an Adapter only maps HTTP to it.
    [files](https://docs.rs/composure/latest/composure/types/enum.InteractionResponse.html#method.files), send it with
    [`send_with_files`](https://docs.rs/composure/latest/composure/adapter/fn.send_with_files.html) and answer `202` instead.
 5. Render handler errors with the handler's
-   [`theme()`](https://docs.rs/composure/latest/composure/command/trait.InteractionHandler.html#method.theme), as the outcome already does.
+   [`render_error`](https://docs.rs/composure/latest/composure/command/trait.InteractionHandler.html#method.render_error), as the outcome already does.
 
 The two existing Adapters (`crates/adapters/` in the repository) are a few hundred lines each.

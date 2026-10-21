@@ -7,7 +7,7 @@ use crate::types::{
     ModalSubmitInteraction,
 };
 
-use super::{__unshare, CommandSetDefinition, HandlerError, Route, ScopedDefinition, Theme};
+use super::{__unshare, CommandSetDefinition, HandlerError, Route, ScopedDefinition};
 
 /// Answers Interactions; the one contract every Adapter talks to. `S` is the Adapter's State.
 ///
@@ -18,9 +18,11 @@ use super::{__unshare, CommandSetDefinition, HandlerError, Route, ScopedDefiniti
 /// Futures are `Send` so Adapters can run each Interaction on any thread (ADR 0012); `async fn`
 /// in impls works as long as what it holds across `.await` is `Send`.
 pub trait InteractionHandler<S> {
-    /// Colors and branding filled into message responses and errors; none by default
-    fn theme(&self) -> Option<&'static Theme> {
-        None
+    /// The response a handler's error is answered with: Adapters call it when dispatch fails,
+    /// as Background Work does when deferred work fails. [`HandlerError::response`] by default;
+    /// an `#[app]` uses its tree's `errors = ..` [`ErrorRenderer`](super::ErrorRenderer).
+    fn render_error(&self, error: &HandlerError) -> InteractionResponse {
+        error.response()
     }
 
     /// Answers a Command (chat input, user, or message); defaults to an unknown-command error
@@ -90,9 +92,8 @@ pub struct NoHandler;
 
 impl<S> InteractionHandler<S> for NoHandler {}
 
-/// Routes an Interaction to the handler. Ping is answered with Pong. The handler's
-/// [`InteractionHandler::theme`] is applied to the response; render an `Err` with
-/// [`HandlerError::response_with`] and the same theme. A Components V2 message that also sets
+/// Routes an Interaction to the handler. Ping is answered with Pong. Render an `Err` with the
+/// handler's [`InteractionHandler::render_error`]. A Components V2 message that also sets
 /// `content`, `embeds` or a poll is an `Err`, since Discord would reject it.
 pub async fn dispatch<S, H: InteractionHandler<S>>(
     interaction: Interaction,
@@ -107,16 +108,13 @@ pub async fn dispatch<S, H: InteractionHandler<S>>(
             super::response::check_components_v2(&response)?;
             Ok(response)
         });
-        let mut response = match checked {
+        let response = match checked {
             Ok(response) => response,
             Err(error) => {
                 error.trace("interaction failed");
                 return Err(error);
             }
         };
-        if let Some(theme) = handler.theme() {
-            theme.apply(&mut response);
-        }
         debug!(response = response_kind(&response), "interaction answered");
         Ok(response)
     }
@@ -223,8 +221,8 @@ impl<C, F> WithFallback<C, F> {
 impl<S: Sync, C: Route<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHandler<S>
     for WithFallback<C, F>
 {
-    fn theme(&self) -> Option<&'static Theme> {
-        C::THEME
+    fn render_error(&self, error: &HandlerError) -> InteractionResponse {
+        super::route::__errors::<C>()(error)
     }
 
     async fn command(
@@ -233,7 +231,7 @@ impl<S: Sync, C: Route<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHa
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         let command = Arc::new(command);
-        match C::dispatch(&command, state, None).await {
+        match C::dispatch(&command, state, super::route::__errors::<C>()).await {
             Some(result) => result,
             None => self.fallback.command(__unshare(command), state).await,
         }
@@ -245,7 +243,7 @@ impl<S: Sync, C: Route<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHa
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         let component = Arc::new(component);
-        match C::dispatch_component(&component, state, None).await {
+        match C::dispatch_component(&component, state, super::route::__errors::<C>()).await {
             Some(result) => result,
             None => self.fallback.component(__unshare(component), state).await,
         }
@@ -257,7 +255,7 @@ impl<S: Sync, C: Route<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHa
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         let autocomplete = Arc::new(autocomplete);
-        match C::dispatch_autocomplete(&autocomplete, state, None).await {
+        match C::dispatch_autocomplete(&autocomplete, state, super::route::__errors::<C>()).await {
             Some(result) => result,
             None => {
                 self.fallback
@@ -273,7 +271,7 @@ impl<S: Sync, C: Route<S> + Sync, F: InteractionHandler<S> + Sync> InteractionHa
         state: &S,
     ) -> Result<InteractionResponse, HandlerError> {
         let modal = Arc::new(modal);
-        match C::dispatch_modal(&modal, state, None).await {
+        match C::dispatch_modal(&modal, state, super::route::__errors::<C>()).await {
             Some(result) => result,
             None => self.fallback.modal_submit(__unshare(modal), state).await,
         }

@@ -203,11 +203,6 @@ pub struct MessageCallbackData {
     /// files to upload; sent as multipart, so the Adapter answers through the callback endpoint
     #[serde(skip)]
     pub files: Vec<File>,
-
-    /// Leave the embeds as they are instead of filling in the App's
-    /// [`Theme`](crate::command::Theme); set by [`Unthemed`](crate::command::Unthemed)
-    #[serde(skip)]
-    pub unthemed: bool,
 }
 
 impl MessageCallbackData {

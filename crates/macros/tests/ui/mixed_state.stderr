@@ -14,7 +14,7 @@ help: the trait `Command<u32>` is not implemented for `b`
 10 | #[composure::command]
    | ^^^^^^^^^^^^^^^^^^^^^
    = help: for that trait implementation, expected `std::string::String`, found `u32`
-note: required for `b` to implement `Route<u32>`
+note: required for `b` to implement `composure::command::Route<u32>`
   --> tests/ui/mixed_state.rs:10:1
    |
 10 | #[composure::command]
@@ -22,7 +22,7 @@ note: required for `b` to implement `Route<u32>`
 11 | fn b(ctx: Ctx<String>) -> String {
    |    ^
    = note: 1 redundant requirement hidden
-   = note: required for `Bot` to implement `Route<u32>`
+   = note: required for `Bot` to implement `composure::command::Route<u32>`
 note: required for `Bot` to implement `InteractionHandler<u32>`
   --> tests/ui/mixed_state.rs:15:1
    |
@@ -55,7 +55,7 @@ help: the trait `Command<u32>` is not implemented for `b`
 10 | #[composure::command]
    | ^^^^^^^^^^^^^^^^^^^^^
    = help: for that trait implementation, expected `std::string::String`, found `u32`
-note: required for `b` to implement `Route<u32>`
+note: required for `b` to implement `composure::command::Route<u32>`
   --> tests/ui/mixed_state.rs:10:1
    |
 10 | #[composure::command]
@@ -63,7 +63,7 @@ note: required for `b` to implement `Route<u32>`
 11 | fn b(ctx: Ctx<String>) -> String {
    |    ^
    = note: 1 redundant requirement hidden
-   = note: required for `Bot` to implement `Route<u32>`
+   = note: required for `Bot` to implement `composure::command::Route<u32>`
 note: required for `Bot` to implement `InteractionHandler<u32>`
   --> tests/ui/mixed_state.rs:15:1
    |
@@ -91,7 +91,7 @@ help: the trait `Command<u32>` is not implemented for `b`
 10 | #[composure::command]
    | ^^^^^^^^^^^^^^^^^^^^^
    = help: for that trait implementation, expected `std::string::String`, found `u32`
-note: required for `b` to implement `Route<u32>`
+note: required for `b` to implement `composure::command::Route<u32>`
   --> tests/ui/mixed_state.rs:10:1
    |
 10 | #[composure::command]
@@ -99,7 +99,7 @@ note: required for `b` to implement `Route<u32>`
 11 | fn b(ctx: Ctx<String>) -> String {
    |    ^
    = note: 1 redundant requirement hidden
-   = note: required for `Bot` to implement `Route<u32>`
+   = note: required for `Bot` to implement `composure::command::Route<u32>`
 note: required for `Bot` to implement `InteractionHandler<u32>`
   --> tests/ui/mixed_state.rs:15:1
    |

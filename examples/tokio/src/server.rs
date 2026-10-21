@@ -13,7 +13,7 @@ use composure::{
     types::{File, InteractionResponse},
 };
 use composure_adapter_tokio::Host;
-use composure_example_bot::Config;
+use composure_example_bot::{Config, style};
 
 /// What the commands read besides the Interaction, handed to `TokioInteractionBot::with_data`:
 /// the Bot Data on tokio
@@ -171,8 +171,8 @@ pub fn primes(
             .map_err(HandlerError::new)?;
         let took = started.elapsed().as_millis();
 
-        // The final edit: a success embed in the App's theme, like a direct reply
-        Ok::<_, HandlerError>(ctx.theme().success(format!(
+        // The final edit: a success embed in the bot's style, like a direct reply
+        Ok::<_, HandlerError>(style::embed(style::SUCCESS).with_description(&format!(
             "{count} primes up to {up_to}, the largest {largest}.
 Counted in {took} ms."
         )))

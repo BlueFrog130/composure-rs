@@ -8,12 +8,12 @@
 pub mod server;
 
 use composure::app;
-use composure_example_bot::{Bot, THEME};
+use composure_example_bot::Bot;
 pub use server::Server;
 use server::{file, primes, uptime};
 
 /// Every command the bot serves on tokio, synced by `src/bin/sync.rs`
-#[app(handlers(Bot, file, uptime, primes), theme = THEME)]
+#[app(handlers(Bot, file, uptime, primes))]
 pub struct TokioBot;
 
 /// Where `/file` reads from when `FILES_DIR` is not set: the sample files next to this crate

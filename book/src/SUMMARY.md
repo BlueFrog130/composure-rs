@@ -7,7 +7,6 @@
 - [Responses](responses.md)
 - [Components and modals](components.md)
 - [Views](views.md)
-- [Themes](theming.md)
 - [REST and deferring](deferring.md)
 - [Webhook Events](events.md)
 - [Platforms](platforms.md)

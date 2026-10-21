@@ -10,11 +10,13 @@ use composure::{
     rsx, view,
 };
 
-/// A Components V2 card (accent color from the theme): like it, or review it in a modal
+use crate::style;
+
+/// A Components V2 card in the bot's accent color: like it, or review it in a modal
 #[view]
 pub fn Card(likes: u32) -> View {
     rsx! {
-        <Container>
+        <Container accent_color=style::PRIMARY>
             <Section>
                 <Text>"## Components V2"</Text>
                 <Text>"Sections, separators, galleries and files in a container."</Text>

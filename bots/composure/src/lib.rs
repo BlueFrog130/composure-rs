@@ -25,7 +25,7 @@ pub mod services;
 pub mod ui;
 pub mod worker;
 
-use composure::{app, command::Theme};
+use composure::app;
 
 pub use config::Config;
 pub use services::{Services, Store};
@@ -34,10 +34,6 @@ pub use services::{Services, Store};
 pub mod build_info {
     include!(concat!(env!("OUT_DIR"), "/build_info.rs"));
 }
-
-/// Composure's colors. Messages are [`ui`] containers, which set their accent from these; the
-/// only embeds are the framework's error replies, so no author or footer that containers lack.
-pub const THEME: Theme = Theme::new().with_primary(0x7c5cff);
 
 /// Every Command, View and handler the bot serves, synced by `src/bin/sync.rs`
 #[app(
@@ -50,7 +46,7 @@ pub const THEME: Theme = Theme::new().with_primary(0x7c5cff);
         about::about,
         about::invite,
     ),
-    theme = THEME,
-    events = events::Events
+    events = events::Events,
+    errors = ui::render_error
 )]
 pub struct ComposureBot;

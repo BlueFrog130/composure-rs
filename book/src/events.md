@@ -83,6 +83,6 @@ working when Discord adds event types.
 [`application_id()`](https://docs.rs/composure/latest/composure/command/struct.EventCtx.html#method.application_id), the event's
 [`timestamp()`](https://docs.rs/composure/latest/composure/command/struct.EventCtx.html#method.timestamp) (events can arrive late and out of order),
 and, with a [`Platform`](https://docs.rs/composure/latest/composure/command/trait.Platform.html) State, [`bot()`](https://docs.rs/composure/latest/composure/command/struct.EventCtx.html#method.bot)
-for REST. There is no Interaction, so no Interaction client or Theme.
+for REST. There is no Interaction, so no Interaction client.
 
 With the `tracing` feature, handlers run inside an `event` span carrying `event_type`.

@@ -46,7 +46,7 @@ message the button is on is re-rendered with them. Nothing is stored anywhere: `
 - [Inline handlers](#inline-handlers): `on:click`, `on:select`, `on:submit`
 - [Modal Views](#modal-views): forms read back as typed parameters
 - [Tag reference](#tag-reference): every tag and its attributes
-- [Themes](#themes): where colors come from
+- [Styling](#styling): colors, tone Views, and how errors look
 - [Without `#[view]`](#without-view): markup in plain functions, sending Views through REST
 
 ## Markup
@@ -448,8 +448,6 @@ A modal can also be submitted to a [`#[modal]`](https://docs.rs/composure/latest
 or answered by `custom_id=..`; inputs then need no matching parameters, and their `name` is the
 `custom_id` the handler reads them by.
 
-Modals have no color or accent, so [Themes](#themes) do not apply to them.
-
 ## Tag reference
 
 Each tag builds the type named in its heading; its attributes are that type's public fields
@@ -466,7 +464,7 @@ optional accent bar. Top level only. Children: text, `<Text>`, `<Section>`, `<Ga
 
 | Attribute | Type | |
 |---|---|---|
-| `accent_color` | `u32` (`0xRRGGBB`) | Color of the bar on the left. Left unset, the App's [Theme](#themes) fills it in |
+| `accent_color` | `u32` (`0xRRGGBB`) | Color of the bar on the left; none when unset |
 | `spoiler` | `bool` | Blurs the content until clicked |
 
 ```text
@@ -751,30 +749,71 @@ children.
 | `file_types` | `Vec<String>` | Up to 10 of `"image"`, `"video"`, `"audio"`, or extensions like `".pdf"` |
 | `required` | `bool` | Set from the submit parameter's type |
 
-## Themes
+## Styling
 
-A View answered by a handler goes through the App's [`Theme`](https://docs.rs/composure/latest/composure/command/struct.Theme.html) like any
-message: every **top-level** `<Container>` without an `accent_color` gets the Theme's
-`primary` color, both when sent and when re-rendered by an inline handler. Containers that set
-`accent_color` keep it, and [`Unthemed`](https://docs.rs/composure/latest/composure/command/struct.Unthemed.html) sends a View as is.
-
-Use the Theme's colors explicitly through `ctx.theme()`, which handlers and Commands have, or by
-naming your `Theme` constant:
+Colors are yours: plain `const`s, set where a message is built. A wrapper View per tone keeps
+every message alike, and works the same whether a handler answers with it, Background Work
+edits with it, or it is sent through REST:
 
 ```rust
-use composure::{rsx, view, command::{Theme, View}};
+use composure::{command::View, rsx, view};
 
-pub const THEME: Theme = Theme::new().with_primary(0xf5c2e7);
+pub const SUCCESS: u32 = 0x57f287;
 
+/// Something worked
 #[view]
-pub fn Alert(message: String, failed: bool) -> View {
-    let color = if failed { THEME.error } else { THEME.success };
-    rsx! { <Container accent_color=color>{message}</Container> }
+pub fn Success(title: String, children: View) -> View {
+    rsx! {
+        <Container accent_color=SUCCESS>
+            <Text>"### " {title}</Text>
+            {children}
+        </Container>
+    }
 }
+
+fn saved(channel: &str) -> View {
+    rsx! { <Success title="Saved">"Announcements will appear in " {channel}</Success> }
+}
+# fn main() { assert_eq!(saved("#news").into_components().unwrap().len(), 1); }
+```
+
+Handler errors are the one message Composure builds itself: by default, the ephemeral text of
+[`HandlerError::response`](https://docs.rs/composure/latest/composure/command/struct.HandlerError.html#method.response).
+`#[app(errors = ..)]` takes an [`ErrorRenderer`](https://docs.rs/composure/latest/composure/command/type.ErrorRenderer.html),
+a `fn(&HandlerError) -> InteractionResponse`, to answer them your way, both right away and when
+deferred work fails:
+
+```rust
+use composure::{
+    app, command,
+    command::{Ephemeral, HandlerError, IntoResponse},
+    rsx,
+    types::InteractionResponse,
+};
+
+const ERROR: u32 = 0xed4245;
+
+/// Errors as an ephemeral red container
+fn render_error(error: &HandlerError) -> InteractionResponse {
+    let message = error.user_message().to_string();
+    Ephemeral(rsx! { <Container accent_color=ERROR>{message}</Container> }).into_response()
+}
+
+/// Ping
+#[command]
+fn ping() -> &'static str {
+    "Pong"
+}
+
+#[app(handlers(ping), errors = render_error)]
+pub struct Bot;
 # fn main() {}
 ```
 
-See [Themes](theming.md) for everything a Theme fills in.
+[`user_message()`](https://docs.rs/composure/latest/composure/command/struct.HandlerError.html#method.user_message)
+is what the user should read: a [`HandlerError::user`](https://docs.rs/composure/latest/composure/command/struct.HandlerError.html#method.user)'s
+message, a generic one otherwise. At most one App in a tree sets `errors`; the root uses it for
+the whole tree.
 
 ## Without `#[view]`
 
@@ -793,5 +832,5 @@ fn announcement(text: &str) -> Result<Vec<Component>, CustomIdError> {
 ```
 
 Send them with the Components V2 flag
-([`MessageFlags::IsComponentsV2`](https://docs.rs/composure/latest/composure/types/struct.MessageFlags.html#associatedconstant.IsComponentsV2)); REST bodies are
-never themed.
+([`MessageFlags::IsComponentsV2`](https://docs.rs/composure/latest/composure/types/struct.MessageFlags.html#associatedconstant.IsComponentsV2)). Built from the same
+[tone Views](#styling) as your replies, they look alike.

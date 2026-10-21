@@ -430,13 +430,12 @@ fn changelog_versions_autocomplete_and_errors() {
         response.to_string().contains("There is no release `9.9.9`"),
         "{response}"
     );
-    // The framework's error embed, in the error color with no branding containers lack
-    let error = &response.embeds()[0];
-    assert_eq!(error["color"], composure_bot::THEME.error);
-    assert!(
-        error["author"].is_null() && error["footer"].is_null(),
-        "{error}"
+    // Rendered by the bot's `errors = ui::render_error`: its error container, ephemeral
+    assert_eq!(
+        response.components()[0]["accent_color"],
+        composure_bot::ui::ERROR
     );
+    assert_eq!(response["data"]["flags"], 64 | (1 << 15));
 }
 
 #[test]
@@ -711,7 +710,7 @@ fn feedback_reaches_the_maintainers() {
     assert_eq!(report["flags"], 1 << 15);
     assert_eq!(
         report["components"][0]["accent_color"],
-        composure_bot::THEME.error
+        composure_bot::ui::ERROR
     );
 }
 

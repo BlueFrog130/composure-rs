@@ -130,7 +130,7 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
 }
 
 /// Dispatches `interaction` to `handler` with `state`, as an Adapter does: routing, the
-/// handler, the Theme. The handler's error is returned as is; [`answer`] renders it.
+/// handler. The handler's error is returned as is; [`answer`] renders it.
 pub fn run<S, H: InteractionHandler<S>>(
     handler: &H,
     interaction: impl Into<Interaction>,
@@ -140,13 +140,13 @@ pub fn run<S, H: InteractionHandler<S>>(
 }
 
 /// [`run`], answering an error with the ephemeral message an Adapter sends instead
-/// ([`HandlerError::response_with`] the handler's Theme)
+/// ([`InteractionHandler::render_error`])
 pub fn answer<S, H: InteractionHandler<S>>(
     handler: &H,
     interaction: impl Into<Interaction>,
     state: &S,
 ) -> InteractionResponse {
-    run(handler, interaction, state).unwrap_or_else(|error| error.response_with(handler.theme()))
+    run(handler, interaction, state).unwrap_or_else(|error| handler.render_error(&error))
 }
 
 #[cfg(test)]

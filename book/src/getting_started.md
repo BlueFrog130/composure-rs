@@ -124,20 +124,18 @@ mod fun {
 
 use composure::app;
 
-#[app(handlers(moderation::Moderation, fun::Fun), theme = THEME)]
+#[app(handlers(moderation::Moderation, fun::Fun))]
 pub struct Bot;
-
-const THEME: composure::command::Theme = composure::command::Theme::new().with_primary(0xf5c2e7);
 # fn main() {}
 ```
 
-`#[app]` also takes `theme = ..` ([Themes](theming.md)) and `events = ..`
-([Webhook Events](events.md)).
+`#[app]` also takes `events = ..` ([Webhook Events](events.md)) and `errors = ..`, how handler
+errors are answered ([Styling](views.md#styling)).
 
 Mistakes that would only show up at runtime fail to compile instead: two Commands with the same
 name and type, two handlers with the same `custom_id` prefix, more Commands in a
 [Scope](commands.md#scopes) than Discord allows, a sub-View with handlers that no App
-lists, two Apps setting `events`.
+lists, two Apps setting `events` (or `errors`).
 
 An App implements [`InteractionHandler`](https://docs.rs/composure/latest/composure/command/trait.InteractionHandler.html) (what Adapters
 serve), [`EventHandler`](https://docs.rs/composure/latest/composure/command/trait.EventHandler.html), and

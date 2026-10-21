@@ -133,9 +133,9 @@ _Avoid_: Command Set, router, registry, bot (that is the Bot Client)
 Anything an App lists: it answers the Interactions addressed to it (by command name and type, or by `custom_id` prefix) and declares what the App's compile-time checks need.
 _Avoid_: Handler (alone), endpoint
 
-**Theme**:
-An App's embed colors (primary plus success, warning, error, info) and branding (author, footer), filled into every message Response and error it answers with (primary also as the accent color of Components V2 Containers); a nested App's Theme fills in first, the outer ones after. REST messages are untouched.
-_Avoid_: Style, skin, palette (for the whole thing)
+**Error Renderer**:
+How an App answers handler errors: a `fn(&HandlerError) -> InteractionResponse` set with `#[app(errors = ..)]` (at most one App in a tree), used for the initial response and for failed Background Work. Without one, errors are the ephemeral text of `HandlerError::response`. Colors are otherwise the bot's own `const`s, set where it builds messages; there is no framework palette.
+_Avoid_: Theme (removed, ADR 0015), error handler (handlers produce errors; this renders them)
 
 ### Deployment
 

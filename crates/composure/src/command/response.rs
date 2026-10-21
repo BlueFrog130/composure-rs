@@ -99,26 +99,6 @@ impl<T: IntoResponse> IntoResponse for Update<T> {
     }
 }
 
-/// A Response sent as is, without the App's [`Theme`](super::Theme) filling in embed
-/// colors, branding and container accent colors: `Unthemed(embed)`, `Ephemeral(Unthemed(embed))`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Unthemed<T>(pub T);
-
-impl<T: IntoResponse> IntoResponse for Unthemed<T> {
-    fn into_response(self) -> InteractionResponse {
-        self.try_into_response()
-            .unwrap_or_else(|error| error.response())
-    }
-
-    fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
-        let mut response = self.0.try_into_response()?;
-        if let Some(data) = response.message_data_mut() {
-            data.unthemed = true;
-        }
-        Ok(response)
-    }
-}
-
 /// What a Command function may return: a Response, or a `Result` of one.
 ///
 /// An `Err` is logged by the Adapter and shown to the user as a generic failure, except a

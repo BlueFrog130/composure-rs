@@ -48,8 +48,7 @@ impl Default for Embed {
 }
 
 impl Embed {
-    /// An empty embed. Discord needs at least a title, description, field, image or thumbnail; an App's
-    /// [`Theme`](crate::command::Theme) fills in the color, author and footer
+    /// An empty embed. Discord needs at least a title, description, field, image or thumbnail
     pub fn new() -> Self {
         Self {
             title: None,

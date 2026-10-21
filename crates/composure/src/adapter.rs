@@ -117,7 +117,7 @@ pub async fn handle_interaction_with_key<S, H: InteractionHandler<S>>(
     match dispatch(interaction, handler, state).await {
         Ok(response) => InteractionOutcome::Respond(response),
         Err(error) => InteractionOutcome::HandlerFailed {
-            response: error.response_with(handler.theme()),
+            response: handler.render_error(&error),
             error,
         },
     }
