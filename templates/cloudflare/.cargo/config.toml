@@ -1,0 +1,11 @@
+# Read when cargo runs from this directory, as worker-build (and so wrangler) does.
+#
+# Drops the wasm name section at link time, keeping only the sections wasm-bindgen reads: about
+# 30% of the bundle, which Workers parse on every cold start. Panic stack traces then show
+# `wasm-function[N]` instead of names; remove these flags while debugging one.
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C", "link-arg=--strip-all",
+    "-C", "link-arg=--keep-section=__wasm_bindgen_unstable",
+    "-C", "link-arg=--keep-section=target_features",
+]

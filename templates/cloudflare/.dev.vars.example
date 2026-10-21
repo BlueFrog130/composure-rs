@@ -1,0 +1,5 @@
+# Copy to .dev.vars (gitignored): `wrangler dev` reads it as the Worker's secrets.
+# Developer Portal > your app > General Information
+DISCORD_PUBLIC_KEY=
+# Developer Portal > your app > Bot, for the bot client (ctx.bot())
+DISCORD_TOKEN=

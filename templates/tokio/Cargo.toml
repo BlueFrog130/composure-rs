@@ -1,0 +1,17 @@
+[package]
+name = "{{project-name}}"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.91"
+publish = false
+
+[dependencies]
+composure = { version = "0.2", features = ["macros"] }
+composure_adapter_tokio = "0.2"
+composure_sync = "0.2"
+dotenvy = "0.15.7"
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+composure = { version = "0.2", features = ["testing"] }

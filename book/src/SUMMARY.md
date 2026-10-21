@@ -12,3 +12,6 @@
 - [Webhook Events](events.md)
 - [Platforms](platforms.md)
 - [Testing](testing.md)
+- [Local development](local_development.md)
+- [Deploying](deploying.md)
+- [Troubleshooting](troubleshooting.md)

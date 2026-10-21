@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Composure: Rust framework for HTTP-interaction-only Discord bots meant to run on the edge (serverless/WASM) or a hosted server (tokio), no gateway. Virtual Cargo workspace; crates under `crates/`, examples under `examples/`, deployed bots under `bots/`.
+Composure: Rust framework for HTTP-interaction-only Discord bots meant to run on the edge (serverless/WASM) or a hosted server (tokio), no gateway. Virtual Cargo workspace; crates under `crates/`, examples under `examples/`, deployed bots under `bots/`, `cargo-generate` starter templates under `templates/` (`cloudflare`, `tokio`; `exclude`d from the workspace, depend on the released `"0.2"`, checked by `scripts/check-templates.sh` in CI: generate, point the deps at the workspace, test, wasm32 check).
 
 ## Commands
 
