@@ -58,7 +58,7 @@ Release profile is size-optimized (`opt-level = "z"`, LTO) because worker bundle
 
 Adapters are the integration layer; new platforms go under `crates/adapters/<name>` and reuse core validation + types.
 
-**Types (`crates/composure/src/types/`)** are one file per resource (interaction, message, channel, member, role, embed, component, ...), shared by Interactions, Responses and REST. All are glob re-exported, so everything is addressed as `composure::types::X`.
+**Types (`crates/composure/src/types/`)** are one file per resource (interaction, message, channel, member, role, embed, component, ...), shared by Interactions, Responses and REST; `cdn.rs` adds the CDN URL methods (`User::avatar_url`, `Guild::icon_url`, ..., `*_url_with(format, size)`, `image_url`). All are glob re-exported, so everything is addressed as `composure::types::X`.
 
 **REST (`crates/composure/src/rest/`, `rest` / `rest-*` / `tier1` / `full` features; one module + feature per resource, registered in `rest.rs`, `rest/spec.rs` `modules()`, and `Cargo.toml` tiers):** async clients over an Adapter-provided `Transport` (`send` + `sleep`; own `Request`/`RawResponse` types, core encodes JSON/multipart). `InteractionClient` (interaction token, no auth) and `BotClient` (bot token; resource Endpoints added as `impl BotClient<T>` blocks in per-feature modules). Each module declares its routes with `routes! { NAME = Method "/spec/{path}"; }` — paths copied from the spec so the spec check matches. Endpoints take borrowed body structs and return lazily-decoded `Response<T>` (`()` for 204). 429s are waited out via `Transport::sleep` up to `with_max_rate_limit_wait` (2s default, Sync uses 60s). Tests use `rest::testing::MockTransport`.
 

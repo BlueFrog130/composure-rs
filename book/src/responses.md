@@ -94,6 +94,34 @@ A Components V2 message (one with
 a `Container` or a View) is laid out entirely by its components: Discord rejects `content`,
 `embeds` and polls alongside it, so text goes in text displays.
 
+## Discord's images
+
+Avatars, guild icons and banners, role icons, emojis and stickers are served by Discord's
+[CDN](https://discord.com/developers/docs/reference#image-formatting). Their types build the
+URLs: [`User::display_avatar_url`](https://docs.rs/composure/latest/composure/types/struct.User.html#method.display_avatar_url),
+[`Member::guild_avatar_url`](https://docs.rs/composure/latest/composure/types/struct.Member.html#method.guild_avatar_url),
+[`Guild::icon_url`](https://docs.rs/composure/latest/composure/types/struct.Guild.html#method.icon_url),
+[`Emoji::url`](https://docs.rs/composure/latest/composure/types/struct.Emoji.html#method.url), ...
+Each `*_url` has a `*_url_with(format, size)` variant; animated images are GIFs unless another
+[`ImageFormat`](https://docs.rs/composure/latest/composure/types/enum.ImageFormat.html) is asked for.
+
+```rust
+use composure::{
+    command,
+    types::{Embed, EmbedThumbnail, User},
+};
+
+/// Show someone's avatar
+#[command]
+fn avatar(#[option("Whose")] user: &User) -> Embed {
+    let url = user.display_avatar_url_with(None, Some(256));
+    Embed::new()
+        .with_title(user.display_name())
+        .with_thumbnail(EmbedThumbnail::new(url, None, None, None))
+}
+# fn main() {}
+```
+
 ## Files
 
 [`with_file`](https://docs.rs/composure/latest/composure/types/enum.InteractionResponse.html#method.with_file) attaches a

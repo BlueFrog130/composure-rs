@@ -1,11 +1,10 @@
 //! Discord's data model, shared by Interactions, Responses and REST. Organized by resource;
 //! everything is re-exported flat as `composure::types::X`.
 
-use strum::AsRefStr;
-
 mod allowed_mentions;
 mod application;
 mod attachment;
+mod cdn;
 mod channel;
 mod component;
 mod embed;
@@ -31,6 +30,7 @@ mod type_field;
 pub use allowed_mentions::*;
 pub use application::*;
 pub use attachment::*;
+pub use cdn::*;
 pub use channel::*;
 pub use component::*;
 pub use embed::*;
@@ -52,16 +52,3 @@ pub use role::*;
 pub use snowflake::*;
 pub use sticker::*;
 pub use type_field::*;
-
-/// [Image formats](https://discord.com/developers/docs/reference#image-formatting-image-formats) of CDN images
-#[derive(Debug, AsRefStr, PartialEq, Eq)]
-pub enum ImageFormat {
-    /// `.png`
-    Png,
-    /// `.jpg`
-    Jpeg,
-    /// `.webp`
-    Webp,
-    /// `.gif`, for animated images
-    Gif,
-}

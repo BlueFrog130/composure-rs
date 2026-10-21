@@ -279,7 +279,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_repr",
- "strum",
  "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",
