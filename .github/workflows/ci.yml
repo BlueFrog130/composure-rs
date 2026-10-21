@@ -60,9 +60,9 @@ jobs:
           targets: wasm32-unknown-unknown
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy -p composure_adapter_cloudflare -p composure_example_cloudflare -p composure_bench_cloudflare --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo clippy -p composure_adapter_cloudflare -p composure_example_cloudflare -p composure_bench_cloudflare -p composure_bot --target wasm32-unknown-unknown -- -D warnings
       - run: cargo clippy -p composure_bench_cloudflare --target wasm32-unknown-unknown --features web-crypto -- -D warnings
-      - run: cargo build -p composure_adapter_cloudflare -p composure_example_cloudflare --target wasm32-unknown-unknown --release
+      - run: cargo build -p composure_adapter_cloudflare -p composure_example_cloudflare -p composure_bot --target wasm32-unknown-unknown --release
 
   msrv:
     name: MSRV (1.88)

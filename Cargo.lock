@@ -329,6 +329,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "composure_bot"
+version = "0.1.0"
+dependencies = [
+ "composure",
+ "composure_adapter_cloudflare",
+ "composure_sync",
+ "dotenvy",
+ "ed25519-dalek",
+ "futures",
+ "hex",
+ "serde",
+ "serde_json",
+ "tracing",
+ "worker",
+]
+
+[[package]]
 name = "composure_commands"
 version = "0.1.2"
 dependencies = [

@@ -212,6 +212,10 @@ Crypto signature checks), so a Worker only ships what it uses. See
 - **[Examples](https://github.com/BlueFrog130/composure-rs/tree/main/examples)**: one bot using
   every feature, served [on Workers](https://github.com/BlueFrog130/composure-rs/tree/main/examples/cloudflare)
   and [on tokio](https://github.com/BlueFrog130/composure-rs/tree/main/examples/tokio).
+- **[The Composure bot](https://github.com/BlueFrog130/composure-rs/tree/main/bots/composure)**:
+  Composure's own bot on Workers, a real deployment. Add it to get release announcements in
+  your server (`/notify setup`), read the changelog (`/changelog`) and search these docs
+  (`/docs`); `/invite` in any server it's in gives the install links.
 - **[Design decisions](https://github.com/BlueFrog130/composure-rs/tree/main/docs/adr)** and the
   [glossary](https://github.com/BlueFrog130/composure-rs/blob/main/CONTEXT.md).
 

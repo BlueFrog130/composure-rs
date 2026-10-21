@@ -1,0 +1,51 @@
+name = "composure-bot"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-10-01"
+
+# Two environments with their own Discord application and channels: `dev` only runs locally
+# (`npx wrangler dev --env dev`), `production` is deployed (`npx wrangler deploy --env
+# production`, as the Worker `composure-bot-production`). `vars` and `kv_namespaces` are not
+# inherited from the top level, so each env lists its own.
+#
+# Secrets: `npx wrangler secret put <NAME> --env production`, and `.dev.vars` for dev:
+# - DISCORD_PUBLIC_KEY (required), DISCORD_TOKEN (every REST call)
+# - GITHUB_TOKEN: fine-grained, read-only "Contents" on the repository; without it GitHub
+#   allows 60 requests an hour per IP, shared with every Worker on that IP
+
+# worker-build compiles the crate to wasm and writes the JS shim to build/worker
+[build]
+command = "worker-build --release"
+
+# Workers Logs: stores and indexes what the tracing subscriber logs (src/worker.rs start)
+[observability]
+enabled = true
+
+# scheduled() checks GitHub for new releases every 15 minutes (inherited by both envs)
+[triggers]
+crons = ["*/15 * * * *"]
+
+[env.dev]
+[env.dev.vars]
+DISCORD_APPLICATION_ID = "1100146565504565411"
+ANNOUNCE_CHANNEL_ID = "1562169589515681832"
+FEEDBACK_CHANNEL_ID = "1562169639239164054"
+LOG_CHANNEL_ID = "1562169852527906989"
+GITHUB_REPO = "BlueFrog130/composure-rs"
+
+# Releases, the last version announced, and crates.io stats (10-minute TTL). Dev's is simulated
+# by `wrangler dev` (in .wrangler/), so it has no id and never touches production's
+[[env.dev.kv_namespaces]]
+binding = "COMPOSURE"
+
+[env.production]
+[env.production.vars]
+DISCORD_APPLICATION_ID = "1562278701016809502"
+ANNOUNCE_CHANNEL_ID = "1562278383138902097"
+FEEDBACK_CHANNEL_ID = "1562278533152112691"
+LOG_CHANNEL_ID = "1562278174015103010"
+GITHUB_REPO = "BlueFrog130/composure-rs"
+
+# `npx wrangler kv namespace create COMPOSURE`
+[[env.production.kv_namespaces]]
+binding = "COMPOSURE"
+id = "cd525071ff7841be92198f051bbe2342"

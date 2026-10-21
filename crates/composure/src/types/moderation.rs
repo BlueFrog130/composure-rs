@@ -305,6 +305,30 @@ pub struct Webhook {
     pub application_id: Option<Snowflake>,
     /// Incoming webhooks: execution URL
     pub url: Option<String>,
+    /// Channel follower webhooks: the guild of the followed channel
+    pub source_guild: Option<WebhookSourceGuild>,
+    /// Channel follower webhooks: the followed announcement channel
+    pub source_channel: Option<WebhookSourceChannel>,
+}
+
+/// The guild a channel follower [`Webhook`] crossposts from
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebhookSourceGuild {
+    /// The guild's id
+    pub id: Snowflake,
+    /// The guild's name
+    pub name: String,
+    /// [Icon hash](https://discord.com/developers/docs/reference#image-formatting)
+    pub icon: Option<String>,
+}
+
+/// The announcement channel a channel follower [`Webhook`] crossposts from
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebhookSourceChannel {
+    /// The channel's id
+    pub id: Snowflake,
+    /// The channel's name
+    pub name: String,
 }
 
 #[cfg(test)]
@@ -355,5 +379,15 @@ mod tests {
             entry.options.as_ref().unwrap().members_removed.as_deref(),
             Some("2")
         );
+
+        let follower: Webhook = serde_json::from_value(json!({
+            "id": "5", "type": 2, "guild_id": "6", "channel_id": "7", "name": "News",
+            "avatar": null, "application_id": null,
+            "source_guild": { "id": "8", "name": "Home", "icon": null },
+            "source_channel": { "id": "9", "name": "announcements" },
+        }))
+        .unwrap();
+        assert_eq!(follower.source_guild.unwrap().name, "Home");
+        assert_eq!(follower.source_channel.unwrap().id, Snowflake::from(9u64));
     }
 }

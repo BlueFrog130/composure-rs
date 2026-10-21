@@ -1,0 +1,58 @@
+name: Deploy bot
+
+# Deploys Composure's own bot (bots/composure) to Cloudflare Workers and syncs its commands:
+# on pushes to main that change it or the crates it builds on, after each release (so /about
+# shows the released version), and by hand.
+#
+# Secrets: CLOUDFLARE_API_TOKEN (Workers Scripts: Edit), CLOUDFLARE_ACCOUNT_ID, DISCORD_TOKEN,
+# DISCORD_APPLICATION_ID. The Worker's own secrets are set once with `wrangler secret put`
+# (bots/composure/README.md).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bots/composure/**"
+      - "crates/**"
+      - "book/src/**"
+      - "Cargo.lock"
+      - ".github/workflows/bot.yml"
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: bot-deploy
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deploy:
+    name: Deploy and sync
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: bot
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install worker-build@0.8.7 --locked
+      - run: cargo test -p composure_bot
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: bots/composure
+          command: deploy
+          environment: production
+      - name: Sync commands
+        run: cargo run -p composure_bot --bin sync-composure-bot -- --yes
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_APPLICATION_ID: ${{ secrets.DISCORD_APPLICATION_ID }}

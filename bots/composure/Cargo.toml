@@ -1,0 +1,38 @@
+[package]
+name = "composure_bot"
+version = "0.1.0"
+edition.workspace = true
+rust-version = "1.91"
+description = "Composure's own Discord bot on Cloudflare Workers: release announcements, changelogs, docs search"
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# Unique across the workspace: the examples have sync bins too
+[[bin]]
+name = "sync-composure-bot"
+path = "src/bin/sync.rs"
+
+[dependencies]
+composure = { workspace = true, features = ["macros", "rest-messages", "rest-users", "rest-channels", "rest-webhooks"] }
+composure_adapter_cloudflare = { workspace = true, features = ["tracing"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+worker = "0.8.7"
+
+# Sync runs on the host only; keeps the HTTP client out of the worker bundle
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+composure_sync.workspace = true
+dotenvy = "0.15.7"
+
+[dev-dependencies]
+ed25519-dalek = "3.0.0"
+futures = { version = "0.3.34", default-features = false, features = ["executor"] }
+hex = "0.4.3"
+
+# Cold-start settings, as in examples/cloudflare (see the adapter README's "Cold starts")
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--one-caller-inline-max-function-size", "0"]

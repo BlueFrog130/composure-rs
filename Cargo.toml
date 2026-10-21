@@ -11,6 +11,7 @@ members = [
     "examples/bot",
     "examples/cloudflare",
     "examples/tokio",
+    "bots/composure",
 ]
 
 [workspace.package]
