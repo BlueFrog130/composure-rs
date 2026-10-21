@@ -33,9 +33,16 @@ fn err<T>(span: Span, message: impl std::fmt::Display) -> syn::Result<T> {
     Err(syn::Error::new(span, message))
 }
 
-/// `rsx! { .. }` outside a `#[view]`: no inline handlers
-pub fn expand_macro(input: TokenStream) -> syn::Result<TokenStream> {
-    Gen::new(None).view(input)
+/// `rsx! { .. }` outside a `#[view]`: no inline handlers. Expands what parsed even with errors,
+/// so the code around and inside it still type-checks
+pub fn expand_macro(input: TokenStream) -> TokenStream {
+    let mut gen_ = Gen::new(None);
+    let view = gen_.view(input);
+    let errors = gen_.errors.into_compile_error();
+    quote! {{
+        #errors
+        #view
+    }}
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -76,6 +83,15 @@ struct Handler {
     asyncness: bool,
 }
 
+/// A `<Modal>`'s attributes
+struct ModalHeader {
+    /// A `String` expression
+    custom_id: TokenStream,
+    title: TokenStream,
+    /// The inline `on:submit`'s typed parameters
+    params: Option<Vec<(Ident, Type)>>,
+}
+
 /// The submit handler's typed parameters, while generating a `<Modal>`'s inputs
 struct ModalScope {
     params: Vec<(Ident, Type, bool)>,
@@ -94,8 +110,8 @@ struct Gen {
     pre: Vec<Vec<TokenStream>>,
     modal: Option<ModalScope>,
     next: usize,
-    /// From the nested-`rsx!` visitor, which cannot return one
-    error: Option<syn::Error>,
+    /// Every error so far: a node with an error is skipped, its siblings still generated
+    errors: Errors,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -281,35 +297,44 @@ struct Attrs {
 }
 
 impl Attrs {
+    /// The element's attributes, or every malformed one's error, combined
     fn new(el: &NodeElement<rstml::Infallible>, tag: &str) -> syn::Result<Self> {
         let mut list: Vec<Attr> = Vec::new();
+        let mut errors = Errors::default();
         for attribute in el.attributes() {
-            let keyed = match attribute {
-                NodeAttribute::Attribute(keyed) => keyed,
-                NodeAttribute::Block(block) => {
-                    return err(block.span(), "attributes are `name=value` or `name`");
-                }
-            };
-            let key = attr_key(&keyed.key)?;
-            let span = keyed.key.span();
-            let value = match &keyed.possible_value {
-                KeyedAttributeValue::None => None,
-                KeyedAttributeValue::Value(value) => match &value.value {
-                    KVAttributeValue::Expr(expr) => Some(unwrap_closure(expr)),
-                    KVAttributeValue::InvalidBraced(block) => {
-                        return err(block.brace.span.join(), "expected a Rust expression");
+            let attr = (|| {
+                let keyed = match attribute {
+                    NodeAttribute::Attribute(keyed) => keyed,
+                    NodeAttribute::Block(block) => {
+                        return err(block.span(), "attributes are `name=value` or `name`");
                     }
-                },
-                KeyedAttributeValue::Binding(binding) => {
-                    return err(binding.paren.span.join(), "expected `name=value`");
+                };
+                let key = attr_key(&keyed.key)?;
+                let span = keyed.key.span();
+                let value = match &keyed.possible_value {
+                    KeyedAttributeValue::None => None,
+                    KeyedAttributeValue::Value(value) => match &value.value {
+                        KVAttributeValue::Expr(expr) => Some(unwrap_closure(expr)),
+                        KVAttributeValue::InvalidBraced(block) => {
+                            return err(block.brace.span.join(), "expected a Rust expression");
+                        }
+                    },
+                    KeyedAttributeValue::Binding(binding) => {
+                        return err(binding.paren.span.join(), "expected `name=value`");
+                    }
+                };
+                let attr = Attr { key, value, span };
+                if list.iter().any(|other| other.name() == attr.name()) {
+                    return err(span, format!("duplicate attribute `{}`", attr.name()));
                 }
-            };
-            let attr = Attr { key, value, span };
-            if list.iter().any(|other| other.name() == attr.name()) {
-                return err(span, format!("duplicate attribute `{}`", attr.name()));
+                Ok(attr)
+            })();
+            match attr {
+                Ok(attr) => list.push(attr),
+                Err(error) => errors.push(error),
             }
-            list.push(attr);
         }
+        errors.finish()?;
         Ok(Self {
             list,
             tag: tag.to_string(),
@@ -370,12 +395,14 @@ impl Attrs {
     fn assign(self, var: &Ident, aliases: &[(&str, &str)]) -> syn::Result<TokenStream> {
         let c = cmd();
         let mut out = TokenStream::new();
+        let mut errors = Errors::default();
         for attr in self.list {
             if attr.key.len() != 1 {
-                return err(
+                errors.push(syn::Error::new(
                     attr.span,
                     format!("`<{}>` has no `{}` attribute", self.tag, attr.name()),
-                );
+                ));
+                continue;
             }
             let key = &attr.key[0];
             let field = match aliases.iter().find(|(alias, _)| key == alias) {
@@ -387,7 +414,29 @@ impl Attrs {
                 #var.#field = #c::IntoAttr::into_attr(#value);
             });
         }
+        errors.finish()?;
         Ok(out)
+    }
+}
+
+/// Errors combined into one `syn::Error`, so every one is reported
+#[derive(Default)]
+struct Errors(Option<syn::Error>);
+
+impl Errors {
+    fn push(&mut self, error: syn::Error) {
+        match &mut self.0 {
+            Some(errors) => errors.combine(error),
+            None => self.0 = Some(error),
+        }
+    }
+
+    fn finish(self) -> syn::Result<()> {
+        self.0.map_or(Ok(()), Err)
+    }
+
+    fn into_compile_error(self) -> Option<TokenStream> {
+        self.0.map(syn::Error::into_compile_error)
     }
 }
 
@@ -535,12 +584,8 @@ impl VisitMut for Expander<'_> {
         if let Expr::Macro(mac) = expr
             && is_view_macro(&mac.mac.path)
         {
-            match self.gen_.view(mac.mac.tokens.clone()) {
-                Ok(tokens) => *expr = Expr::Verbatim(used(&mac.mac.path, tokens)),
-                Err(error) => {
-                    self.gen_.error.get_or_insert(error);
-                }
-            }
+            let tokens = self.gen_.view(mac.mac.tokens.clone());
+            *expr = Expr::Verbatim(used(&mac.mac.path, tokens));
             return;
         }
         visit_mut::visit_expr_mut(self, expr);
@@ -550,14 +595,8 @@ impl VisitMut for Expander<'_> {
         if let Stmt::Macro(mac) = stmt
             && is_view_macro(&mac.mac.path)
         {
-            match self.gen_.view(mac.mac.tokens.clone()) {
-                Ok(tokens) => {
-                    *stmt = Stmt::Expr(Expr::Verbatim(used(&mac.mac.path, tokens)), mac.semi_token)
-                }
-                Err(error) => {
-                    self.gen_.error.get_or_insert(error);
-                }
-            }
+            let tokens = self.gen_.view(mac.mac.tokens.clone());
+            *stmt = Stmt::Expr(Expr::Verbatim(used(&mac.mac.path, tokens)), mac.semi_token);
             return;
         }
         visit_mut::visit_stmt_mut(self, stmt);
@@ -574,7 +613,7 @@ impl Gen {
             pre: Vec::new(),
             modal: None,
             next: 0,
-            error: None,
+            errors: Errors::default(),
         }
     }
 
@@ -583,90 +622,124 @@ impl Gen {
         Ident::new(&format!("__{name}{}", self.next), Span::mixed_site())
     }
 
-    /// One `rsx!` invocation: a `View`, or a `ModalView` for a `<Modal>` root
-    fn view(&mut self, tokens: TokenStream) -> syn::Result<TokenStream> {
-        let nodes = rstml::parse2(tokens)?;
+    /// Records an error; generation goes on
+    fn error(&mut self, error: syn::Error) {
+        self.errors.push(error);
+    }
+
+    /// The value, or `None` with the error recorded
+    fn recover<T>(&mut self, result: syn::Result<T>) -> Option<T> {
+        result.map_err(|error| self.error(error)).ok()
+    }
+
+    /// One `rsx!` invocation: a `View`, or a `ModalView` for a `<Modal>` root. Never fails: errors
+    /// are recorded and what parsed is still expanded (`View::default()` or a placeholder
+    /// `ModalView` when nothing did), so `{..}` blocks keep type-checking in incomplete markup
+    fn view(&mut self, tokens: TokenStream) -> TokenStream {
+        let parser = rstml::Parser::new(rstml::ParserConfig::new().recover_block(true));
+        let (nodes, diagnostics) = parser.parse_recoverable(tokens).split_vec();
+        let incomplete = !diagnostics.is_empty();
+        for diagnostic in diagnostics {
+            // Each spanned child becomes its own `error:`; rstml's notes ("treating all inputs
+            // after open tag as it content") only add noise, its helps point at the open tag
+            let error: syn::Error = diagnostic.into();
+            for part in error {
+                if !part.to_string().starts_with("[note]") {
+                    self.error(part);
+                }
+            }
+        }
         self.pre.push(Vec::new());
         let cx = self.var("cx");
         let meaningful: Vec<&Node> = nodes.iter().filter(|node| !is_comment(node)).collect();
         let modal = match meaningful.as_slice() {
-            [Node::Element(el)] if element_name(el)?.is_ident("Modal") => Some(el),
+            [Node::Element(el)] if element_name(el).is_ok_and(|path| path.is_ident("Modal")) => {
+                Some(el)
+            }
             _ => None,
         };
+        let in_modal_view = self.scope.as_ref().is_some_and(|scope| scope.modal);
         let body = match modal {
-            Some(el) => self.modal(el, &cx)?,
+            Some(el) => self.modal(el, &cx),
+            // A `#[view] -> ModalView` whose `<Modal>` is still being typed
+            None if incomplete && in_modal_view => modal_data(
+                &cx,
+                quote!(::std::string::String::new()),
+                quote!(::std::string::String::new()),
+            ),
             None => {
-                let children = self.children(&nodes, Parent::Top, &cx)?;
+                let children = self.children(&nodes, Parent::Top, &cx);
                 quote!(#children #cx.view())
             }
         };
         let pre = self.pre.pop().expect("pushed above");
         let c = cmd();
-        Ok(quote! {{
+        quote! {{
             #(#pre)*
             #[allow(unused_mut)]
             let mut #cx = #c::Children::default();
             #body
-        }})
+        }}
     }
 
-    /// A `{..}` in the markup; nested `rsx!`s share this View's Scope
-    fn block(&mut self, block: &NodeBlock) -> syn::Result<TokenStream> {
+    /// A `{..}` in the markup; nested `rsx!`s share this View's Scope. An invalid block (`{x.}`,
+    /// kept by `recover_block`) is passed through for rustc to report and the IDE to complete
+    fn block(&mut self, block: &NodeBlock) -> TokenStream {
         let NodeBlock::ValidBlock(block) = block else {
-            return Ok(block.to_token_stream());
+            return block.to_token_stream();
         };
         let mut block = block.clone();
         if self.scope.is_some() {
             let mut expander = Expander { gen_: self };
             expander.visit_block_mut(&mut block);
-            if let Some(error) = self.error.take() {
-                return Err(error);
-            }
         }
         // `{expr}` as the expression itself, so it is not linted as needless braces
         if let [Stmt::Expr(expr, None)] = block.stmts.as_slice() {
-            return Ok(quote!((#expr)));
+            return quote!((#expr));
         }
-        Ok(block.to_token_stream())
+        block.to_token_stream()
     }
 
-    /// Statements adding `nodes` to the `cx` Children
+    /// Statements adding `nodes` to the `cx` Children; a node with an error is recorded and skipped
     fn children<'n>(
         &mut self,
         nodes: impl IntoIterator<Item = &'n Node>,
         parent: Parent,
         cx: &Ident,
-    ) -> syn::Result<TokenStream> {
-        let c = cmd();
+    ) -> TokenStream {
         let mut out = TokenStream::new();
         for node in nodes {
-            match node {
-                Node::Text(text) => {
-                    if !parent.takes_text() {
-                        return err(
-                            text.value.span(),
-                            format!("text cannot go {}", parent.describe()),
-                        );
-                    }
-                    let text = &text.value;
-                    out.extend(quote!(#cx.text(#text);));
-                }
-                Node::RawText(raw) if !raw.to_token_stream().is_empty() => {
-                    return err(raw.span(), "put text in quotes: \"text\"");
-                }
-                Node::Block(block) => {
-                    let expr = self.block(block)?;
-                    out.extend(quote!(#c::IntoChildren::push_into(#expr, &mut #cx);));
-                }
-                Node::Fragment(fragment) => {
-                    out.extend(self.children(&fragment.children, parent, cx)?);
-                }
-                Node::Element(el) => out.extend(self.element(el, parent, cx)?),
-                Node::Doctype(doctype) => return err(doctype.span(), "unexpected doctype"),
-                _ => {}
+            if let Some(tokens) = self.child(node, parent, cx) {
+                out.extend(tokens);
             }
         }
-        Ok(out)
+        out
+    }
+
+    fn child(&mut self, node: &Node, parent: Parent, cx: &Ident) -> Option<TokenStream> {
+        let c = cmd();
+        let result = match node {
+            Node::Text(text) if !parent.takes_text() => err(
+                text.value.span(),
+                format!("text cannot go {}", parent.describe()),
+            ),
+            Node::Text(text) => {
+                let text = &text.value;
+                Ok(quote!(#cx.text(#text);))
+            }
+            Node::RawText(raw) if !raw.to_token_stream().is_empty() => {
+                err(raw.span(), "put text in quotes: \"text\"")
+            }
+            Node::Block(block) => {
+                let expr = self.block(block);
+                Ok(quote!(#c::IntoChildren::push_into(#expr, &mut #cx);))
+            }
+            Node::Fragment(fragment) => Ok(self.children(&fragment.children, parent, cx)),
+            Node::Element(el) => self.element(el, parent, cx),
+            Node::Doctype(doctype) => err(doctype.span(), "unexpected doctype"),
+            _ => Ok(TokenStream::new()),
+        };
+        self.recover(result)
     }
 
     fn element(
@@ -723,7 +796,7 @@ impl Gen {
         Ok(match tag {
             Tag::Container => {
                 let inner = self.var("c");
-                let body = self.children(&el.children, Parent::Container, &inner)?;
+                let body = self.children(&el.children, Parent::Container, &inner);
                 let assign = attrs.assign(&e, &[])?;
                 quote! {{
                     #[allow(unused_mut)]
@@ -739,7 +812,7 @@ impl Gen {
                 let content = match attrs.value(&["content"])? {
                     Some((_, value)) => quote!(#value),
                     None => self
-                        .text(&el.children, "Text")?
+                        .text(&el.children, "Text")
                         .unwrap_or_else(|| quote!(::std::string::String::new())),
                 };
                 let assign = attrs.assign(&e, &[])?;
@@ -793,26 +866,25 @@ impl Gen {
                 let items = self.var("items");
                 let mut body = TokenStream::new();
                 for node in &el.children {
-                    match node {
+                    let item = match node {
                         Node::Element(item)
-                            if element_name(item)?.is_ident("Item")
-                                || element_name(item)?.is_ident("MediaGalleryItem") =>
+                            if element_name(item).is_ok_and(|path| {
+                                path.is_ident("Item") || path.is_ident("MediaGalleryItem")
+                            }) =>
                         {
-                            let expr = self.item(item)?;
-                            body.extend(quote!(#items.push(#expr);));
+                            self.item(item).map(|expr| quote!(#items.push(#expr);))
                         }
                         Node::Block(block) => {
-                            let expr = self.block(block)?;
-                            body.extend(quote!(::core::iter::Extend::extend(&mut #items, #expr);));
+                            let expr = self.block(block);
+                            Ok(quote!(::core::iter::Extend::extend(&mut #items, #expr);))
                         }
-                        node if is_comment(node) => {}
-                        other => {
-                            return err(
-                                other.span(),
-                                "a `<Gallery>` takes `<Item url=..>`s and `{..}` of `MediaGalleryItem`s",
-                            );
-                        }
-                    }
+                        node if is_comment(node) => continue,
+                        other => err(
+                            other.span(),
+                            "a `<Gallery>` takes `<Item url=..>`s and `{..}` of `MediaGalleryItem`s",
+                        ),
+                    };
+                    body.extend(self.recover(item));
                 }
                 let assign = attrs.assign(&e, &[])?;
                 quote! {{
@@ -827,7 +899,7 @@ impl Gen {
             }
             Tag::Row => {
                 let inner = self.var("c");
-                let body = self.children(&el.children, Parent::Row, &inner)?;
+                let body = self.children(&el.children, Parent::Row, &inner);
                 let assign = attrs.assign(&e, &[])?;
                 quote! {{
                     #[allow(unused_mut)]
@@ -849,8 +921,8 @@ impl Gen {
     }
 
     /// The text of a text-only element (`<Text>`, a button label, an option), or `None` without
-    /// children
-    fn text(&mut self, nodes: &[Node], tag: &str) -> syn::Result<Option<TokenStream>> {
+    /// children; a child that is not text is recorded and skipped
+    fn text(&mut self, nodes: &[Node], tag: &str) -> Option<TokenStream> {
         let text = self.var("t");
         let mut parts = TokenStream::new();
         let mut any = false;
@@ -863,26 +935,29 @@ impl Gen {
                 }
                 Node::Block(block) => {
                     let c = cmd();
-                    let expr = self.block(block)?;
+                    let expr = self.block(block);
                     parts.extend(quote!(#c::IntoText::push_text(#expr, &mut #text);));
                     any = true;
                 }
                 Node::RawText(raw) if !raw.to_token_stream().is_empty() => {
-                    return err(raw.span(), "put text in quotes: \"text\"");
+                    self.error(syn::Error::new(raw.span(), "put text in quotes: \"text\""));
                 }
                 Node::Element(el) => {
-                    return err(el.name().span(), format!("`<{tag}>` only takes text"));
+                    self.error(syn::Error::new(
+                        el.name().span(),
+                        format!("`<{tag}>` only takes text"),
+                    ));
                 }
                 _ => {}
             }
         }
-        Ok(any.then(|| {
+        any.then(|| {
             quote! {{
                 let mut #text = ::std::string::String::new();
                 #parts
                 #text
             }}
-        }))
+        })
     }
 
     fn section(
@@ -893,34 +968,38 @@ impl Gen {
     ) -> syn::Result<TokenStream> {
         let c = cmd();
         let t = types();
-        let mut accessory = None;
+        // `Some(None)`: the accessory child had an error, recorded
+        let mut accessory: Option<Option<TokenStream>> = None;
         let mut rest = Vec::new();
         for node in &el.children {
-            if let Node::Element(child) = node {
-                let path = element_name(child)?;
-                if path.is_ident("Button") || path.is_ident("Thumbnail") {
-                    if accessory.is_some() {
-                        return err(
-                            child.name().span(),
-                            "a `<Section>` has one accessory: a `<Button>` or `<Thumbnail>`",
-                        );
-                    }
-                    let tag = Tag::parse(&path.get_ident().expect("an ident").to_string())
-                        .expect("a tag");
-                    accessory = Some(self.component(child, tag, cx)?);
+            if let Node::Element(child) = node
+                && let Ok(path) = element_name(child)
+                && (path.is_ident("Button") || path.is_ident("Thumbnail"))
+            {
+                if accessory.is_some() {
+                    self.error(syn::Error::new(
+                        child.name().span(),
+                        "a `<Section>` has one accessory: a `<Button>` or `<Thumbnail>`",
+                    ));
                     continue;
                 }
+                let tag =
+                    Tag::parse(&path.get_ident().expect("an ident").to_string()).expect("a tag");
+                let component = self.component(child, tag, cx);
+                accessory = Some(self.recover(component));
+                continue;
             }
             rest.push(node);
         }
         let accessory = match (accessory, attrs.value(&["accessory"])?) {
+            (Some(None), _) => placeholder(),
+            (Some(Some(accessory)), None) => accessory,
             (Some(_), Some((span, _))) => {
                 return err(
                     span,
                     "the accessory is already a `<Button>` or `<Thumbnail>` child",
                 );
             }
-            (Some(accessory), None) => accessory,
             (None, Some((_, value))) => {
                 quote!(::core::convert::Into::<#t::Component>::into(#value))
             }
@@ -932,7 +1011,7 @@ impl Gen {
             }
         };
         let inner = self.var("c");
-        let body = self.children(rest, Parent::Section, &inner)?;
+        let body = self.children(rest, Parent::Section, &inner);
         let e = self.var("e");
         let acc = self.var("accessory");
         let assign = attrs.assign(&e, &[])?;
@@ -991,7 +1070,7 @@ impl Gen {
         let event = attrs.event();
         let custom_id = attrs.value(&["custom_id"])?;
         let label_attr = attrs.value(&["label"])?;
-        let label_text = self.text(&el.children, "Button")?;
+        let label_text = self.text(&el.children, "Button");
         let span = el.name().span();
 
         if (link || premium) && (event.is_some() || custom_id.is_some()) {
@@ -1381,23 +1460,24 @@ impl Gen {
             });
         }
         for node in &el.children {
-            match node {
-                Node::Element(option) if element_name(option)?.is_ident("Option") => {
-                    let expr = self.option(option, group)?;
-                    out.extend(quote!(#var.push(#expr);));
+            let option = match node {
+                Node::Element(option)
+                    if element_name(option).is_ok_and(|path| path.is_ident("Option")) =>
+                {
+                    self.option(option, group)
+                        .map(|expr| quote!(#var.push(#expr);))
                 }
                 Node::Block(block) => {
-                    let expr = self.block(block)?;
-                    out.extend(quote!(::core::iter::Extend::extend(&mut #var, #expr);));
+                    let expr = self.block(block);
+                    Ok(quote!(::core::iter::Extend::extend(&mut #var, #expr);))
                 }
-                node if is_comment(node) => {}
-                other => {
-                    return err(
-                        other.span(),
-                        "options are `<Option value=..>\"Label\"</Option>`, `{..}` of options, or `options=ChoiceEnum`",
-                    );
-                }
-            }
+                node if is_comment(node) => continue,
+                other => err(
+                    other.span(),
+                    "options are `<Option value=..>\"Label\"</Option>`, `{..}` of options, or `options=ChoiceEnum`",
+                ),
+            };
+            out.extend(self.recover(option));
         }
         Ok(out)
     }
@@ -1411,7 +1491,7 @@ impl Gen {
         let t = types();
         let mut attrs = Attrs::new(el, "Option")?;
         let value = attrs.required(&["value"], "what the option submits")?;
-        let label = match (attrs.value(&["label"])?, self.text(&el.children, "Option")?) {
+        let label = match (attrs.value(&["label"])?, self.text(&el.children, "Option")) {
             (Some((span, _)), Some(_)) => {
                 return err(span, "the label is either `label` or the option's text");
             }
@@ -1447,15 +1527,60 @@ impl Gen {
         }})
     }
 
-    fn modal(
+    /// A `<Modal>` root; an error in its attributes is recorded and its inputs still generated
+    fn modal(&mut self, el: &NodeElement<rstml::Infallible>, cx: &Ident) -> TokenStream {
+        let header = self.modal_header(el, cx);
+        let ModalHeader {
+            custom_id,
+            title,
+            params,
+        } = self.recover(header).unwrap_or_else(|| {
+            let empty = quote!(::std::string::String::new());
+            ModalHeader {
+                custom_id: empty.clone(),
+                title: empty,
+                params: None,
+            }
+        });
+        self.modal = Some(ModalScope {
+            strict: params.is_some(),
+            params: params
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(name, ty)| (name, ty, false))
+                .collect(),
+        });
+        let body = self.children(&el.children, Parent::Modal, cx);
+        let scope = self.modal.take().expect("set above");
+        for (name, _, _) in scope.params.iter().filter(|(_, _, used)| !used) {
+            self.error(syn::Error::new(
+                name.span(),
+                format!("no input in this modal has `name=\"{name}\"`"),
+            ));
+        }
+        let id = self.var("id");
+        let modal = modal_data(cx, quote!(#id), title);
+        quote! {
+            let #id = #custom_id;
+            #body
+            #modal
+        }
+    }
+
+    /// A missing or unknown attribute is recorded, so the handler is still hoisted
+    fn modal_header(
         &mut self,
         el: &NodeElement<rstml::Infallible>,
         cx: &Ident,
-    ) -> syn::Result<TokenStream> {
+    ) -> syn::Result<ModalHeader> {
         let c = cmd();
-        let t = types();
+        let empty = quote!(::std::string::String::new());
         let mut attrs = Attrs::new(el, "Modal")?;
-        let title = attrs.required(&["title"], "shown at the top, max 45 characters")?;
+        let title = attrs.required(&["title"], "shown at the top, max 45 characters");
+        let title = match self.recover(title) {
+            Some(title) => title.to_token_stream(),
+            None => empty.clone(),
+        };
         let (custom_id, params) = match (attrs.event(), attrs.value(&["custom_id"])?) {
             (Some(_), Some((span, _))) => {
                 return err(span, "the custom_id comes from `on:submit`");
@@ -1469,49 +1594,23 @@ impl Gen {
                 None,
             ),
             (None, None) => {
-                return err(
+                self.error(syn::Error::new(
                     el.name().span(),
                     "a `<Modal>` needs `on:submit` or a `custom_id`",
-                );
+                ));
+                (empty, None)
             }
         };
-        if let Some(attr) = attrs.list.first() {
-            return err(
+        for attr in &attrs.list {
+            self.error(syn::Error::new(
                 attr.span,
                 format!("`<Modal>` has no `{}` attribute", attr.name()),
-            );
+            ));
         }
-        self.modal = Some(ModalScope {
-            strict: params.is_some(),
-            params: params
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(name, ty)| (name, ty, false))
-                .collect(),
-        });
-        let body = self.children(&el.children, Parent::Modal, cx);
-        let scope = self.modal.take().expect("set above");
-        let body = body?;
-        if let Some((name, _, _)) = scope.params.iter().find(|(_, _, used)| !used) {
-            return err(
-                name.span(),
-                format!("no input in this modal has `name=\"{name}\"`"),
-            );
-        }
-        let id = self.var("id");
-        Ok(quote! {
-            let #id = #custom_id;
-            #body
-            #cx.modal(#t::ModalCallbackData {
-                custom_id: #id,
-                title: #c::IntoAttr::<::std::string::String>::into_attr(#title),
-                components: ::core::option::Option::None,
-                tts: ::core::option::Option::None,
-                content: ::core::option::Option::None,
-                embeds: ::core::option::Option::None,
-                allowed_mentions: ::core::option::Option::None,
-                flags: ::core::option::Option::None,
-            })
+        Ok(ModalHeader {
+            custom_id,
+            title,
+            params,
         })
     }
 
@@ -1524,32 +1623,39 @@ impl Gen {
         let c = cmd();
         let t = types();
         let text = attrs.required(&["text", "label"], "shown above the input")?;
-        let mut input = None;
+        // `Some(None)`: the input had an error, recorded
+        let mut input: Option<Option<TokenStream>> = None;
         for node in &el.children {
             match node {
+                Node::Element(child) if input.is_some() => {
+                    self.error(syn::Error::new(
+                        child.name().span(),
+                        "a `<Label>` holds one input",
+                    ));
+                }
                 Node::Element(child) => {
-                    if input.is_some() {
-                        return err(child.name().span(), "a `<Label>` holds one input");
-                    }
-                    let path = element_name(child)?;
-                    let tag = path
-                        .get_ident()
-                        .and_then(|ident| Tag::parse(&ident.to_string()))
+                    let tag = element_name(child)
+                        .ok()
+                        .and_then(|path| path.get_ident().map(Ident::to_string))
+                        .and_then(|name| Tag::parse(&name))
                         .filter(|tag| tag.is_input());
-                    let Some(tag) = tag else {
-                        return err(
+                    let component = match tag {
+                        Some(tag) => self.component(child, tag, cx),
+                        None => err(
                             child.name().span(),
                             "a `<Label>` holds an input: `<TextInput>`, a select, `<RadioGroup>`, `<CheckboxGroup>`, `<Checkbox>` or `<FileUpload>`",
-                        );
+                        ),
                     };
-                    input = Some(self.component(child, tag, cx)?);
+                    input = Some(self.recover(component));
                 }
                 node if is_comment(node) => {}
-                other => return err(other.span(), "a `<Label>` holds one input"),
+                other => self.error(syn::Error::new(other.span(), "a `<Label>` holds one input")),
             }
         }
-        let Some(input) = input else {
-            return err(el.name().span(), "a `<Label>` holds one input");
+        let input = match input {
+            Some(Some(input)) => input,
+            Some(None) => placeholder(),
+            None => return err(el.name().span(), "a `<Label>` holds one input"),
         };
         let e = self.var("e");
         let assign = attrs.assign(&e, &[])?;
@@ -1774,7 +1880,7 @@ impl Gen {
         let children: Vec<&Node> = el.children.iter().filter(|n| !is_comment(n)).collect();
         if !children.is_empty() {
             let inner = self.var("c");
-            let body = self.children(children, Parent::Any, &inner)?;
+            let body = self.children(children, Parent::Any, &inner);
             setters.extend(quote! {
                 .children({
                     #[allow(unused_mut)]
@@ -1801,6 +1907,31 @@ impl Gen {
             #c::IntoChildren::push_into(#var, &mut #cx);
         })
     }
+}
+
+/// `cx.modal(..)`: the `ModalView` with this `custom_id` (a `String`) and title
+fn modal_data(cx: &Ident, custom_id: TokenStream, title: TokenStream) -> TokenStream {
+    let c = cmd();
+    let t = types();
+    quote! {
+        #cx.modal(#t::ModalCallbackData {
+            custom_id: #custom_id,
+            title: #c::IntoAttr::<::std::string::String>::into_attr(#title),
+            components: ::core::option::Option::None,
+            tts: ::core::option::Option::None,
+            content: ::core::option::Option::None,
+            embeds: ::core::option::Option::None,
+            allowed_mentions: ::core::option::Option::None,
+            flags: ::core::option::Option::None,
+        })
+    }
+}
+
+/// Stands in for a child whose error is recorded (the macro emits a `compile_error!`), so its
+/// parent and siblings are still generated
+fn placeholder() -> TokenStream {
+    let t = types();
+    quote!(#t::Component::Separator(#t::Separator::new()))
 }
 
 /// A compile-time check that a submit parameter's type reads what its input submits
@@ -1958,11 +2089,10 @@ pub fn expand_attr(args: TokenStream, item: TokenStream) -> syn::Result<TokenStr
         props,
         modal,
     }));
+    // Errors in the markup are emitted next to the full expansion (Props, builder, handlers), so
+    // code using the View still type-checks
     let mut expander = Expander { gen_: &mut gen_ };
     expander.visit_block_mut(&mut function.block);
-    if let Some(error) = gen_.error.take() {
-        return Err(error);
-    }
     let scope = gen_.scope.take().expect("set above");
 
     let c = cmd();
@@ -1996,11 +2126,16 @@ pub fn expand_attr(args: TokenStream, item: TokenStream) -> syn::Result<TokenStr
     });
 
     let handled = !gen_.handlers.is_empty();
+    let handler = view_handler(&name, &prefix, &gen_.handlers);
+    let handler = gen_.recover(handler);
     let views = &gen_.views;
-    let handler = view_handler(&name, &prefix, &gen_.handlers)?;
     let route = crate::app::view_route(&name);
+    let errors = std::mem::take(&mut gen_.errors).into_compile_error();
 
     Ok(quote! {
+        #errors
+
+
         #[allow(non_snake_case)]
         #function
 

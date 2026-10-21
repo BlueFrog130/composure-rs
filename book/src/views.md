@@ -184,6 +184,14 @@ braces, or the markup parser reads `<` as a tag: `options={Vec::<SelectOption>::
 
 `<!-- comments -->` are allowed anywhere and produce nothing.
 
+### Errors
+
+`rsx!` reports every error in the markup at once, not just the first: a misplaced tag, a bad
+attribute, an unclosed or mismatched tag. A tag with an error is left out and the rest is still
+expanded, so the `{..}` blocks around it keep type-checking, and rust-analyzer keeps completing
+them while a tag is half-typed. A `#[view]` with markup errors still gets its Props, builder and
+handlers, so code using the View doesn't report errors of its own.
+
 ## View functions
 
 `#[view]` turns a function returning `View` (or `ModalView`) into a component of its own. The

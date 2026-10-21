@@ -301,6 +301,10 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 /// need the markup to be in a `#[view]`. A `<Section>`'s `<Button>` or `<Thumbnail>` child is
 /// its accessory. Wrap attribute values that use `<..>` in braces.
 ///
+/// Every error in the markup is reported, not just the first. A tag with an error is left out
+/// and the rest still expands (to `View::default()` when nothing parsed), so `{..}` blocks keep
+/// type-checking and completing in incomplete markup.
+///
 /// | Tag | Builds | Attributes (every tag but `<Modal>`, `<Item>` and `<Option>` also takes `id`) |
 /// |---|---|---|
 /// | `<Container>` | `Container` | `accent_color`, `spoiler` |
@@ -324,9 +328,7 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 /// | `<FileUpload>` | `FileUpload` | `name`, `min`, `max`, `file_types`, `required` |
 #[proc_macro]
 pub fn rsx(input: TokenStream) -> TokenStream {
-    view::expand_macro(input.into())
-        .unwrap_or_else(syn::Error::into_compile_error)
-        .into()
+    view::expand_macro(input.into()).into()
 }
 
 /// Defines a View: a layout rendered from its Props (the parameters, owned values), whose

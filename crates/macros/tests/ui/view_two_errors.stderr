@@ -1,0 +1,11 @@
+error: `<Button>` goes in a `<Row>`, or in a `<Section>` as its accessory
+ --> tests/ui/view_two_errors.rs:7:14
+  |
+7 |             <Button custom_id="x">"Loose"</Button>
+  |              ^^^^^^
+
+error: text cannot go in a <Row>
+  --> tests/ui/view_two_errors.rs:10:14
+   |
+10 |         <Row>"Text"</Row>
+   |              ^^^^^^
