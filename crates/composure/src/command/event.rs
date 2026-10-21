@@ -60,7 +60,7 @@ impl<S: super::Platform> EventCtx<'_, S> {
             .ok_or_else(|| HandlerError::new("the bot token (DISCORD_TOKEN) is not configured"))?;
         Ok(crate::rest::BotClient::new(
             self.state.transport(),
-            &token,
+            token,
             self.application_id,
         ))
     }

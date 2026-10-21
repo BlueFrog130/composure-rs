@@ -188,8 +188,8 @@ impl Platform for TestEnv {
         self.work.lock().unwrap().push(work);
     }
 
-    fn bot_token(&self) -> Option<String> {
-        Some("bot-token".into())
+    fn bot_token(&self) -> Option<&str> {
+        Some("bot-token")
     }
 }
 

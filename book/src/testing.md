@@ -104,8 +104,8 @@ impl Platform for TestPlatform {
         self.work.lock().unwrap().push(work); // run later with block_on
     }
 
-    fn bot_token(&self) -> Option<String> {
-        Some("test-token".into())
+    fn bot_token(&self) -> Option<&str> {
+        Some("test-token")
     }
 }
 # fn main() {}
