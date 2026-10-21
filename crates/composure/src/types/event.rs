@@ -1,12 +1,13 @@
 //! [Webhook Events](https://discord.com/developers/docs/events/webhook-events): notifications
 //! Discord POSTs to the app's events URL.
 
-use std::collections::HashMap;
-
 use serde::Deserialize;
 use serde_json::value::RawValue;
 
-use crate::types::{ApplicationIntegrationType, Entitlement, PartialGuild, Snowflake, User};
+use crate::types::{
+    ApplicationIntegrationType, Entitlement, LobbyMessage, LobbyMessageDelete, PartialGuild,
+    Snowflake, User,
+};
 
 /// The request body Discord sends to the events URL
 #[derive(Debug, Clone, Deserialize)]
@@ -125,50 +126,6 @@ pub struct ApplicationAuthorized {
 pub struct ApplicationDeauthorized {
     /// Who removed the app
     pub user: User,
-}
-
-/// [Lobby Message](https://discord.com/developers/docs/events/webhook-events#lobby-message-create)
-#[derive(Debug, Clone, Deserialize)]
-pub struct LobbyMessage {
-    /// The message's id
-    pub id: Snowflake,
-
-    /// The message type
-    #[serde(rename = "type")]
-    pub t: u8,
-
-    /// The text
-    pub content: String,
-
-    /// The lobby
-    pub lobby_id: Snowflake,
-
-    /// The lobby's channel
-    pub channel_id: Snowflake,
-
-    /// Who sent it
-    pub author: User,
-
-    /// Key-value data attached by the game
-    pub metadata: Option<HashMap<String, String>>,
-
-    /// [Message flags](https://discord.com/developers/docs/resources/message#message-object-message-flags)
-    pub flags: Option<u64>,
-
-    /// The application that sent it, for messages sent by apps
-    pub application_id: Option<Snowflake>,
-
-    /// When it was edited (ISO 8601)
-    pub edited_timestamp: Option<String>,
-}
-
-/// [Lobby Message Delete](https://discord.com/developers/docs/events/webhook-events#lobby-message-delete)
-#[derive(Debug, Clone, Deserialize)]
-pub struct LobbyMessageDelete {
-    /// The deleted message's id
-    pub id: Snowflake,
-    /// The lobby
-    pub lobby_id: Snowflake,
 }
 
 #[cfg(test)]

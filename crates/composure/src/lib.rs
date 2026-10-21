@@ -81,7 +81,7 @@
 //! | `macros` | `#[app]`, `#[command]`, `#[group]`, `#[component]`, `#[modal]`, `#[autocomplete]`, `#[view]`, `rsx!`, `#[derive(Choice)]`, `#[derive(Modal)]` |
 //! | `rest` | The REST client ([`rest`]) with the Interaction Endpoints, [`Platform`](command::Platform), `ctx.defer(..)`, and the [`adapter`] pipeline |
 //! | `rest-commands`, `rest-messages`, `rest-users`, `rest-channels`, `rest-guilds`, `rest-members`, `rest-roles` | One group of Endpoints each on [`BotClient`](rest::BotClient) |
-//! | `rest-bans`, `rest-threads`, `rest-invites`, `rest-emojis`, `rest-stickers`, `rest-scheduled-events`, `rest-automod`, `rest-audit-log`, `rest-webhooks`, `rest-monetization`, `rest-polls`, `rest-soundboard`, `rest-application` | The rest of Discord's Endpoints, one group each |
+//! | `rest-bans`, `rest-threads`, `rest-invites`, `rest-emojis`, `rest-stickers`, `rest-scheduled-events`, `rest-automod`, `rest-audit-log`, `rest-webhooks`, `rest-monetization`, `rest-polls`, `rest-soundboard`, `rest-application`, `rest-role-connections`, `rest-onboarding`, `rest-stage-instances`, `rest-lobbies` | The rest of Discord's Endpoints, one group each |
 //! | `tier1` | `rest` and the Endpoints most bots need (commands, messages, users, channels, guilds, members, roles) |
 //! | `full` | Every Endpoint |
 //! | `tracing` | Spans and events through [`tracing`](https://docs.rs/tracing); see [Platforms](https://bluefrog130.github.io/composure-rs/platforms.html#logging) |

@@ -25,6 +25,8 @@ mod guilds;
 mod interaction;
 #[cfg(feature = "rest-invites")]
 mod invites;
+#[cfg(feature = "rest-lobbies")]
+mod lobbies;
 #[cfg(feature = "rest-members")]
 mod members;
 #[cfg(feature = "rest-messages")]
@@ -32,11 +34,15 @@ mod messages;
 #[cfg(feature = "rest-monetization")]
 mod monetization;
 mod multipart;
+#[cfg(feature = "rest-onboarding")]
+mod onboarding;
 #[cfg(feature = "rest-polls")]
 mod polls;
 #[cfg(feature = "reqwest")]
 mod reqwest;
 mod response;
+#[cfg(feature = "rest-role-connections")]
+mod role_connections;
 #[cfg(feature = "rest-roles")]
 mod roles;
 mod route;
@@ -46,6 +52,8 @@ mod scheduled_events;
 mod soundboard;
 #[cfg(test)]
 mod spec;
+#[cfg(feature = "rest-stage-instances")]
+mod stage_instances;
 #[cfg(feature = "rest-stickers")]
 mod stickers;
 // The Endpoints' tests use the public `MockTransport`
@@ -84,12 +92,18 @@ pub use guilds::{ChannelPosition, CreateGuildChannel, GetGuilds, ModifyGuild};
 pub use interaction::{CreateFollowup, EditMessage, InteractionClient};
 #[cfg(feature = "rest-invites")]
 pub use invites::CreateInvite;
+#[cfg(feature = "rest-lobbies")]
+pub use lobbies::{CreateOrJoinLobby, LobbyFields, LobbyMemberFields};
 #[cfg(feature = "rest-members")]
 pub use members::{AddMember, ModifyCurrentMember, ModifyMember};
 #[cfg(feature = "rest-messages")]
 pub use messages::{CreateMessage, GetMessages};
 #[cfg(feature = "rest-monetization")]
 pub use monetization::{EntitlementOwner, ListEntitlements};
+#[cfg(feature = "rest-onboarding")]
+pub use onboarding::{
+    ModifyOnboarding, ModifyWelcomeScreen, OnboardingPromptFields, OnboardingPromptOptionFields,
+};
 #[cfg(feature = "reqwest")]
 pub use reqwest::ReqwestTransport;
 pub use response::Response;
@@ -100,6 +114,8 @@ pub use route::Route;
 pub use scheduled_events::{GetScheduledEventUsers, ScheduledEventFields};
 #[cfg(feature = "rest-soundboard")]
 pub use soundboard::{SoundboardSoundFields, SoundboardSounds};
+#[cfg(feature = "rest-stage-instances")]
+pub use stage_instances::{CreateStageInstance, ModifyStageInstance};
 #[cfg(feature = "rest-stickers")]
 pub use stickers::{CreateSticker, ModifySticker, StickerPack, StickerPacks};
 #[cfg(feature = "rest-threads")]

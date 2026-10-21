@@ -1,5 +1,6 @@
 //! Checks every implemented Endpoint against Discord's OpenAPI spec (vendored at the commit in
-//! `spec/PINNED`; bump with `scripts/update-spec.sh`) and reports what is not implemented yet.
+//! `spec/PINNED`; bump with `scripts/update-spec.sh`) and reports what is not implemented yet,
+//! leaving out what an HTTP-only bot has no use for ([`OUT_OF_SCOPE`]).
 
 use std::collections::BTreeSet;
 
@@ -49,7 +50,76 @@ fn modules() -> Vec<&'static [Route]> {
     modules.push(super::soundboard::ROUTES);
     #[cfg(feature = "rest-application")]
     modules.push(super::application::ROUTES);
+    #[cfg(feature = "rest-role-connections")]
+    modules.push(super::role_connections::ROUTES);
+    #[cfg(feature = "rest-onboarding")]
+    modules.push(super::onboarding::ROUTES);
+    #[cfg(feature = "rest-stage-instances")]
+    modules.push(super::stage_instances::ROUTES);
+    #[cfg(feature = "rest-lobbies")]
+    modules.push(super::lobbies::ROUTES);
     modules
+}
+
+/// Spec routes Composure doesn't implement on purpose, by normalized path prefix (`{}` for
+/// parameters), optionally after a method (`PUT /path`), with the reason
+const OUT_OF_SCOPE: &[(&str, &str)] = &[
+    (
+        "/gateway",
+        "the Gateway: HTTP-only bots don't connect to it",
+    ),
+    (
+        "/oauth2/",
+        "OAuth2: an app's own token info and user-token flows",
+    ),
+    (
+        "/partner-sdk/",
+        "the Social SDK's partner token exchange and DM moderation",
+    ),
+    (
+        "/users/@me/connections",
+        "a user's connections: needs their OAuth2 token",
+    ),
+    (
+        "/users/@me/guilds/{}/member",
+        "a user's own membership: needs their OAuth2 token",
+    ),
+    (
+        "/users/@me/applications/{}/",
+        "a user's role connection and entitlements: needs their OAuth2 token",
+    ),
+    (
+        "/channels/{}/pins",
+        "the deprecated pins Endpoints: `/channels/{}/messages/pins` replaces them",
+    ),
+    (
+        "/channels/{}/recipients/",
+        "group DM recipients: needs a user's OAuth2 token",
+    ),
+    (
+        "/webhooks/{}/{}/github",
+        "GitHub-compatible webhook payloads, posted by GitHub",
+    ),
+    (
+        "/webhooks/{}/{}/slack",
+        "Slack-compatible webhook payloads, posted by Slack",
+    ),
+    (
+        "PUT /applications/{}/guilds/{}/commands/{}/permissions",
+        "Command permissions: needs a user's OAuth2 token with `applications.commands.permissions.update`",
+    ),
+];
+
+/// Whether `entry` (from [`OUT_OF_SCOPE`]) covers the normalized `route`
+fn covers(entry: &str, (method, path): &(String, String)) -> bool {
+    match entry.split_once(' ') {
+        Some((entry_method, prefix)) => entry_method == method && path.starts_with(prefix),
+        None => path.starts_with(entry),
+    }
+}
+
+fn out_of_scope(route: &(String, String)) -> bool {
+    OUT_OF_SCOPE.iter().any(|(entry, _)| covers(entry, route))
 }
 
 /// Parameter names differ between Endpoints sharing a path (`webhook_id` vs `application_id`),
@@ -117,15 +187,40 @@ fn implemented_routes_are_unique_per_module() {
     }
 }
 
-/// Not a check: `cargo test -p composure --all-features unimplemented -- --nocapture`
+/// Every entry still names spec routes, and none of them is implemented after all
+#[test]
+fn out_of_scope_entries_match_the_spec() {
+    let spec = spec_routes();
+    let implemented: BTreeSet<_> = implemented().iter().map(key).collect();
+    for (entry, _) in OUT_OF_SCOPE {
+        assert!(
+            spec.iter().any(|route| covers(entry, route)),
+            "{entry} matches no spec route"
+        );
+        let both: Vec<_> = implemented
+            .iter()
+            .filter(|route| covers(entry, route))
+            .collect();
+        assert!(
+            both.is_empty(),
+            "{entry} is out of scope but implemented: {both:?}"
+        );
+    }
+}
+
+/// Not a check: `cargo test -p composure --features full --lib rest::spec -- --nocapture`
 #[test]
 fn unimplemented_routes_report() {
     let implemented: BTreeSet<_> = implemented().iter().map(key).collect();
-    let missing: Vec<_> = spec_routes()
+    let (skipped, missing): (Vec<_>, Vec<_>) = spec_routes()
         .into_iter()
         .filter(|route| !implemented.contains(route))
-        .collect();
-    println!("{} spec routes not implemented:", missing.len());
+        .partition(out_of_scope);
+    println!(
+        "{} spec routes not implemented ({} more out of scope):",
+        missing.len(),
+        skipped.len()
+    );
     for (method, path) in missing {
         println!("  {method:6} {path}");
     }
