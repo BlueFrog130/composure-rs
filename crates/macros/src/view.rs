@@ -1,9 +1,15 @@
-//! `rsx!` and `#[view]`: JSX markup (parsed with rstml) expanded to `types::*` components with
-//! no runtime tree, and inline handlers hoisted into the View's `ViewHandler` (ADR 0011).
+//! `rsx!` and `#[view]`: JSX markup (parsed with rstml) expanded to builder calls, as Leptos's
+//! `view!` does. A tag is its type's `builder()` at the tag's span, each attribute a method call,
+//! each child a `.child(..)` whose bound checks where it may go (`composure::command::RowChild`,
+//! ...), and `.build()` at the tag's span; so the compiler checks attributes and placement, and
+//! the IDE completes and documents them as methods. The macro keeps what only it can see: inline
+//! handlers, hoisted into the View's `ViewHandler` (ADR 0011), a modal's inputs against its
+//! submit parameters, required attributes, the counts Discord limits, and locals an inline
+//! handler cannot use.
 
 use std::collections::HashSet;
 
-use proc_macro2::{Span, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Group, Punct, Spacing, Span, TokenStream, TokenTree};
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use rstml::node::{
     KVAttributeValue, KeyedAttributeValue, Node, NodeAttribute, NodeBlock, NodeElement, NodeName,
@@ -20,7 +26,6 @@ use syn::{
 use crate::{
     handler::{ctx_state, is_ctx},
     meta::snake_case,
-    tags::{self, TagDef},
 };
 
 fn cmd() -> TokenStream {
@@ -41,8 +46,8 @@ pub fn expand_macro(input: TokenStream) -> TokenStream {
     let mut gen_ = Gen::new(None);
     let view = gen_.view(input);
     let errors = gen_.errors.into_compile_error();
-    // The errors last: their text can name what is being typed, and rust-analyzer maps its
-    // completion cursor between expansions by offset (see `completion_refs`)
+    // The errors after the code: their text can name what is being typed, and rust-analyzer
+    // maps its completion cursor between expansions by offset
     let v = Ident::new("__view", Span::mixed_site());
     quote! {{
         let #v = #view;
@@ -109,40 +114,37 @@ struct Gen {
     next: usize,
     /// Every error so far: a node with an error is skipped, its siblings still generated
     errors: Errors,
-    /// `&mut MarkupRoot` expressions: the invocation's root, then each `Children` level's, so
-    /// the innermost level reaches it
-    roots: Vec<TokenStream>,
     /// Names the `#[view]` body binds, which hoisted inline handlers cannot see
     locals: HashSet<String>,
     /// Names bound in the `{..}` blocks around the markup being expanded
     enclosing: Vec<HashSet<String>>,
 }
 
+/// What a level's children go into, which decides the counts checked and how room is reserved
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Parent {
+    /// The top of a message, or a sub-View's children (a `View`)
     Top,
     Container,
     Section,
     Row,
     Modal,
-    /// A user View's children
-    Any,
+    Label,
+    Gallery,
+    /// A select's options (`group` false) or a radio or checkbox group's
+    Options {
+        group: bool,
+    },
+    /// `<Text>`: text whose room is reserved
+    Text,
+    /// A button's or an option's label
+    Caption,
 }
 
 impl Parent {
-    fn takes_text(self) -> bool {
-        !matches!(self, Parent::Row)
-    }
-
-    fn describe(self) -> &'static str {
-        match self {
-            Parent::Top => "at the top of a message",
-            Parent::Container => "in a <Container>",
-            Parent::Section => "in a <Section>",
-            Parent::Row => "in a <Row>",
-            Parent::Modal => "in a <Modal>",
-            Parent::Any => "here",
-        }
+    /// Whether its builder has `.reserve(n)` for `n` children
+    fn reserves(self) -> bool {
+        !matches!(self, Parent::Label | Parent::Text | Parent::Caption)
     }
 }
 
@@ -203,9 +205,70 @@ impl Tag {
         })
     }
 
-    /// Its entry in the tag table
-    fn def(self) -> &'static TagDef {
-        tags::find(&format!("{self:?}")).expect("every tag is in the table")
+    /// The type it builds (whose `builder()` it calls)
+    fn ty(self) -> &'static str {
+        match self {
+            Tag::Container => "Container",
+            Tag::Section => "Section",
+            Tag::Text => "TextDisplay",
+            Tag::Thumbnail => "Thumbnail",
+            Tag::Gallery => "MediaGallery",
+            Tag::Item => "MediaGalleryItem",
+            Tag::File => "FileComponent",
+            Tag::Separator => "Separator",
+            Tag::Row => "ActionRow",
+            Tag::Button => "ButtonComponent",
+            Tag::StringSelect => "StringSelect",
+            Tag::UserSelect => "UserSelect",
+            Tag::RoleSelect => "RoleSelect",
+            Tag::MentionableSelect => "MentionableSelect",
+            Tag::ChannelSelect => "ChannelSelect",
+            Tag::Option => "SelectOption",
+            Tag::Modal => "ModalView",
+            Tag::Label => "Label",
+            Tag::TextInput => "TextInput",
+            Tag::RadioGroup => "RadioGroup",
+            Tag::CheckboxGroup => "CheckboxGroup",
+            Tag::Checkbox => "Checkbox",
+            Tag::FileUpload => "FileUpload",
+        }
+    }
+
+    /// `::composure::types::X`, only `X` at `span`: the IDE takes one token for the tag, and the
+    /// `composure`/`types` segments would make `<Button>` (built as `ButtonComponent`) a module
+    fn path(self, span: Span) -> TokenStream {
+        let ident = Ident::new(self.ty(), span);
+        match self {
+            Tag::Modal => quote!(::composure::command::#ident),
+            _ => quote!(::composure::types::#ident),
+        }
+    }
+
+    /// What its children go into; `None` for a tag without children
+    fn children(self) -> Option<Parent> {
+        Some(match self {
+            Tag::Container => Parent::Container,
+            Tag::Section => Parent::Section,
+            Tag::Row => Parent::Row,
+            Tag::Modal => Parent::Modal,
+            Tag::Label => Parent::Label,
+            Tag::Gallery => Parent::Gallery,
+            Tag::StringSelect => Parent::Options { group: false },
+            Tag::RadioGroup | Tag::CheckboxGroup => Parent::Options { group: true },
+            Tag::Text => Parent::Text,
+            Tag::Button | Tag::Option => Parent::Caption,
+            _ => return None,
+        })
+    }
+
+    /// The event it answers
+    fn event(self) -> Option<Event> {
+        match self {
+            Tag::Button => Some(Event::Click),
+            Tag::Modal => Some(Event::Submit),
+            tag if tag.is_select() => Some(Event::Select),
+            _ => None,
+        }
     }
 
     fn is_select(self) -> bool {
@@ -230,46 +293,10 @@ impl Tag {
                     | Tag::FileUpload
             )
     }
-
-    /// Whether the tag can be placed directly in `parent`
-    fn allowed(self, parent: Parent) -> bool {
-        let layout = matches!(
-            self,
-            Tag::Container
-                | Tag::Text
-                | Tag::Section
-                | Tag::Gallery
-                | Tag::File
-                | Tag::Separator
-                | Tag::Row
-        );
-        match parent {
-            // A sub-View may be a single button or select meant for a row
-            Parent::Top | Parent::Any => layout || self == Tag::Button || self.is_select(),
-            Parent::Container => layout && self != Tag::Container,
-            Parent::Section => self == Tag::Text,
-            Parent::Row => self == Tag::Button || self.is_select(),
-            Parent::Modal => matches!(self, Tag::Text | Tag::Label),
-        }
-    }
-
-    fn placement(self) -> &'static str {
-        match self {
-            Tag::Button => "`<Button>` goes in a `<Row>`, or in a `<Section>` as its accessory",
-            Tag::Thumbnail => "`<Thumbnail>` goes in a `<Section>` as its accessory",
-            Tag::Item => "`<Item>` goes in a `<Gallery>`",
-            Tag::Option => "`<Option>` goes in a select, `<RadioGroup>` or `<CheckboxGroup>`",
-            Tag::Modal => "`<Modal>` must be the only top-level tag of the markup",
-            Tag::Label => "`<Label>` goes in a `<Modal>`",
-            Tag::Container => "`<Container>` goes at the top of a message",
-            tag if tag.is_select() => "selects go in a `<Row>`, or in a `<Label>` in a modal",
-            tag if tag.is_input() => "inputs go in a `<Label>` in a `<Modal>`",
-            _ => "it goes in a message, a `<Container>` or a `<Section>`",
-        }
-    }
 }
 
 /// One attribute: its `:`-separated key and its value (`None` for a flag)
+#[derive(Clone)]
 struct Attr {
     key: Vec<Ident>,
     value: Option<Expr>,
@@ -298,18 +325,14 @@ impl Attr {
     }
 }
 
-/// An element's attributes, taken by name as the element is generated; the rest are assigned to
-/// the component's fields
+/// An element's attributes, in source order
 struct Attrs {
     list: Vec<Attr>,
-    tag: String,
-    /// The built-in tag's table entry; `None` for a sub-View
-    def: Option<&'static TagDef>,
 }
 
 impl Attrs {
     /// The element's attributes, or every malformed one's error, combined
-    fn new(el: &NodeElement<rstml::Infallible>, tag: &str) -> syn::Result<Self> {
+    fn new(el: &NodeElement<rstml::Infallible>) -> syn::Result<Self> {
         let mut list: Vec<Attr> = Vec::new();
         let mut errors = Errors::default();
         for attribute in el.attributes() {
@@ -346,138 +369,73 @@ impl Attrs {
             }
         }
         errors.finish()?;
-        let def = tags::find(tag);
-        Ok(Self {
-            list,
-            tag: tag.to_string(),
-            def,
-        })
+        Ok(Self { list })
     }
 
-    fn take(&mut self, names: &[&str]) -> Option<Attr> {
-        if let Some(def) = self.def {
-            debug_assert!(
-                names.iter().all(|name| def.has(name)),
-                "`{names:?}` of `<{}>` missing from the tag table",
-                def.name
-            );
-        }
-        let index = self
-            .list
-            .iter()
-            .position(|attr| names.iter().any(|name| attr.is(name)))?;
-        Some(self.list.remove(index))
+    fn get(&self, name: &str) -> Option<&Attr> {
+        self.list.iter().find(|attr| attr.is(name))
     }
 
     fn has(&self, name: &str) -> bool {
-        if let Some(def) = self.def {
-            debug_assert!(
-                def.has(name),
-                "`{name}` of `<{}>` missing from the tag table",
-                def.name
-            );
-        }
-        self.list.iter().any(|attr| attr.is(name))
+        self.get(name).is_some()
     }
 
-    /// `url` (or `src`): what `IntoMedia` turns into a URL
-    fn media(&mut self) -> syn::Result<(Span, Expr)> {
-        match self.value(&["url", "src"])? {
-            Some(media) => Ok(media),
-            None => err(
-                Span::call_site(),
-                format!(
-                    "`<{}>` needs `url` or `src` (a URL, or a `File` to upload)",
-                    self.tag
-                ),
-            ),
-        }
-    }
-
-    fn value(&mut self, names: &[&str]) -> syn::Result<Option<(Span, Expr)>> {
-        match self.take(names) {
-            None => Ok(None),
-            Some(Attr {
-                value: Some(value),
-                span,
-                ..
-            }) => Ok(Some((span, value))),
-            Some(attr) => err(attr.span, format!("`{}` needs a value", attr.name())),
-        }
-    }
-
-    fn required(&mut self, names: &[&str], what: &str) -> syn::Result<Expr> {
-        match self.value(names)? {
-            Some((_, value)) => Ok(value),
-            None => err(
-                Span::call_site(),
-                format!("`<{}>` needs `{}` ({what})", self.tag, names[0]),
-            ),
-        }
-    }
-
-    fn flag(&mut self, name: &str) -> syn::Result<Option<Span>> {
-        match self.take(&[name]) {
-            None => Ok(None),
-            Some(Attr {
-                value: None, span, ..
-            }) => Ok(Some(span)),
-            Some(attr) => err(attr.span, format!("`{name}` takes no value")),
-        }
-    }
-
-    fn event(&mut self) -> Option<Attr> {
-        let index = self.list.iter().position(|attr| attr.key[0] == "on")?;
-        Some(self.list.remove(index))
-    }
-
-    /// `#var.field = IntoAttr::into_attr(value);` for the remaining attributes, with `aliases`
-    /// (`min` for `min_values`, ...)
-    fn assign(self, var: &Ident, aliases: &[(&str, &str)]) -> syn::Result<TokenStream> {
-        let c = cmd();
-        let mut out = TokenStream::new();
-        let mut errors = Errors::default();
-        for attr in self.list {
-            if attr.key.len() != 1 {
-                errors.push(syn::Error::new(
-                    attr.span,
-                    format!("`<{}>` has no `{}` attribute", self.tag, attr.name()),
-                ));
-                continue;
-            }
-            let key = &attr.key[0];
-            let field = match aliases.iter().find(|(alias, _)| key == alias) {
-                Some((_, field)) => Ident::new(field, key.span()),
-                None => key.clone(),
-            };
-            let value = attr.value_or_true();
-            out.extend(quote_spanned! {attr.span=>
-                #var.#field = #c::IntoAttr::into_attr(#value);
-            });
-        }
-        errors.finish()?;
-        Ok(out)
+    /// `on:..`
+    fn event(&self) -> Option<&Attr> {
+        self.list.iter().find(|attr| attr.key[0] == "on")
     }
 }
 
-/// Errors combined into one `syn::Error`, so every one is reported
+/// Most errors one invocation reports; the rest are summed up, so one mistake can't bury the
+/// user under cascading errors (as Leptos's `view!` caps them)
+const MAX_ERRORS: usize = 16;
+
+/// Errors collected while expanding, reported together: each at the offending token's span,
+/// duplicates dropped, at most [`MAX_ERRORS`]
 #[derive(Default)]
-struct Errors(Option<syn::Error>);
+struct Errors(Vec<syn::Error>);
 
 impl Errors {
     fn push(&mut self, error: syn::Error) {
-        match &mut self.0 {
-            Some(errors) => errors.combine(error),
-            None => self.0 = Some(error),
+        // A combined error is several messages: keep them apart, to count and de-duplicate
+        self.0.extend(error);
+    }
+
+    /// The errors as one, de-duplicated and capped
+    fn combined(self) -> Option<syn::Error> {
+        let mut seen = HashSet::new();
+        let mut out: Option<syn::Error> = None;
+        let mut suppressed = 0;
+        for error in self.0 {
+            if !seen.insert((error.to_string(), format!("{:?}", error.span()))) {
+                continue;
+            }
+            if seen.len() > MAX_ERRORS {
+                suppressed += 1;
+                continue;
+            }
+            match &mut out {
+                Some(out) => out.combine(error),
+                None => out = Some(error),
+            }
         }
+        if suppressed > 0
+            && let Some(out) = &mut out
+        {
+            out.combine(syn::Error::new(
+                Span::call_site(),
+                format!("... and {suppressed} more errors in this markup"),
+            ));
+        }
+        out
     }
 
     fn finish(self) -> syn::Result<()> {
-        self.0.map_or(Ok(()), Err)
+        self.combined().map_or(Ok(()), Err)
     }
 
     fn into_compile_error(self) -> Option<TokenStream> {
-        self.0.map(syn::Error::into_compile_error)
+        self.combined().map(syn::Error::into_compile_error)
     }
 }
 
@@ -657,7 +615,6 @@ impl Gen {
             modal: None,
             next: 0,
             errors: Errors::default(),
-            roots: Vec::new(),
             locals: HashSet::new(),
             enclosing: Vec::new(),
         }
@@ -678,23 +635,30 @@ impl Gen {
         result.map_err(|error| self.error(error)).ok()
     }
 
-    /// A `&mut MarkupRoot` expression for the level being generated
-    fn root(&self) -> TokenStream {
-        self.roots
-            .last()
-            .cloned()
-            .expect("inside an rsx! invocation")
-    }
-
-    /// One `rsx!` invocation: a `View`, or a `ModalView` for a `<Modal>` root. Never fails: errors
-    /// are recorded and what parsed is still expanded (`View::default()` or a placeholder
-    /// `ModalView` when nothing did), so `{..}` blocks keep type-checking in incomplete markup
-    fn view(&mut self, tokens: TokenStream) -> TokenStream {
-        let parser = rstml::Parser::new(rstml::ParserConfig::new().recover_block(true));
-        let raw = tokens.clone();
-        let (nodes, diagnostics) = parser.parse_recoverable(tokens).split_vec();
+    /// The markup's nodes, with rstml's diagnostics recorded; whether there were any.
+    ///
+    /// As Leptos's `view!` does in debug builds: a tag still being typed (`<Button pri`) has no
+    /// `>` yet, so rstml drops it and the IDE has nothing to complete its name or attributes
+    /// from. The parse is retried with the tag closed (`/>`), and the retry's nodes are kept when
+    /// it has strictly fewer errors and loses no nodes. Leptos appends `/>` at the end only; here
+    /// it closes every tag left open when the next one starts (`<Row><Butt</Row>`), so a tag
+    /// typed inside another completes too. Unlike Leptos, the first parse's errors are still
+    /// reported, so markup missing its `/>` never compiles.
+    fn parse(&mut self, tokens: TokenStream) -> (Vec<Node>, bool) {
+        let parser = || rstml::Parser::new(rstml::ParserConfig::new().recover_block(true));
+        let retry = cfg!(debug_assertions)
+            .then(|| close_open_tags(tokens.clone()))
+            .flatten();
+        let (mut nodes, diagnostics) = parser().parse_recoverable(tokens).split_vec();
+        if !diagnostics.is_empty()
+            && let Some(retry) = retry
+        {
+            let (recovered, recovered_diagnostics) = parser().parse_recoverable(retry).split_vec();
+            if recovered_diagnostics.len() < diagnostics.len() && recovered.len() >= nodes.len() {
+                nodes = recovered;
+            }
+        }
         let incomplete = !diagnostics.is_empty();
-        let completion = completion_refs(raw, incomplete);
         for diagnostic in diagnostics {
             // Each spanned child becomes its own `error:`; rstml's notes ("treating all inputs
             // after open tag as it content") only add noise, its helps point at the open tag
@@ -705,9 +669,16 @@ impl Gen {
                 }
             }
         }
+        (nodes, incomplete)
+    }
+
+    /// One `rsx!` invocation: a `View`, or a `ModalView` for a `<Modal>` root. Never fails: errors
+    /// are recorded and what parsed is still expanded (an empty View or `ModalView` when nothing
+    /// did), so `{..}` blocks keep type-checking in incomplete markup
+    fn view(&mut self, tokens: TokenStream) -> TokenStream {
+        let (nodes, incomplete) = self.parse(tokens);
         self.pre.push(Vec::new());
-        let root = self.var("root");
-        self.roots.push(quote!((&mut #root)));
+        let c = cmd();
         let meaningful = flatten(&nodes);
         let modal = match meaningful.as_slice() {
             [Node::Element(el)] if element_name(el).is_ok_and(|path| path.is_ident("Modal")) => {
@@ -717,37 +688,26 @@ impl Gen {
         };
         let in_modal_view = self.scope.as_ref().is_some_and(|scope| scope.modal);
         let body = match modal {
-            Some(el) => self.modal(el, &root),
-            // A `#[view] -> ModalView` whose `<Modal>` is still being typed
-            None if incomplete && in_modal_view => {
-                let data = modal_data(
-                    quote!(::composure::types::ModalCallbackData),
-                    quote!(::std::string::String::new()),
-                    quote!(::std::string::String::new()),
-                );
-                quote!(#root.modal(#data, ::std::vec::Vec::new()))
+            Some(el) => {
+                let modal = self.builtin(el, Tag::Modal);
+                self.recover(modal)
+                    .unwrap_or_else(|| quote!(#c::ModalView::builder().build()))
             }
+            // A `#[view] -> ModalView` whose `<Modal>` is still being typed
+            None if incomplete && in_modal_view => quote!(#c::ModalView::builder().build()),
             None => {
-                let components = self.level(&nodes, Parent::Top);
-                let v = self.var("v");
-                quote! {
-                    let #v = #components;
-                    #root.view(#v)
-                }
+                let children = self.children(&nodes, Parent::Top);
+                quote!(#c::View::builder() #children .build())
             }
         };
-        self.roots.pop();
         let pre = self.pre.pop().expect("pushed above");
-        let c = cmd();
-        let mut docs = TokenStream::new();
-        attr_docs(&nodes, &mut docs);
+        // Each child is in braces spanned at its tag (see `children`), as in Leptos's `view!`
         quote! {{
-            #docs
-            #completion
-            #(#pre)*
-            #[allow(unused_mut)]
-            let mut #root = #c::MarkupRoot::default();
-            #body
+            #[allow(unused_braces)]
+            {
+                #(#pre)*
+                #body
+            }
         }}
     }
 
@@ -768,21 +728,19 @@ impl Gen {
         }
         // `{expr}` as the expression itself, so it is not linted as needless braces
         if let [Stmt::Expr(expr, None)] = block.stmts.as_slice() {
-            return quote!((#expr));
+            return expr.to_token_stream();
         }
         block.to_token_stream()
     }
 
-    /// The components of one markup level, a `Vec<Component>` expression: `vec![..]` when every
-    /// child is known at compile time (literal text folded), else collected through `Children`.
-    /// A node with an error is recorded and skipped.
-    fn level<'n>(
+    /// `.child(..)` for each of `nodes` (adjacent literals joined), after `.reserve(..)` for the
+    /// children the markup shows, so a level allocates once. A node with an error is recorded and
+    /// skipped.
+    fn children<'n>(
         &mut self,
         nodes: impl IntoIterator<Item = &'n Node>,
         parent: Parent,
     ) -> TokenStream {
-        let c = cmd();
-        let t = types();
         let nodes = flatten(nodes);
         let pieces = pieces(&nodes);
         let fixed = nodes.iter().all(|node| match node {
@@ -793,69 +751,51 @@ impl Gen {
         if fixed {
             self.check_counts(&pieces, parent);
         }
-        if fixed {
-            let mut items = Vec::new();
-            for piece in &pieces {
-                match piece {
-                    Piece::Text(lits) => {
-                        if let Some(text) = self.text_run(lits, parent) {
-                            items.push(quote!(#t::Component::text(#text)));
-                        }
-                    }
-                    Piece::Node(node) => {
-                        if let Some(Child::Component(component)) = self.child(node, parent) {
-                            items.push(component);
-                        }
-                    }
-                }
-            }
-            return quote!(::std::vec![#(#items),*]);
-        }
-        let cx = self.var("c");
-        let root = self.root();
-        self.roots.push(quote!(#cx.root()));
-        let mut body = TokenStream::new();
+        let mut calls = TokenStream::new();
+        let mut count = 0;
+        let mut text = 0;
+        let mut exprs = 0;
         for piece in &pieces {
-            match piece {
+            let child = match piece {
                 Piece::Text(lits) => {
-                    if let Some(text) = self.text_run(lits, parent) {
-                        body.extend(quote!(#cx.text(#text);));
-                    }
+                    let lit = fold(lits);
+                    text += lit.value().len();
+                    Some(lit.to_token_stream())
                 }
-                Piece::Node(node) => match self.child(node, parent) {
-                    Some(Child::Component(component)) => {
-                        let e = self.var("e");
-                        body.extend(quote! {
-                            let #e = #component;
-                            #cx.component(#e);
-                        });
+                Piece::Node(node) => {
+                    if let Node::Block(_) = node {
+                        exprs += 1;
                     }
-                    Some(Child::Push(value)) => {
-                        body.extend(quote!(#c::IntoChildren::push_into(#value, &mut #cx);));
-                    }
-                    None => {}
-                },
+                    // In braces spanned at the node: a block's span is its braces, so an error
+                    // about the child (it cannot go here) points at it, not at the whole macro
+                    let span = match node {
+                        Node::Element(el) => el.name().span(),
+                        node => node.span(),
+                    };
+                    self.child(node).map(|child| {
+                        let mut group = Group::new(Delimiter::Brace, child);
+                        group.set_span(span);
+                        group.into_token_stream()
+                    })
+                }
+            };
+            if let Some(child) = child {
+                if !(parent == Parent::Section && is_accessory(piece)) {
+                    count += 1;
+                }
+                calls.extend(quote!(.child(#child)));
             }
         }
-        self.roots.pop();
-        quote! {{
-            #[allow(unused_mut)]
-            let mut #cx = #c::Children::new(#root);
-            #body
-            #cx.finish()
-        }}
-    }
-
-    /// Adjacent literals as one, or `None` (recorded) where text cannot go
-    fn text_run(&mut self, lits: &[&LitStr], parent: Parent) -> Option<LitStr> {
-        if !parent.takes_text() {
-            self.error(syn::Error::new(
-                lits[0].span(),
-                format!("text cannot go {}", parent.describe()),
-            ));
-            return None;
+        let reserve = match parent {
+            // Room for the literals, and a number or a short name per `{..}`
+            Parent::Text if exprs > 0 => Some(text + EXPR_CAPACITY * exprs),
+            parent if parent.reserves() && count > 0 => Some(count),
+            _ => None,
+        };
+        match reserve {
+            Some(reserve) => quote!(.reserve(#reserve) #calls),
+            None => calls,
         }
-        Some(fold(lits))
     }
 
     /// The counts Discord limits that a level known at compile time shows (ADR 0015); the
@@ -866,13 +806,17 @@ impl Gen {
             Piece::Node(Node::Element(el)) => el.name().span(),
             Piece::Node(node) => node.span(),
         };
+        let counted: Vec<&Piece> = pieces
+            .iter()
+            .filter(|piece| !(parent == Parent::Section && is_accessory(piece)))
+            .collect();
         let (max, message) = match parent {
             Parent::Row => {
-                let selects = pieces.iter().position(|piece| {
+                let select = counted.iter().any(|piece| {
                     matches!(piece, Piece::Node(Node::Element(el))
                         if matches!(classify(el), Ok(Kind::Tag(tag)) if tag.is_select()))
                 });
-                if let (Some(_), Some(second)) = (selects, pieces.get(1)) {
+                if select && let Some(second) = counted.get(1) {
                     self.error(syn::Error::new(
                         span(second),
                         "a select fills its `<Row>`: nothing else can go beside it",
@@ -889,28 +833,35 @@ impl Gen {
                 limits::MODAL_COMPONENTS_MAX,
                 "a `<Modal>` holds up to 5 components",
             ),
+            Parent::Gallery => (
+                limits::GALLERY_ITEMS_MAX,
+                "a `<Gallery>` holds up to 10 items",
+            ),
+            Parent::Options { group: false } => (
+                limits::MAX_SELECT_OPTIONS,
+                "a select holds up to 25 options",
+            ),
+            Parent::Options { group: true } => {
+                (limits::MAX_GROUP_OPTIONS, "a group holds up to 10 options")
+            }
             _ => return,
         };
-        if let Some(extra) = pieces.get(max) {
+        if let Some(extra) = counted.get(max) {
             self.error(syn::Error::new(span(extra), message));
         }
     }
 
-    /// One node of a level, as a component or a value to push; `None` for nothing (or an error,
-    /// recorded)
-    fn child(&mut self, node: &Node, parent: Parent) -> Option<Child> {
+    /// One node of a level, as the expression its parent's `.child(..)` takes; `None` for
+    /// nothing (or an error, recorded)
+    fn child(&mut self, node: &Node) -> Option<TokenStream> {
         let result = match node {
             Node::RawText(raw) if !raw.to_token_stream().is_empty() => {
                 err(raw.span(), "put text in quotes: \"text\"")
             }
-            Node::Block(block) => Ok(Some(Child::Push(self.block(block)))),
+            Node::Block(block) => Ok(Some(self.block(block))),
             Node::Element(el) => match classify(el) {
-                Ok(Kind::Tag(tag)) => self
-                    .element(el, tag, parent)
-                    .map(|component| Some(Child::Component(component))),
-                Ok(Kind::View(path)) => {
-                    self.user_view(el, path).map(|view| Some(Child::Push(view)))
-                }
+                Ok(Kind::Tag(tag)) => self.builtin(el, tag).map(Some),
+                Ok(Kind::View(path)) => self.user_view(el, path).map(Some),
                 Err(error) => Err(error),
             },
             Node::Doctype(doctype) => err(doctype.span(), "unexpected doctype"),
@@ -919,427 +870,339 @@ impl Gen {
         self.recover(result).flatten()
     }
 
-    /// A built-in tag where it is placed: a `Component` expression
-    fn element(
+    /// A built-in tag: `Type::builder()`, its attributes as method calls, its children, then
+    /// `.build()`; where it may go is the parent's `.child(..)` bound
+    fn builtin(
         &mut self,
         el: &NodeElement<rstml::Infallible>,
         tag: Tag,
-        parent: Parent,
     ) -> syn::Result<TokenStream> {
-        if !tag.allowed(parent) {
-            return err(el.name().span(), tag.placement());
+        let attrs = Attrs::new(el)?;
+        // Recorded, and the tag still generated: a tag being typed (no handler yet) keeps its
+        // attributes completing and its `{..}` type-checking; the builders have defaults
+        for problem in self.check(el, tag, &attrs).0 {
+            self.error(problem);
         }
-        self.component(el, tag)
-    }
-
-    /// An expression building the component for a built-in tag
-    fn component(
-        &mut self,
-        el: &NodeElement<rstml::Infallible>,
-        tag: Tag,
-    ) -> syn::Result<TokenStream> {
-        let c = cmd();
-        let t = types();
-        let name = format!("{tag:?}");
-        let mut attrs = Attrs::new(el, &name)?;
-        let e = self.var("e");
         let span = el.name().span();
-        let ty = tag_type(tag, el, false);
-        let close = close_type(tag, el, false);
-        let no_children = |el: &NodeElement<rstml::Infallible>| -> syn::Result<()> {
-            match el.children.iter().find(|node| !is_comment(node)) {
-                Some(child) => err(child.span(), format!("`<{name}>` takes no children")),
-                None => Ok(()),
+        let ty = tag.path(span);
+        let (calls, handler) = self.attributes(tag, &attrs)?;
+        let mut statements = TokenStream::new();
+        let mut extra = TokenStream::new();
+        if self.modal.is_some() && tag.is_input() {
+            let (calls, checks) = self.modal_input(tag, &attrs, span)?;
+            extra.extend(calls);
+            statements.extend(checks);
+        } else if tag.is_select()
+            && let Some(ty) =
+                handler.and_then(|i| self.handlers[i].typed.first().map(|(_, ty)| ty.clone()))
+        {
+            let c = cmd();
+            extra.extend(quote!(.many(<#ty as #c::SelectValue>::MANY)));
+        }
+        let children = match tag.children() {
+            Some(parent) => {
+                if tag == Tag::Modal {
+                    self.modal_children(el, handler)
+                } else {
+                    self.children(&el.children, parent)
+                }
+            }
+            None => {
+                if let Some(child) = el.children.iter().find(|node| !is_comment(node)) {
+                    return err(child.span(), format!("`<{tag:?}>` takes no children"));
+                }
+                TokenStream::new()
             }
         };
-        let r = self.root();
-        Ok(match tag {
-            Tag::Container | Tag::Row => {
-                let (inner, variant) = match tag {
-                    Tag::Container => (Parent::Container, quote!(Container)),
-                    _ => (Parent::Row, quote!(ActionRow)),
-                };
-                let components = self.level(&el.children, inner);
-                let assign = attrs.assign(&e, &[])?;
-                quote! {{
-                    #close
-                    #[allow(unused_mut)]
-                    let mut #e = #ty::new(#components);
-                    #assign
-                    #t::Component::#variant(#e)
-                }}
-            }
-            Tag::Text => {
-                let content = match attrs.value(&["content"])? {
-                    Some((_, value)) => quote!(#value),
-                    None => self
-                        .text(&el.children, "Text")
-                        .unwrap_or_else(|| quote!(::std::string::String::new())),
-                };
-                let assign = attrs.assign(&e, &[])?;
-                quote! {{
-                    #close
-                    #[allow(unused_mut)]
-                    let mut #e = #ty::new(#content);
-                    #assign
-                    #t::Component::TextDisplay(#e)
-                }}
-            }
-            Tag::Section => self.section(el, attrs, ty, close)?,
-            Tag::Thumbnail | Tag::File => {
-                no_children(el)?;
-                let (url_span, url) = attrs.media()?;
-                let assign = attrs.assign(&e, &[])?;
-                let variant = match tag {
-                    Tag::Thumbnail => quote!(Thumbnail),
-                    _ => quote!(File),
-                };
-                let media = quote_spanned!(url_span=> #c::IntoMedia::into_media(#url, #r));
-                quote! {{
-                    #close
-                    #[allow(unused_mut)]
-                    let mut #e = #ty::new(#media);
-                    #assign
-                    #t::Component::#variant(#e)
-                }}
-            }
-            Tag::Separator => {
-                no_children(el)?;
-                let spacing = match (attrs.flag("small")?, attrs.flag("large")?) {
-                    (Some(_), Some(span)) => {
-                        return err(span, "a separator is `small` or `large`");
-                    }
-                    (Some(_), None) => quote! {
-                        #e.spacing = ::core::option::Option::Some(#t::SeparatorSpacing::Small);
-                    },
-                    (None, Some(_)) => quote! {
-                        #e.spacing = ::core::option::Option::Some(#t::SeparatorSpacing::Large);
-                    },
-                    (None, None) => quote!(),
-                };
-                let assign = attrs.assign(&e, &[])?;
-                quote! {{
-                    #close
-                    #[allow(unused_mut)]
-                    let mut #e = #ty::new();
-                    #spacing
-                    #assign
-                    #t::Component::Separator(#e)
-                }}
-            }
-            Tag::Gallery => {
-                let items = self.gallery_items(el);
-                let assign = attrs.assign(&e, &[])?;
-                quote! {{
-                    #close
-                    #[allow(unused_mut)]
-                    let mut #e = #ty::new(#items);
-                    #assign
-                    #t::Component::MediaGallery(#e)
-                }}
-            }
-            Tag::Button => self.button(el, attrs, ty, close)?,
-            tag if tag.is_select() => self.select(el, tag, attrs, ty, close)?,
-            Tag::Label => self.label(el, attrs, ty, close)?,
-            tag if tag.is_input() => self.input(el, tag, attrs, ty, close)?,
-            Tag::Item | Tag::Option | Tag::Modal => return err(span, tag.placement()),
-            _ => unreachable!("every tag is handled"),
+        if let Some(close) = &el.close_tag {
+            let ty = tag.path(close.name.span());
+            statements.extend(quote!(let _: #ty;));
+        }
+        let build = quote_spanned!(span=> .build());
+        let chain = quote!(#ty::builder() #calls #extra #children #build);
+        Ok(if statements.is_empty() {
+            chain
+        } else {
+            quote!({ #statements #chain })
         })
     }
 
-    /// The items of a `<Gallery>`, a `Vec<MediaGalleryItem>` expression
-    fn gallery_items(&mut self, el: &NodeElement<rstml::Infallible>) -> TokenStream {
-        let t = types();
-        let nodes = flatten(&el.children);
-        let mut items = Vec::new();
-        let mut dynamic = false;
-        let mut count = 0;
-        for node in nodes {
-            let item = match node {
-                Node::Element(item)
-                    if element_name(item).is_ok_and(|path| {
-                        path.is_ident("Item") || path.is_ident("MediaGalleryItem")
-                    }) =>
-                {
-                    count += 1;
-                    if count == limits::GALLERY_ITEMS_MAX + 1 {
-                        self.error(syn::Error::new(
-                            item.name().span(),
-                            "a `<Gallery>` holds up to 10 items",
-                        ));
-                    }
-                    self.item(item).map(Item::One)
-                }
-                Node::Block(block) => {
-                    dynamic = true;
-                    Ok(Item::Many(self.block(block)))
-                }
-                other => err(
-                    other.span(),
-                    "a `<Gallery>` takes `<Item url=..>`s and `{..}` of `MediaGalleryItem`s",
-                ),
-            };
-            items.extend(self.recover(item));
-        }
-        collect_items(items, dynamic, quote!(#t::MediaGalleryItem))
-    }
-
-    /// The text of a text-only element (`<Text>`, a button label, an option), or `None` without
-    /// children; a child that is not text is recorded and skipped. Literals are joined at compile
-    /// time: only literals become one `String::from`, else the `String` is sized for them.
-    fn text(&mut self, nodes: &[Node], tag: &str) -> Option<TokenStream> {
-        let c = cmd();
-        let mut parts: Vec<TextPart> = Vec::new();
-        for node in nodes {
-            match node {
-                Node::Text(lit) => match parts.last_mut() {
-                    Some(TextPart::Lits(lits)) => lits.push(&lit.value),
-                    _ => parts.push(TextPart::Lits(vec![&lit.value])),
-                },
-                Node::Block(block) => parts.push(TextPart::Expr(self.block(block))),
-                Node::RawText(raw) if !raw.to_token_stream().is_empty() => {
-                    self.error(syn::Error::new(raw.span(), "put text in quotes: \"text\""));
-                }
-                Node::Element(el) => {
-                    self.error(syn::Error::new(
-                        el.name().span(),
-                        format!("`<{tag}>` only takes text"),
-                    ));
-                }
-                _ => {}
-            }
-        }
-        match parts.as_slice() {
-            [] => None,
-            [TextPart::Lits(lits)] => {
-                let text = fold(lits);
-                Some(quote!(::std::string::String::from(#text)))
-            }
-            _ => {
-                let text = self.var("t");
-                let capacity: usize = parts
-                    .iter()
-                    .map(|part| match part {
-                        TextPart::Lits(lits) => lits.iter().map(|lit| lit.value().len()).sum(),
-                        // Room for a number or a short name, so most texts allocate once
-                        TextPart::Expr(_) => EXPR_CAPACITY,
-                    })
-                    .sum();
-                let pushes = parts.iter().map(|part| match part {
-                    TextPart::Lits(lits) => {
-                        let lit = fold(lits);
-                        quote!(#text.push_str(#lit);)
-                    }
-                    TextPart::Expr(expr) => quote!(#c::IntoText::push_text(#expr, &mut #text);),
-                });
-                Some(quote! {{
-                    let mut #text = ::std::string::String::with_capacity(#capacity);
-                    #(#pushes)*
-                    #text
-                }})
-            }
-        }
-    }
-
-    fn section(
+    /// A `<Modal>`'s children, its inputs matched to the `on:submit` handler's parameters
+    fn modal_children(
         &mut self,
         el: &NodeElement<rstml::Infallible>,
-        mut attrs: Attrs,
-        ty: TokenStream,
-        close: TokenStream,
-    ) -> syn::Result<TokenStream> {
-        let t = types();
-        // `Some(None)`: the accessory child had an error, recorded
-        let mut accessory: Option<Option<TokenStream>> = None;
-        let mut rest = Vec::new();
-        for node in flatten(&el.children) {
-            if let Node::Element(child) = node
-                && let Ok(path) = element_name(child)
-                && (path.is_ident("Button") || path.is_ident("Thumbnail"))
-            {
-                if accessory.is_some() {
-                    self.error(syn::Error::new(
-                        child.name().span(),
-                        "a `<Section>` has one accessory: a `<Button>` or `<Thumbnail>`",
-                    ));
-                    continue;
+        handler: Option<usize>,
+    ) -> TokenStream {
+        let params = handler.map(|i| self.handlers[i].typed.clone());
+        self.modal = Some(ModalScope {
+            strict: params.is_some(),
+            params: params
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(name, ty)| (name, ty, false))
+                .collect(),
+        });
+        let children = self.children(&el.children, Parent::Modal);
+        let scope = self.modal.take().expect("set above");
+        for (name, _, _) in scope.params.iter().filter(|(_, _, used)| !used) {
+            self.error(syn::Error::new(
+                name.span(),
+                format!("no input in this modal has `name=\"{name}\"`"),
+            ));
+        }
+        children
+    }
+
+    /// What the macro checks of a built-in tag, besides placement and attribute names (the
+    /// compiler's): required attributes and conflicting ones, each at the offending token
+    fn check(&self, el: &NodeElement<rstml::Infallible>, tag: Tag, attrs: &Attrs) -> Errors {
+        let mut errors = Errors::default();
+        let mut fail = |span: Span, message: &str| errors.push(syn::Error::new(span, message));
+        let span = el.name().span();
+        let text_children = || {
+            el.children
+                .iter()
+                .any(|node| matches!(node, Node::Text(_) | Node::Block(_)))
+        };
+        let elements = || {
+            el.children
+                .iter()
+                .filter_map(|node| match node {
+                    Node::Element(child) => Some(child),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let in_modal = self.modal.is_some();
+        if let Some(event) = attrs.event() {
+            if in_modal && tag.is_input() {
+                fail(
+                    event.span,
+                    "inputs in a modal are read by the `<Modal>`'s `on:submit`",
+                );
+            } else if tag.event().is_none() {
+                fail(event.span, &format!("`<{tag:?}>` has no events"));
+            }
+        }
+        match tag {
+            Tag::Button => {
+                let link = attrs.has("url") || attrs.has("sku_id");
+                let id = attrs.event().or(attrs.get("custom_id"));
+                if link && let Some(id) = id {
+                    fail(
+                        id.span,
+                        "a link or premium button cannot have `on:click` or a `custom_id`",
+                    );
+                } else if !link && id.is_none() {
+                    fail(
+                        span,
+                        "a `<Button>` needs `on:click`, a `custom_id`, or a `url`",
+                    );
                 }
-                let tag =
-                    Tag::parse(&path.get_ident().expect("an ident").to_string()).expect("a tag");
-                let component = self.component(child, tag);
-                accessory = Some(self.recover(component));
+                if attrs.event().is_some()
+                    && let Some(custom_id) = attrs.get("custom_id")
+                {
+                    fail(custom_id.span, "the custom_id comes from `on:click`");
+                }
+                let styles: Vec<&Attr> = ["primary", "secondary", "success", "danger", "style"]
+                    .iter()
+                    .filter_map(|style| attrs.get(style))
+                    .collect();
+                if let Some(second) = styles.get(1) {
+                    fail(second.span, "a button has one style");
+                }
+                if let Some(label) = attrs.get("label")
+                    && text_children()
+                {
+                    fail(
+                        label.span,
+                        "the label is either `label` or the button's text",
+                    );
+                }
+            }
+            Tag::Section => {
+                let accessories: Vec<_> = elements()
+                    .into_iter()
+                    .filter(|child| {
+                        element_name(child)
+                            .is_ok_and(|path| path.is_ident("Button") || path.is_ident("Thumbnail"))
+                    })
+                    .collect();
+                if let Some(second) = accessories.get(1) {
+                    fail(
+                        second.name().span(),
+                        "a `<Section>` has one accessory: a `<Button>` or `<Thumbnail>`",
+                    );
+                }
+                match (accessories.is_empty(), attrs.get("accessory")) {
+                    (false, Some(attr)) => fail(
+                        attr.span,
+                        "the accessory is already a `<Button>` or `<Thumbnail>` child",
+                    ),
+                    (true, None) => fail(
+                        span,
+                        "a `<Section>` needs an accessory: a `<Button>` or `<Thumbnail>` child",
+                    ),
+                    _ => {}
+                }
+            }
+            Tag::Text => {
+                if let Some(content) = attrs.get("content")
+                    && text_children()
+                {
+                    fail(content.span, "the text is either `content` or the children");
+                }
+            }
+            Tag::Thumbnail | Tag::File | Tag::Item => match (attrs.get("url"), attrs.get("src")) {
+                (None, None) => fail(
+                    span,
+                    &format!("`<{tag:?}>` needs `src` (a URL, or a `File` to upload)"),
+                ),
+                (Some(_), Some(src)) => fail(src.span, "`src` and `url` are the same: use one"),
+                _ => {}
+            },
+            Tag::Separator => {
+                if attrs.has("small")
+                    && let Some(large) = attrs.get("large")
+                {
+                    fail(large.span, "a separator is `small` or `large`");
+                }
+            }
+            Tag::TextInput => {
+                if attrs.has("paragraph")
+                    && let Some(style) = attrs.get("style")
+                {
+                    fail(style.span, "use `paragraph` or `style`");
+                }
+            }
+            Tag::Option => {
+                if !attrs.has("value") {
+                    fail(
+                        span,
+                        "an `<Option>` needs `value` (what the option submits)",
+                    );
+                }
+                match (attrs.get("label"), text_children()) {
+                    (Some(label), true) => fail(
+                        label.span,
+                        "the label is either `label` or the option's text",
+                    ),
+                    (None, false) => fail(span, "an `<Option>` needs a label: its text or `label`"),
+                    _ => {}
+                }
+            }
+            Tag::Label => {
+                if !attrs.has("text") && !attrs.has("label") {
+                    fail(span, "a `<Label>` needs `text` (shown above the input)");
+                }
+                let inputs = elements();
+                match inputs.as_slice() {
+                    [] => fail(span, "a `<Label>` holds one input"),
+                    [_, second, ..] => fail(second.name().span(), "a `<Label>` holds one input"),
+                    _ => {}
+                }
+            }
+            Tag::Modal => {
+                if !attrs.has("title") {
+                    fail(
+                        span,
+                        "a `<Modal>` needs `title` (shown at the top, max 45 characters)",
+                    );
+                }
+                match (attrs.event(), attrs.get("custom_id")) {
+                    (Some(_), Some(custom_id)) => {
+                        fail(custom_id.span, "the custom_id comes from `on:submit`")
+                    }
+                    (None, None) => fail(span, "a `<Modal>` needs `on:submit` or a `custom_id`"),
+                    _ => {}
+                }
+            }
+            tag if tag.is_select() && !in_modal => match (attrs.event(), attrs.get("custom_id")) {
+                (Some(_), Some(custom_id)) => {
+                    fail(custom_id.span, "the custom_id comes from `on:select`")
+                }
+                (None, None) => fail(
+                    span,
+                    &format!("a `<{tag:?}>` needs `on:select` or a `custom_id`"),
+                ),
+                _ => {}
+            },
+            _ => {}
+        }
+        errors
+    }
+
+    /// The attributes as method calls in source order: `name=value` is `.name(value)` (a flag
+    /// `.name(true)`), `on:click=..` `.on_click(custom_id)`, `options=Choice` `.options::<Choice>()`.
+    /// Returns the inline handler's index, if one was hoisted.
+    fn attributes(&mut self, tag: Tag, attrs: &Attrs) -> syn::Result<(TokenStream, Option<usize>)> {
+        let mut calls = TokenStream::new();
+        let mut handler = None;
+        let mut errors = Errors::default();
+        for attr in &attrs.list {
+            if attr.key[0] == "on" {
+                match self.event(attr.clone(), tag) {
+                    Ok((custom_id, index)) => {
+                        let method = format_ident!("on_{}", attr.key[1], span = attr.key[1].span());
+                        calls.extend(quote!(.#method(#custom_id)));
+                        handler = index;
+                    }
+                    Err(error) => errors.push(error),
+                }
                 continue;
             }
-            rest.push(node);
-        }
-        let accessory = match (accessory, attrs.value(&["accessory"])?) {
-            (Some(None), _) => placeholder(),
-            (Some(Some(accessory)), None) => accessory,
-            (Some(_), Some((span, _))) => {
-                return err(
-                    span,
-                    "the accessory is already a `<Button>` or `<Thumbnail>` child",
-                );
+            if attr.key.len() != 1 {
+                errors.push(syn::Error::new(
+                    attr.span,
+                    format!("`<{tag:?}>` has no `{}` attribute", attr.name()),
+                ));
+                continue;
             }
-            (None, Some((_, value))) => {
-                quote!(::core::convert::Into::<#t::Component>::into(#value))
-            }
-            (None, None) => {
-                return err(
-                    el.name().span(),
-                    "a `<Section>` needs an accessory: a `<Button>` or `<Thumbnail>` child",
-                );
-            }
-        };
-        let components = self.level(rest, Parent::Section);
-        let e = self.var("e");
-        let inner = self.var("c");
-        let acc = self.var("accessory");
-        let assign = attrs.assign(&e, &[])?;
-        Ok(quote! {{
-            #close
-            let #inner = #components;
-            let #acc = #accessory;
-            #[allow(unused_mut)]
-            let mut #e = #ty::new(#inner, #acc);
-            #assign
-            #t::Component::Section(#e)
-        }})
-    }
-
-    fn item(&mut self, el: &NodeElement<rstml::Infallible>) -> syn::Result<TokenStream> {
-        let c = cmd();
-        let mut attrs = Attrs::new(el, "Item")?;
-        let ty = tag_type(Tag::Item, el, false);
-        let close = close_type(Tag::Item, el, false);
-        let (url_span, url) = attrs.media()?;
-        let e = self.var("e");
-        let r = self.root();
-        let media = quote_spanned!(url_span=> #c::IntoMedia::into_media(#url, #r));
-        let assign = attrs.assign(&e, &[])?;
-        Ok(quote! {{
-            #close
-            #[allow(unused_mut)]
-            let mut #e = #ty::new(#media);
-            #assign
-            #e
-        }})
-    }
-
-    fn button(
-        &mut self,
-        el: &NodeElement<rstml::Infallible>,
-        mut attrs: Attrs,
-        ty: TokenStream,
-        close: TokenStream,
-    ) -> syn::Result<TokenStream> {
-        let c = cmd();
-        let t = types();
-        let mut style_flag = None;
-        for (flag, variant) in [
-            ("primary", "Primary"),
-            ("secondary", "Secondary"),
-            ("success", "Success"),
-            ("danger", "Danger"),
-        ] {
-            if let Some(span) = attrs.flag(flag)? {
-                if style_flag.is_some() {
-                    return err(span, "a button has one style");
+            let key = &attr.key[0];
+            if key == "options"
+                && matches!(
+                    tag,
+                    Tag::StringSelect | Tag::RadioGroup | Tag::CheckboxGroup
+                )
+            {
+                let choice = attr
+                    .value
+                    .as_ref()
+                    .and_then(|value| syn::parse2::<Type>(value.to_token_stream()).ok());
+                match choice {
+                    Some(choice) => calls.extend(quote!(.#key::<#choice>())),
+                    None => errors.push(syn::Error::new(
+                        attr.span,
+                        "`options` is a #[derive(Choice)] enum",
+                    )),
                 }
-                style_flag = Some(Ident::new(variant, span));
+                continue;
             }
+            let value = attr.value_or_true();
+            calls.extend(quote!(.#key(#value)));
         }
-        let style_attr = attrs.value(&["style"])?;
-        let link = attrs.has("url");
-        let premium = attrs.has("sku_id");
-        let event = attrs.event();
-        let custom_id = attrs.value(&["custom_id"])?;
-        let label_attr = attrs.value(&["label"])?;
-        let label_text = self.text(&el.children, "Button");
-        let span = el.name().span();
-
-        if (link || premium) && (event.is_some() || custom_id.is_some()) {
-            return err(
-                span,
-                "a link or premium button cannot have `on:click` or a `custom_id`",
-            );
-        }
-        if !link && !premium && event.is_none() && custom_id.is_none() {
-            return err(
-                span,
-                "a `<Button>` needs `on:click`, a `custom_id`, or a `url`",
-            );
-        }
-        let label = match (label_attr, label_text) {
-            (Some((span, _)), Some(_)) => {
-                return err(span, "the label is either `label` or the button's text");
-            }
-            (Some((_, value)), None) => {
-                quote!(#c::IntoAttr::<::core::option::Option<::std::string::String>>::into_attr(#value))
-            }
-            (None, Some(text)) => quote!(::core::option::Option::Some(#text)),
-            (None, None) => quote!(::core::option::Option::None),
-        };
-        let style = match (style_flag, style_attr) {
-            (Some(_), Some((span, _))) => return err(span, "a button has one style"),
-            (Some(variant), None) => quote!(#t::ButtonStyle::#variant),
-            (None, Some((_, value))) => quote!(#c::IntoAttr::<#t::ButtonStyle>::into_attr(#value)),
-            (None, None) if link => quote!(#t::ButtonStyle::Link),
-            (None, None) if premium => quote!(#t::ButtonStyle::Premium),
-            (None, None) => quote!(#t::ButtonStyle::Secondary),
-        };
-        let custom_id = match (event, custom_id) {
-            (Some(_), Some((span, _))) => {
-                return err(span, "the custom_id comes from `on:click`");
-            }
-            (Some(event), None) => {
-                let (id, _) = self.event(event, Event::Click, "Button")?;
-                quote!(::core::option::Option::Some(#id))
-            }
-            (None, Some((_, value))) => {
-                quote!(#c::IntoAttr::<::core::option::Option<::std::string::String>>::into_attr(#value))
-            }
-            (None, None) => quote!(::core::option::Option::None),
-        };
-        let e = self.var("e");
-        let assign = attrs.assign(&e, &[])?;
-        Ok(quote! {{
-            #close
-            #[allow(unused_mut)]
-            let mut #e = #ty::new(
-                #style,
-                #label,
-                ::core::option::Option::None,
-                #custom_id,
-                ::core::option::Option::None,
-                ::core::option::Option::None,
-            );
-            #assign
-            #t::Component::Button(#e)
-        }})
+        errors.finish()?;
+        Ok((calls, handler))
     }
 
-    /// The `custom_id` (a `String` expression) for an `on:<event>` attribute: a reference to a
-    /// handler (`on:click=like(likes)`), or an inline handler (`on:click:like=|ctx| ..`), hoisted.
-    /// Returns the inline handler's index.
-    fn event(
-        &mut self,
-        attr: Attr,
-        expected: Event,
-        tag: &str,
-    ) -> syn::Result<(TokenStream, Option<usize>)> {
+    /// The `custom_id` (an `IntoCustomId` expression) for an `on:<event>` attribute: a reference
+    /// to a handler (`on:click=like(likes)`), or an inline handler (`on:click:like=|ctx| ..`),
+    /// hoisted. Returns the inline handler's index.
+    fn event(&mut self, attr: Attr, tag: Tag) -> syn::Result<(TokenStream, Option<usize>)> {
+        let Some(expected) = tag.event() else {
+            return err(attr.span, format!("`<{tag:?}>` has no events"));
+        };
         let event = attr.key.get(1).map(Ident::to_string);
         if event.as_deref() != Some(expected.name()) {
             return err(
                 attr.span,
-                format!("`<{tag}>` answers `on:{}`", expected.name()),
+                format!("`<{tag:?}>` answers `on:{}`", expected.name()),
             );
         }
         let key_name = attr.name();
         let Some(value) = attr.value else {
             return err(attr.span, format!("`{key_name}` needs a handler"));
         };
-        let r = self.root();
         match attr.key.len() {
             2 => {
                 let custom_id = match &value {
@@ -1359,7 +1222,7 @@ impl Gen {
                         );
                     }
                 };
-                Ok((quote!(#r.id(#custom_id)), None))
+                Ok((custom_id, None))
             }
             3 => {
                 let Expr::Closure(closure) = value else {
@@ -1373,7 +1236,7 @@ impl Gen {
                     );
                 };
                 let var = self.inline(attr.key[2].clone(), expected, closure)?;
-                Ok((quote!(#r.id(#var)), Some(self.handlers.len() - 1)))
+                Ok((quote!(#var), Some(self.handlers.len() - 1)))
             }
             _ => err(attr.span, "expected `on:event` or `on:event:name`"),
         }
@@ -1524,397 +1387,6 @@ impl Gen {
         errors.finish()
     }
 
-    fn select(
-        &mut self,
-        el: &NodeElement<rstml::Infallible>,
-        tag: Tag,
-        mut attrs: Attrs,
-        ty: TokenStream,
-        close: TokenStream,
-    ) -> syn::Result<TokenStream> {
-        let c = cmd();
-        let t = types();
-        let name = format!("{tag:?}");
-        let (custom_id, value_ty, modal) = if self.modal.is_some() {
-            if let Some(event) = attrs.event() {
-                return err(
-                    event.span,
-                    "inputs in a modal are read by the `<Modal>`'s `on:submit`",
-                );
-            }
-            let input = self.input_name(&mut attrs, &name)?;
-            let ty = self.modal_param(&input)?;
-            (quote!(::std::string::String::from(#input)), ty, true)
-        } else {
-            match (attrs.event(), attrs.value(&["custom_id"])?) {
-                (Some(_), Some((span, _))) => {
-                    return err(span, "the custom_id comes from `on:select`");
-                }
-                (Some(event), None) => {
-                    let (id, handler) = self.event(event, Event::Select, &name)?;
-                    let ty = handler
-                        .and_then(|i| self.handlers[i].typed.first().map(|(_, ty)| ty.clone()));
-                    (id, ty, false)
-                }
-                (None, Some((_, value))) => (
-                    quote!(#c::IntoAttr::<::std::string::String>::into_attr(#value)),
-                    None,
-                    false,
-                ),
-                (None, None) => {
-                    return err(
-                        el.name().span(),
-                        format!("a `<{name}>` needs `on:select` or a `custom_id`"),
-                    );
-                }
-            }
-        };
-        let e = self.var("e");
-        let (variant, options) = match tag {
-            Tag::StringSelect => {
-                let options = self.options(el, &mut attrs, false)?;
-                (
-                    quote!(StringSelect),
-                    quote!(::core::option::Option::Some(#options)),
-                )
-            }
-            other => {
-                if let Some(child) = el.children.iter().find(|node| !is_comment(node)) {
-                    return err(child.span(), format!("a `<{name}>` takes no children"));
-                }
-                let variant = match other {
-                    Tag::UserSelect => quote!(UserSelect),
-                    Tag::RoleSelect => quote!(RoleSelect),
-                    Tag::MentionableSelect => quote!(MentionableSelect),
-                    _ => quote!(ChannelSelect),
-                };
-                (variant, quote!(::core::option::Option::None))
-            }
-        };
-        let typed = value_ty.map(|ty| {
-            let (trait_, extra) = if modal {
-                let shape = shape_check(
-                    &ty,
-                    "VALUES",
-                    &format!("a `<{name}>` submits selections (a value, Option, or Vec)"),
-                );
-                (
-                    quote!(#c::ModalValue),
-                    quote! {
-                        #shape
-                        #e.required = #c::required::<#ty>();
-                    },
-                )
-            } else {
-                (quote!(#c::SelectValue), quote!())
-            };
-            quote! {
-                if <#ty as #trait_>::MANY {
-                    let all = #e.options.as_ref().map_or(25, ::std::vec::Vec::len).min(25);
-                    #e.max_values = ::core::option::Option::Some(all as i32);
-                }
-                #extra
-            }
-        });
-        let assign = attrs.assign(&e, &[("min", "min_values"), ("max", "max_values")])?;
-        Ok(quote! {{
-            #close
-            #[allow(unused_mut)]
-            let mut #e = #ty::new(
-                #custom_id,
-                #options,
-                ::core::option::Option::None,
-                ::core::option::Option::None,
-                ::core::option::Option::None,
-                ::core::option::Option::None,
-                ::core::option::Option::None,
-            );
-            #typed
-            #assign
-            #t::Component::#variant(#e)
-        }})
-    }
-
-    /// The options of a select (`group` false) or a radio or checkbox group, a `Vec` expression:
-    /// `options=ChoiceEnum`, `<Option>` children, `{..}` of options
-    fn options(
-        &mut self,
-        el: &NodeElement<rstml::Infallible>,
-        attrs: &mut Attrs,
-        group: bool,
-    ) -> syn::Result<TokenStream> {
-        let c = cmd();
-        let t = types();
-        let ty = if group {
-            quote!(#t::GroupOption)
-        } else {
-            quote!(#t::SelectOption)
-        };
-        let mut items = Vec::new();
-        let mut dynamic = false;
-        if let Some((span, choice)) = attrs.value(&["options"])? {
-            let choice: Type = syn::parse2(choice.to_token_stream())
-                .map_err(|_| syn::Error::new(span, "`options` is a #[derive(Choice)] enum"))?;
-            let option = if group {
-                quote!(#t::GroupOption::new(*label, *value))
-            } else {
-                quote!(#t::SelectOption::new(
-                    ::std::string::ToString::to_string(label),
-                    ::std::string::ToString::to_string(value),
-                    ::core::option::Option::None,
-                    ::core::option::Option::None,
-                    ::core::option::Option::None,
-                ))
-            };
-            dynamic = true;
-            items.push(Item::Many(quote! {
-                #c::choice_options::<#choice>().iter().map(|(label, value)| #option)
-            }));
-        }
-        let (max, message) = if group {
-            (10, "a group holds up to 10 options")
-        } else {
-            (
-                limits::MAX_SELECT_OPTIONS,
-                "a select holds up to 25 options",
-            )
-        };
-        let mut count = 0;
-        for node in flatten(&el.children) {
-            let option = match node {
-                Node::Element(option)
-                    if element_name(option).is_ok_and(|path| path.is_ident("Option")) =>
-                {
-                    count += 1;
-                    if count == max + 1 {
-                        self.error(syn::Error::new(option.name().span(), message));
-                    }
-                    self.option(option, group).map(Item::One)
-                }
-                Node::Block(block) => {
-                    dynamic = true;
-                    Ok(Item::Many(self.block(block)))
-                }
-                other => err(
-                    other.span(),
-                    "options are `<Option value=..>\"Label\"</Option>`, `{..}` of options, or `options=ChoiceEnum`",
-                ),
-            };
-            items.extend(self.recover(option));
-        }
-        Ok(collect_items(items, dynamic, ty))
-    }
-
-    fn option(
-        &mut self,
-        el: &NodeElement<rstml::Infallible>,
-        group: bool,
-    ) -> syn::Result<TokenStream> {
-        let c = cmd();
-        let mut attrs = Attrs::new(el, "Option")?;
-        let ty = tag_type(Tag::Option, el, group);
-        let close = close_type(Tag::Option, el, group);
-        let value = attrs.required(&["value"], "what the option submits")?;
-        let label = match (attrs.value(&["label"])?, self.text(&el.children, "Option")) {
-            (Some((span, _)), Some(_)) => {
-                return err(span, "the label is either `label` or the option's text");
-            }
-            (Some((_, label)), None) => {
-                quote!(#c::IntoAttr::<::std::string::String>::into_attr(#label))
-            }
-            (None, Some(text)) => text,
-            (None, None) => {
-                return err(
-                    el.name().span(),
-                    "an `<Option>` needs a label: its text or `label`",
-                );
-            }
-        };
-        let e = self.var("e");
-        let assign = attrs.assign(&e, &[])?;
-        let new = if group {
-            quote!(#ty::new(#label, #c::IntoAttr::<::std::string::String>::into_attr(#value)))
-        } else {
-            quote!(#ty::new(
-                #label,
-                #c::IntoAttr::<::std::string::String>::into_attr(#value),
-                ::core::option::Option::None,
-                ::core::option::Option::None,
-                ::core::option::Option::None,
-            ))
-        };
-        Ok(quote! {{
-            #close
-            #[allow(unused_mut)]
-            let mut #e = #new;
-            #assign
-            #e
-        }})
-    }
-
-    /// A `<Modal>` root, a `ModalView` expression built on the invocation's `root`; an error in
-    /// its attributes is recorded and its inputs still generated
-    fn modal(&mut self, el: &NodeElement<rstml::Infallible>, root: &Ident) -> TokenStream {
-        let header = self.modal_header(el);
-        let ModalHeader {
-            custom_id,
-            title,
-            params,
-        } = self.recover(header).unwrap_or_else(|| {
-            let empty = quote!(::std::string::String::new());
-            ModalHeader {
-                custom_id: empty.clone(),
-                title: empty,
-                params: None,
-            }
-        });
-        self.modal = Some(ModalScope {
-            strict: params.is_some(),
-            params: params
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(name, ty)| (name, ty, false))
-                .collect(),
-        });
-        let components = self.level(&el.children, Parent::Modal);
-        let scope = self.modal.take().expect("set above");
-        for (name, _, _) in scope.params.iter().filter(|(_, _, used)| !used) {
-            self.error(syn::Error::new(
-                name.span(),
-                format!("no input in this modal has `name=\"{name}\"`"),
-            ));
-        }
-        let id = self.var("id");
-        let v = self.var("v");
-        let data = modal_data(tag_type(Tag::Modal, el, false), quote!(#id), title);
-        let close = close_type(Tag::Modal, el, false);
-        quote! {
-            #close
-            let #id = #custom_id;
-            let #v = #components;
-            #root.modal(#data, #v)
-        }
-    }
-
-    /// A missing or unknown attribute is recorded, so the handler is still hoisted
-    fn modal_header(&mut self, el: &NodeElement<rstml::Infallible>) -> syn::Result<ModalHeader> {
-        let c = cmd();
-        let empty = quote!(::std::string::String::new());
-        let mut attrs = Attrs::new(el, "Modal")?;
-        let title = attrs.required(&["title"], "shown at the top, max 45 characters");
-        let title = match self.recover(title) {
-            Some(title) => title.to_token_stream(),
-            None => empty.clone(),
-        };
-        let (custom_id, params) = match (attrs.event(), attrs.value(&["custom_id"])?) {
-            (Some(_), Some((span, _))) => {
-                return err(span, "the custom_id comes from `on:submit`");
-            }
-            (Some(event), None) => {
-                let (id, handler) = self.event(event, Event::Submit, "Modal")?;
-                (id, handler.map(|i| self.handlers[i].typed.clone()))
-            }
-            (None, Some((_, value))) => (
-                quote!(#c::IntoAttr::<::std::string::String>::into_attr(#value)),
-                None,
-            ),
-            (None, None) => {
-                self.error(syn::Error::new(
-                    el.name().span(),
-                    "a `<Modal>` needs `on:submit` or a `custom_id`",
-                ));
-                (empty, None)
-            }
-        };
-        for attr in &attrs.list {
-            self.error(syn::Error::new(
-                attr.span,
-                format!("`<Modal>` has no `{}` attribute", attr.name()),
-            ));
-        }
-        Ok(ModalHeader {
-            custom_id,
-            title,
-            params,
-        })
-    }
-
-    fn label(
-        &mut self,
-        el: &NodeElement<rstml::Infallible>,
-        mut attrs: Attrs,
-        ty: TokenStream,
-        close: TokenStream,
-    ) -> syn::Result<TokenStream> {
-        let c = cmd();
-        let t = types();
-        let text = attrs.required(&["text", "label"], "shown above the input")?;
-        // `Some(None)`: the input had an error, recorded
-        let mut input: Option<Option<TokenStream>> = None;
-        for node in &el.children {
-            match node {
-                Node::Element(child) if input.is_some() => {
-                    self.error(syn::Error::new(
-                        child.name().span(),
-                        "a `<Label>` holds one input",
-                    ));
-                }
-                Node::Element(child) => {
-                    let tag = element_name(child)
-                        .ok()
-                        .and_then(|path| path.get_ident().map(Ident::to_string))
-                        .and_then(|name| Tag::parse(&name))
-                        .filter(|tag| tag.is_input());
-                    let component = match tag {
-                        Some(tag) => self.component(child, tag),
-                        None => err(
-                            child.name().span(),
-                            "a `<Label>` holds an input: `<TextInput>`, a select, `<RadioGroup>`, `<CheckboxGroup>`, `<Checkbox>` or `<FileUpload>`",
-                        ),
-                    };
-                    input = Some(self.recover(component));
-                }
-                node if is_comment(node) => {}
-                other => self.error(syn::Error::new(other.span(), "a `<Label>` holds one input")),
-            }
-        }
-        let input = match input {
-            Some(Some(input)) => input,
-            Some(None) => placeholder(),
-            None => return err(el.name().span(), "a `<Label>` holds one input"),
-        };
-        let e = self.var("e");
-        let assign = attrs.assign(&e, &[])?;
-        Ok(quote! {{
-            #close
-            let #e = #input;
-            #[allow(unused_mut)]
-            let mut #e = #ty::new(#c::IntoAttr::<::std::string::String>::into_attr(#text), #e);
-            #assign
-            #t::Component::Label(#e)
-        }})
-    }
-
-    /// A modal input's `name` (its `custom_id`), a string literal
-    fn input_name(&mut self, attrs: &mut Attrs, tag: &str) -> syn::Result<LitStr> {
-        match attrs.value(&["name"])? {
-            Some((
-                _,
-                Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(name),
-                    ..
-                }),
-            )) => Ok(name),
-            Some((span, _)) => err(span, "`name` is a string literal"),
-            None => err(
-                Span::call_site(),
-                format!(
-                    "a `<{tag}>` in a modal needs `name=\"..\"`, matching an `on:submit` parameter"
-                ),
-            ),
-        }
-    }
-
     /// The submit parameter's type for the input named `name`
     fn modal_param(&mut self, name: &LitStr) -> syn::Result<Option<Type>> {
         let scope = self.modal.as_mut().expect("in a modal");
@@ -1937,164 +1409,87 @@ impl Gen {
         }
     }
 
-    /// A modal input other than a select
-    fn input(
+    /// A modal input's checks against the `on:submit` parameter its `name` matches: calls setting
+    /// `required` (and `max` for several values) from the parameter's type, and compile-time
+    /// checks that the type reads what the input submits
+    fn modal_input(
         &mut self,
-        el: &NodeElement<rstml::Infallible>,
         tag: Tag,
-        mut attrs: Attrs,
-        ty_path: TokenStream,
-        close: TokenStream,
-    ) -> syn::Result<TokenStream> {
+        attrs: &Attrs,
+        span: Span,
+    ) -> syn::Result<(TokenStream, TokenStream)> {
         let c = cmd();
-        let t = types();
-        let name_str = format!("{tag:?}");
-        if self.modal.is_none() {
-            return err(el.name().span(), tag.placement());
+        let name = self.input_name(attrs, tag, span)?;
+        let Some(ty) = self.modal_param(&name)? else {
+            return Ok((TokenStream::new(), TokenStream::new()));
+        };
+        let (shape, expected) = match tag {
+            Tag::TextInput => (
+                "TEXT",
+                "a text input submits a single value (String, Option<String>, or a Choice enum)"
+                    .to_string(),
+            ),
+            Tag::RadioGroup => (
+                "TEXT",
+                "a radio group submits a single value (String, Option<String>, or a Choice enum)"
+                    .to_string(),
+            ),
+            Tag::CheckboxGroup => (
+                "VALUES",
+                "a checkbox group submits selections (a value, Option, or Vec)".to_string(),
+            ),
+            Tag::Checkbox => ("CHECKED", "a checkbox submits a bool".to_string()),
+            Tag::FileUpload => (
+                "VALUES",
+                "a file upload submits attachments (Attachment, Option, or Vec)".to_string(),
+            ),
+            _ => (
+                "VALUES",
+                format!("a `<{tag:?}>` submits selections (a value, Option, or Vec)"),
+            ),
+        };
+        let check = shape_check(&ty, shape, &expected);
+        let mut calls = TokenStream::new();
+        if tag != Tag::Checkbox {
+            calls.extend(quote!(.required_default(#c::required::<#ty>())));
         }
-        if let Some(event) = attrs.event() {
-            return err(
-                event.span,
-                "inputs in a modal are read by the `<Modal>`'s `on:submit`",
-            );
+        if tag.is_select() || tag == Tag::FileUpload {
+            calls.extend(quote!(.many(<#ty as #c::ModalValue>::MANY)));
         }
-        let name = self.input_name(&mut attrs, &name_str)?;
-        let ty = self.modal_param(&name)?;
-        let e = self.var("e");
-        let required = |shape: &str, expected: &str| {
-            ty.as_ref().map(|ty| {
-                let check = shape_check(ty, shape, expected);
-                quote! {
-                    #check
-                    #e.required = #c::required::<#ty>();
-                }
-            })
-        };
-        let many = |max: u8| {
-            ty.as_ref().map(|ty| {
-                quote! {
-                    if <#ty as #c::ModalValue>::MANY && #e.max_values.is_none() {
-                        #e.max_values = ::core::option::Option::Some(#max);
-                    }
-                }
-            })
-        };
-        let no_children = || match el.children.iter().find(|node| !is_comment(node)) {
-            Some(child) => err(child.span(), format!("a `<{name_str}>` takes no children")),
-            None => Ok(()),
-        };
-        Ok(match tag {
-            Tag::TextInput => {
-                no_children()?;
-                let style = match (attrs.flag("paragraph")?, attrs.value(&["style"])?) {
-                    (Some(_), Some((span, _))) => {
-                        return err(span, "use `paragraph` or `style`");
-                    }
-                    (Some(_), None) => quote!(#t::TextInputStyle::Paragraph),
-                    (None, Some((_, style))) => {
-                        quote!(#c::IntoAttr::<#t::TextInputStyle>::into_attr(#style))
-                    }
-                    (None, None) => quote!(#t::TextInputStyle::Short),
-                };
-                let required = required(
-                    "TEXT",
-                    "a text input submits a single value (String, Option<String>, or a Choice enum)",
-                );
-                let assign =
-                    attrs.assign(&e, &[("min_len", "min_length"), ("max_len", "max_length")])?;
-                quote! {{
-                    #close
-                    let mut #e = #ty_path::new(
-                        ::std::string::String::from(#name),
-                        #style,
-                        ::std::string::String::new(),
-                        ::core::option::Option::None,
-                        ::core::option::Option::None,
-                        ::core::option::Option::None,
-                        ::core::option::Option::None,
-                        ::core::option::Option::None,
-                    );
-                    #e.label = ::core::option::Option::None;
-                    #required
-                    #assign
-                    #t::Component::TextInput(#e)
-                }}
-            }
-            Tag::RadioGroup | Tag::CheckboxGroup => {
-                let options = self.options(el, &mut attrs, true)?;
-                let (variant, required) = if tag == Tag::RadioGroup {
-                    (
-                        quote!(RadioGroup),
-                        required(
-                            "TEXT",
-                            "a radio group submits a single value (String, Option<String>, or a Choice enum)",
-                        ),
-                    )
-                } else {
-                    (
-                        quote!(CheckboxGroup),
-                        required(
-                            "VALUES",
-                            "a checkbox group submits selections (a value, Option, or Vec)",
-                        ),
-                    )
-                };
-                let assign = attrs.assign(&e, &[("min", "min_values"), ("max", "max_values")])?;
-                quote! {{
-                    #close
-                    #[allow(unused_mut)]
-                    let mut #e = #ty_path::new(#name, #options);
-                    #required
-                    #assign
-                    #t::Component::#variant(#e)
-                }}
-            }
-            Tag::Checkbox => {
-                no_children()?;
-                let check = ty
-                    .as_ref()
-                    .map(|ty| shape_check(ty, "CHECKED", "a checkbox submits a bool"));
-                let assign = attrs.assign(&e, &[])?;
-                quote! {{
-                    #close
-                    #check
-                    #[allow(unused_mut)]
-                    let mut #e = #ty_path::new(#name);
-                    #assign
-                    #t::Component::Checkbox(#e)
-                }}
-            }
-            Tag::FileUpload => {
-                no_children()?;
-                let required = required(
-                    "VALUES",
-                    "a file upload submits attachments (Attachment, Option, or Vec)",
-                );
-                let assign = attrs.assign(&e, &[("min", "min_values"), ("max", "max_values")])?;
-                let many = many(10);
-                quote! {{
-                    #close
-                    #[allow(unused_mut)]
-                    let mut #e = #ty_path::new(#name);
-                    #required
-                    #assign
-                    #many
-                    #t::Component::FileUpload(#e)
-                }}
-            }
-            _ => unreachable!("selects are handled by `select`"),
-        })
+        Ok((calls, check))
     }
 
-    /// `<Card title=.. likes=3/>`: a user View, built through its Props builder (a value to push
-    /// into the level)
+    /// A modal input's `name` (its `custom_id`), a string literal
+    fn input_name(&mut self, attrs: &Attrs, tag: Tag, span: Span) -> syn::Result<LitStr> {
+        match attrs.get("name") {
+            Some(Attr {
+                value:
+                    Some(Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(name),
+                        ..
+                    })),
+                ..
+            }) => Ok(name.clone()),
+            Some(attr) => err(attr.span, "`name` is a string literal"),
+            None => err(
+                span,
+                format!(
+                    "a `<{tag:?}>` in a modal needs `name=\"..\"`, matching an `on:submit` parameter"
+                ),
+            ),
+        }
+    }
+
+    /// `<Card title=.. likes=3/>`: a user View, built through its Props builder (`.build()` at the
+    /// tag, so a missing Prop's error points at it). A single name resolves through the built-in
+    /// tags too, so one being typed completes from both.
     fn user_view(
         &mut self,
         el: &NodeElement<rstml::Infallible>,
         path: syn::Path,
     ) -> syn::Result<TokenStream> {
         let c = cmd();
-        let attrs = Attrs::new(el, &path.to_token_stream().to_string())?;
+        let attrs = Attrs::new(el)?;
         let mut setters = TokenStream::new();
         for attr in attrs.list {
             if attr.key.len() != 1 {
@@ -2105,24 +1500,13 @@ impl Gen {
             }
             let key = &attr.key[0];
             let value = attr.value_or_true();
-            setters.extend(quote_spanned!(attr.span=> .#key(#value)));
+            setters.extend(quote!(.#key(#value)));
         }
         let children: Vec<&Node> = el.children.iter().filter(|n| !is_comment(n)).collect();
         if !children.is_empty() {
-            // The children are a View of their own, merged into this one when the sub-View is
-            // placed
-            let root = self.var("root");
-            self.roots.push(quote!((&mut #root)));
-            let components = self.level(children, Parent::Any);
-            self.roots.pop();
-            let v = self.var("v");
+            let children = self.children(children, Parent::Top);
             setters.extend(quote! {
-                .children({
-                    #[allow(unused_mut)]
-                    let mut #root = #c::MarkupRoot::default();
-                    let #v = #components;
-                    #root.view(#v)
-                })
+                .children(#c::View::builder() #children .build())
             });
         }
         let is_self = self
@@ -2136,122 +1520,67 @@ impl Gen {
         {
             self.views.push(path.clone());
         }
-        Ok(quote! {
-            #path::builder() #setters .build()
-        })
-    }
-}
-
-/// `let _ = ::composure::command::tags::Tag::attr;` at each known attribute's span, so rust-analyzer
-/// shows the attribute's docs on hover. Emitted for the whole markup, apart from generating it,
-/// so a tag with an error (half-typed) keeps them.
-fn attr_docs(nodes: &[Node], out: &mut TokenStream) {
-    for node in nodes {
-        match node {
-            Node::Element(el) => {
-                if let Ok(Kind::Tag(tag)) = classify(el) {
-                    let def = tag.def();
-                    let module = Ident::new(def.name, Span::call_site());
-                    for attribute in el.attributes() {
-                        if let NodeAttribute::Attribute(keyed) = attribute
-                            && let Ok(key) = attr_key(&keyed.key)
-                            && def.has(&key[0].to_string())
-                        {
-                            let key = &key[0];
-                            out.extend(quote!(let _ = ::composure::command::tags::#module::#key;));
-                        }
-                    }
-                }
-                attr_docs(&el.children, out);
+        let builder = match path.get_ident() {
+            Some(ident) => {
+                let mut block = Group::new(
+                    Delimiter::Brace,
+                    quote! {
+                        #[allow(unused_imports)]
+                        use #c::elements::*;
+                        #ident::builder()
+                    },
+                );
+                block.set_span(el.name().span());
+                block.into_token_stream()
             }
-            Node::Fragment(fragment) => attr_docs(&fragment.children, out),
-            _ => {}
-        }
+            None => quote!(#path::builder()),
+        };
+        let build = quote_spanned!(el.name().span()=> .build());
+        Ok(quote!(#builder #setters #build))
     }
 }
 
-/// The identifier rust-analyzer inserts at the cursor to complete in a macro (older versions
-/// `intellijRulezz`)
-const COMPLETION_MARKERS: [&str; 2] = ["raCompletionMarker", "intellijRulezz"];
-
-/// What was typed at `ident`, without rust-analyzer's completion marker
-fn typed(ident: &Ident) -> String {
-    let mut name = ident.to_string();
-    for marker in COMPLETION_MARKERS {
-        name = name.replace(marker, "");
-    }
-    name
-}
-
-/// Keywords an expression continues after, so a word after them is in an attribute's value
-const KEYWORDS: &[&str] = &[
-    "as", "async", "await", "break", "else", "if", "in", "let", "match", "move", "mut", "ref",
-    "return", "unsafe", "while",
-];
-
-/// Paths into `composure::command::tags` for names being typed, so rust-analyzer completes them:
-/// `<Con` (in markup that does not parse yet) gets `use tags::Con as _;`, which offers the tags;
-/// `<Button pri` gets `let _ = tags::Button::pri;`, which offers that tag's special attributes
-/// (field attributes complete through the field they set). Read from the raw tokens, since
-/// half-typed markup often does not parse.
-///
-/// rust-analyzer completes by expanding the macro again with a marker identifier at the cursor
-/// (`priraCompletionMarker`) and maps the cursor between the two expansions by offset, so both
-/// must expand alike: the marker is ignored here, and the errors (whose text can name what is
-/// typed) come after all the code.
-fn completion_refs(tokens: TokenStream, incomplete: bool) -> TokenStream {
+/// `tokens` with `/>` closing each opening tag that the next tag starts before its `>` (or the
+/// markup ends), as while it is being typed; `None` when every tag is closed. Attribute values
+/// using `<` are in braces, so a bare `<` in an opening tag starts the next tag.
+fn close_open_tags(tokens: TokenStream) -> Option<TokenStream> {
+    let close = || {
+        [
+            TokenTree::Punct(Punct::new('/', Spacing::Joint)),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+        ]
+    };
     let trees: Vec<TokenTree> = tokens.into_iter().collect();
-    let punct =
-        |i: usize, c: char| matches!(trees.get(i), Some(TokenTree::Punct(p)) if p.as_char() == c);
-    let mut out = TokenStream::new();
+    let mut out = Vec::with_capacity(trees.len());
+    let mut open = false;
+    let mut closed_any = false;
     for (i, tree) in trees.iter().enumerate() {
-        let ident = match tree {
-            TokenTree::Group(group) => {
-                out.extend(completion_refs(group.stream(), incomplete));
-                continue;
+        if let TokenTree::Punct(punct) = tree {
+            match punct.as_char() {
+                '<' => {
+                    if open {
+                        out.extend(close());
+                        closed_any = true;
+                    }
+                    open = matches!(trees.get(i + 1), Some(TokenTree::Ident(_)));
+                }
+                '>' => open = false,
+                _ => {}
             }
-            TokenTree::Ident(ident) => ident,
-            _ => continue,
-        };
-        let name = typed(ident);
-        if name.is_empty() {
-            continue;
         }
-        // A tag name: `<Con`, `</Con`
-        if i >= 1 && (punct(i - 1, '<') || (i >= 2 && punct(i - 1, '/') && punct(i - 2, '<'))) {
-            if incomplete && tags::find(&name).is_none() && tags::starts(&name) {
-                out.extend(quote!(use ::composure::command::tags::#ident as _;));
-            }
-            continue;
-        }
-        // An attribute name follows the tag name or a whole attribute (`custom_id="x"`, `{..}`,
-        // `primary`); after punctuation it is in a value (`=..`, `move |_| ..`, `on:..`, `a.b`)
-        let after_attribute = match i.checked_sub(1).map(|j| &trees[j]) {
-            Some(TokenTree::Literal(_) | TokenTree::Group(_)) => true,
-            Some(TokenTree::Ident(prev)) => !KEYWORDS.contains(&prev.to_string().as_str()),
-            _ => false,
-        };
-        if !after_attribute {
-            continue;
-        }
-        let open = (0..i).rev().find_map(|j| match &trees[j] {
-            TokenTree::Punct(p) if p.as_char() == '>' => Some(None),
-            TokenTree::Punct(p) if p.as_char() == '<' => match trees.get(j + 1) {
-                Some(TokenTree::Ident(tag)) => Some(Some(tag.to_string())),
-                _ => Some(None),
-            },
-            _ => None,
-        });
-        if let Some(Some(tag)) = open
-            && let Some(def) = tags::find(&tag)
-            && !def.has(&name)
-            && def.starts_special(&name)
-        {
-            let module = Ident::new(def.name, Span::call_site());
-            out.extend(quote!(let _ = ::composure::command::tags::#module::#ident;));
-        }
+        out.push(tree.clone());
     }
-    out
+    if open {
+        out.extend(close());
+        closed_any = true;
+    }
+    closed_any.then(|| out.into_iter().collect())
+}
+
+/// Whether a level's piece is a `<Section>`'s accessory
+fn is_accessory(piece: &Piece) -> bool {
+    matches!(piece, Piece::Node(Node::Element(el))
+        if element_name(el).is_ok_and(|path| path.is_ident("Button") || path.is_ident("Thumbnail")))
 }
 
 /// Discord's limits that `rsx!` checks at compile time; the runtime check uses
@@ -2262,16 +1591,11 @@ mod limits {
     pub const MODAL_COMPONENTS_MAX: usize = 5;
     pub const GALLERY_ITEMS_MAX: usize = 10;
     pub const MAX_SELECT_OPTIONS: usize = 25;
+    pub const MAX_GROUP_OPTIONS: usize = 10;
 }
 
-/// A `<Modal>`'s attributes
-struct ModalHeader {
-    /// A `String` expression
-    custom_id: TokenStream,
-    title: TokenStream,
-    /// The inline `on:submit`'s typed parameters
-    params: Option<Vec<(Ident, Type)>>,
-}
+/// Bytes reserved for each `{..}` in a `<Text>`, besides its literals
+const EXPR_CAPACITY: usize = 16;
 
 /// What a level's element is
 enum Kind {
@@ -2294,14 +1618,6 @@ fn classify(el: &NodeElement<rstml::Infallible>) -> syn::Result<Kind> {
     } else {
         err(el.name().span(), format!("unknown tag `<{last}>`"))
     }
-}
-
-/// One generated child of a level
-enum Child {
-    /// A `Component` expression
-    Component(TokenStream),
-    /// A value pushed with `IntoChildren`: a `{..}`, a sub-View
-    Push(TokenStream),
 }
 
 /// A level's nodes: runs of adjacent text (joined into one text display), and the rest
@@ -2343,67 +1659,6 @@ fn fold(lits: &[&LitStr]) -> LitStr {
             &lits.iter().map(|lit| lit.value()).collect::<String>(),
             lits[0].span(),
         ),
-    }
-}
-
-/// Bytes reserved for each `{..}` in a text-only element, besides its literals
-const EXPR_CAPACITY: usize = 16;
-
-/// Part of a text-only element's text
-enum TextPart<'n> {
-    Lits(Vec<&'n LitStr>),
-    Expr(TokenStream),
-}
-
-/// An item of a `Vec` markup builds (gallery items, options)
-enum Item {
-    One(TokenStream),
-    /// An iterator of items, extended with
-    Many(TokenStream),
-}
-
-/// A `Vec<ty>` expression: `vec![..]` when every item is one, else pushed and extended
-fn collect_items(items: Vec<Item>, dynamic: bool, ty: TokenStream) -> TokenStream {
-    if !dynamic {
-        let items = items.into_iter().map(|item| match item {
-            Item::One(item) | Item::Many(item) => item,
-        });
-        return quote!(::std::vec![#(#items),*]);
-    }
-    let var = Ident::new("__items", Span::mixed_site());
-    let statements = items.into_iter().map(|item| match item {
-        Item::One(item) => quote!(#var.push(#item);),
-        Item::Many(items) => quote!(::core::iter::Extend::extend(&mut #var, #items);),
-    });
-    quote! {{
-        let mut #var: ::std::vec::Vec<#ty> = ::std::vec::Vec::new();
-        #(#statements)*
-        #var
-    }}
-}
-
-/// The type a built-in tag builds, `::composure::types::X` at the tag name's span, so hover and
-/// go-to-definition on `<X>` reach it
-fn tag_type(tag: Tag, el: &NodeElement<rstml::Infallible>, group: bool) -> TokenStream {
-    spanned_type(tag, el.name().span(), group)
-}
-
-fn spanned_type(tag: Tag, span: Span, group: bool) -> TokenStream {
-    let name = if group { "GroupOption" } else { tag.def().ty };
-    // Only the type's name at the tag's span: the IDE picks one token for the tag, and the
-    // `composure`/`types` segments would make `<Button>` (built as `ButtonComponent`) a module
-    let ident = Ident::new(name, span);
-    quote!(::composure::types::#ident)
-}
-
-/// `let _: X;` at the closing tag's span, so `</X>` reaches the type too
-fn close_type(tag: Tag, el: &NodeElement<rstml::Infallible>, group: bool) -> TokenStream {
-    match &el.close_tag {
-        Some(close) => {
-            let ty = spanned_type(tag, close.name.span(), group);
-            quote!(let _: #ty;)
-        }
-        None => TokenStream::new(),
     }
 }
 
@@ -2492,31 +1747,6 @@ fn macro_uses(tokens: TokenStream, out: &mut Vec<Ident>) {
             TokenTree::Punct(_) => {}
         }
     }
-}
-
-/// A `ModalCallbackData` (`ty`, spanned) with this `custom_id` (a `String`) and title, its
-/// components left to `MarkupRoot::modal`
-fn modal_data(ty: TokenStream, custom_id: TokenStream, title: TokenStream) -> TokenStream {
-    let c = cmd();
-    quote! {
-        #ty {
-            custom_id: #custom_id,
-            title: #c::IntoAttr::<::std::string::String>::into_attr(#title),
-            components: ::core::option::Option::None,
-            tts: ::core::option::Option::None,
-            content: ::core::option::Option::None,
-            embeds: ::core::option::Option::None,
-            allowed_mentions: ::core::option::Option::None,
-            flags: ::core::option::Option::None,
-        }
-    }
-}
-
-/// Stands in for a child whose error is recorded (the macro emits a `compile_error!`), so its
-/// parent and siblings are still generated
-fn placeholder() -> TokenStream {
-    let t = types();
-    quote!(#t::Component::Separator(#t::Separator::new()))
 }
 
 /// A compile-time check that a submit parameter's type reads what its input submits
@@ -2695,9 +1925,9 @@ pub fn expand_attr(args: TokenStream, item: TokenStream) -> syn::Result<TokenStr
 
     let message_impls = (!modal).then(|| {
         quote! {
-            impl #c::IntoChildren for #name {
-                fn push_into(self, children: &mut #c::Children<'_>) {
-                    #c::IntoChildren::push_into(self.render(), children)
+            impl #c::IntoView for #name {
+                fn into_view(self) -> #c::View {
+                    self.render()
                 }
             }
 
@@ -3029,13 +2259,50 @@ mod tests {
 
     use super::*;
 
-    /// Every `Container` ident of `tokens` written as `types::Container`, by position
+    fn tokens(source: &str) -> TokenStream {
+        TokenStream::from_str(source).expect("test markup tokenizes")
+    }
+
+    /// What `rsx!` reports for `markup`: each message and where it starts
+    fn errors(markup: &str) -> Vec<(String, LineColumn)> {
+        let mut gen_ = Gen::new(None);
+        let _ = gen_.view(tokens(markup));
+        gen_.errors
+            .0
+            .into_iter()
+            .map(|error| (error.to_string(), error.span().start()))
+            .collect()
+    }
+
+    /// Asserts `markup` reports `message` at the first `at` in it (0-based column, line 1), not at
+    /// the macro's call site
+    fn assert_error_at(markup: &str, message: &str, at: &str) {
+        let column = markup.find(at).expect("`at` is in the markup");
+        let found = errors(markup);
+        assert!(
+            found
+                .iter()
+                .any(|(text, start)| text.contains(message)
+                    && *start == LineColumn { line: 1, column }),
+            "`{message}` at column {column}: {found:?}"
+        );
+    }
+
+    /// The expansion, formatted, for snapshots
+    fn expand(markup: &str) -> String {
+        let view = expand_macro(tokens(markup));
+        let file: syn::File = syn::parse2(quote!(fn view() -> View { #view })).expect("parses");
+        prettyplease::unparse(&file)
+    }
+
+    /// Every `name` ident written as `types::name` (or `command::name`), by position
     fn type_paths(tokens: TokenStream, name: &str, out: &mut Vec<LineColumn>) {
         let trees: Vec<TokenTree> = tokens.into_iter().collect();
         for (i, tree) in trees.iter().enumerate() {
             match tree {
                 TokenTree::Ident(ident) if ident == name && i >= 3 => {
-                    if matches!(&trees[i - 3], TokenTree::Ident(types) if types == "types") {
+                    if matches!(&trees[i - 3], TokenTree::Ident(m) if m == "types" || m == "command")
+                    {
                         out.push(ident.span().start());
                     }
                 }
@@ -3046,12 +2313,11 @@ mod tests {
     }
 
     #[test]
-    fn built_in_tags_keep_their_span() {
-        let input = TokenStream::from_str("<Container>\"Hi\"</Container> <Row></Row>").unwrap();
-        let output = expand_macro(input);
+    fn built_in_tags_are_their_type_at_the_tag() {
+        let output = expand_macro(tokens("<Container>\"Hi\"</Container> <Row></Row>"));
         let mut containers = Vec::new();
         type_paths(output.clone(), "Container", &mut containers);
-        // The opening tag's name (column 1) and the closing tag's (column 17, 0-based), both as the type
+        // The opening tag's name (column 1) and the closing tag's (column 17, 0-based)
         assert!(
             containers.contains(&LineColumn { line: 1, column: 1 }),
             "{containers:?}"
@@ -3076,95 +2342,125 @@ mod tests {
     }
 
     #[test]
-    fn every_tag_is_in_the_table() {
-        let tags = [
-            Tag::Container,
-            Tag::Section,
-            Tag::Text,
-            Tag::Thumbnail,
-            Tag::Gallery,
-            Tag::Item,
-            Tag::File,
-            Tag::Separator,
-            Tag::Row,
-            Tag::Button,
-            Tag::StringSelect,
-            Tag::UserSelect,
-            Tag::RoleSelect,
-            Tag::MentionableSelect,
-            Tag::ChannelSelect,
-            Tag::Option,
-            Tag::Modal,
-            Tag::Label,
-            Tag::TextInput,
-            Tag::RadioGroup,
-            Tag::CheckboxGroup,
-            Tag::Checkbox,
-            Tag::FileUpload,
-        ];
-        assert_eq!(tags.len(), tags::TAGS.len());
-        for tag in tags {
-            let def = tag.def();
-            assert_eq!(Tag::parse(def.name), Some(tag));
-            for alias in def.aliases {
-                assert_eq!(Tag::parse(alias), Some(tag), "{alias}");
-            }
+    fn every_tag_names_its_type() {
+        for name in [
+            "Container",
+            "Section",
+            "Text",
+            "TextDisplay",
+            "Thumbnail",
+            "Gallery",
+            "MediaGallery",
+            "Item",
+            "MediaGalleryItem",
+            "File",
+            "Separator",
+            "Row",
+            "ActionRow",
+            "Button",
+            "StringSelect",
+            "Select",
+            "UserSelect",
+            "RoleSelect",
+            "MentionableSelect",
+            "ChannelSelect",
+            "Option",
+            "Modal",
+            "Label",
+            "TextInput",
+            "RadioGroup",
+            "CheckboxGroup",
+            "Checkbox",
+            "FileUpload",
+        ] {
+            let tag = Tag::parse(name).unwrap_or_else(|| panic!("`{name}` is a tag"));
+            assert!(!tag.ty().is_empty());
         }
     }
 
-    /// What rust-analyzer expands when completing at `$`: the marker identifier in place of the
+    #[test]
+    fn literals_are_joined_and_room_reserved() {
+        let output = expand_macro(tokens("<Text>\"a\" \"b\" {x}</Text> \"c\" \"d\"")).to_string();
+        assert!(output.contains("\"ab\""), "{output}");
+        assert!(output.contains("\"cd\""), "{output}");
+        // 2 bytes of literals and room for one `{..}`
+        assert!(output.contains("reserve (18usize)"), "{output}");
+    }
+
+    #[test]
+    fn errors_point_at_the_offending_token() {
+        assert_error_at(
+            "<Section><Text>\"a\"</Text></Section>",
+            "needs an accessory",
+            "Section",
+        );
+        assert_error_at(
+            "<Row><Button>\"x\"</Button></Row>",
+            "needs `on:click`",
+            "Button",
+        );
+        assert_error_at(
+            "<Modal custom_id=\"m\"><Label text=\"a\"><TextInput name=\"a\"/></Label></Modal>",
+            "needs `title`",
+            "Modal",
+        );
+        assert_error_at("<Container id=1 id=2/>", "duplicate attribute `id`", "id=2");
+        assert_error_at("<Text/><foo/>", "unknown tag `<foo>`", "foo");
+        assert_error_at(
+            "<Row><Button on:select=pick custom_id=\"x\"/></Row>",
+            "answers `on:click`",
+            "on:",
+        );
+    }
+
+    #[test]
+    fn errors_are_deduplicated_and_capped() {
+        let mut errors = Errors::default();
+        let span = Span::call_site();
+        for _ in 0..3 {
+            errors.push(syn::Error::new(span, "same"));
+        }
+        assert_eq!(errors.combined().into_iter().flatten().count(), 1);
+
+        let mut errors = Errors::default();
+        for i in 0..MAX_ERRORS + 4 {
+            errors.push(syn::Error::new(span, format!("error {i}")));
+        }
+        let messages: Vec<String> = errors
+            .combined()
+            .into_iter()
+            .flatten()
+            .map(|error| error.to_string())
+            .collect();
+        assert_eq!(messages.len(), MAX_ERRORS + 1);
+        assert_eq!(messages[MAX_ERRORS], "... and 4 more errors in this markup");
+    }
+
+    #[test]
+    fn tags_being_typed_are_closed_for_the_retry() {
+        let closed =
+            |markup: &str| close_open_tags(tokens(markup)).map(|t| t.to_string().replace(' ', ""));
+        assert_eq!(
+            closed("<Row><Butt</Row>").as_deref(),
+            Some("<Row><Butt/></Row>")
+        );
+        assert_eq!(
+            closed("<Row><Button pri").as_deref(),
+            Some("<Row><Buttonpri/>")
+        );
+        assert_eq!(closed("<Row><Button/></Row>"), None);
+        // A half-typed tag is still generated, so its attributes complete
+        let output = expand_macro(tokens("<Row><Button pri</Row>")).to_string();
+        assert!(output.contains(". pri (true)"), "{output}");
+        // And the markup still fails to compile
+        assert!(!errors("<Row><Button pri</Row>").is_empty());
+    }
+
+    /// What rust-analyzer expands when completing at `$`: its marker identifier in place of the
     /// cursor, in markup that often does not parse
     fn completing(markup: &str) -> String {
         let input = markup.replace('$', "raCompletionMarker");
-        expand_macro(TokenStream::from_str(&input).unwrap())
-            .to_string()
-            .replace(' ', "")
-    }
-
-    #[test]
-    fn tag_names_complete_from_the_tags_module() {
-        for markup in ["<Con$", "<Container><Con$</Container>", "<Row></Ro$"] {
-            let output = completing(markup);
-            assert!(
-                output.contains("use::composure::command::tags::")
-                    && output.contains("raCompletionMarkeras_;"),
-                "{markup}: {output}"
-            );
-        }
-    }
-
-    #[test]
-    fn attribute_names_complete_from_the_tag_module() {
-        for markup in [
-            "<Row><Button pri$</Row>",
-            "<Row><Button pri$ custom_id=\"x\">\"a\"</Button></Row>",
-            "<Row><Button primary custom_id=\"x\" sec$/></Row>",
-        ] {
-            let output = completing(markup);
-            assert!(
-                output.contains("let_=::composure::command::tags::Button::")
-                    && output.contains("raCompletionMarker;"),
-                "{markup}: {output}"
-            );
-        }
-        // Not in a value, an event name or text
-        for (markup, partial) in [
-            ("<Row><Button custom_id=a$>\"a\"</Button></Row>", "a"),
-            ("<Row><Button on:cl$>\"a\"</Button></Row>", "cl"),
-            ("<Text>{x$}</Text>", "x"),
-            (
-                "<Row><Button on:click=move |_| fo$>\"a\"</Button></Row>",
-                "fo",
-            ),
-            (
-                "<Row><Button on:click=move |_| return fo$>\"a\"</Button></Row>",
-                "fo",
-            ),
-        ] {
-            let output = completing(markup);
-            let marker = format!("::{partial}raCompletionMarker");
-            assert!(!output.contains(&marker), "{markup}: {output}");
-        }
+        expand_macro(tokens(&input)).to_string().replace(' ', "")
     }
 
     /// rust-analyzer maps the cursor between the expansions with and without its marker by
@@ -3180,7 +2476,7 @@ mod tests {
             "<Text>{x$}</Text> <Con",
             "<Unknown$ a=1/>",
         ] {
-            let typed = expand_macro(TokenStream::from_str(&markup.replace('$', "")).unwrap())
+            let typed = expand_macro(tokens(&markup.replace('$', "")))
                 .to_string()
                 .replace(' ', "");
             let completing = completing(markup).replace("raCompletionMarker", "");
@@ -3189,20 +2485,39 @@ mod tests {
     }
 
     #[test]
-    fn known_attributes_link_their_docs_even_in_a_tag_with_an_error() {
-        // A button without a handler is an error, so it is not generated
-        let output = completing("<Row><Button primary disabled>\"a\"</Button></Row>");
-        assert!(output.contains("tags::Button::primary;"), "{output}");
-        assert!(output.contains("tags::Button::disabled;"), "{output}");
+    fn snapshot_static_card() {
+        insta::assert_snapshot!(expand(
+            r###"<Container accent_color=0x5865F2>
+                "## " "Components V2"
+                <Section>
+                    <Text>"Beside a thumbnail"</Text>
+                    <Thumbnail src="https://example.com/a.png"/>
+                </Section>
+                <Separator/>
+                <Row><Button primary custom_id="like">"Like"</Button></Row>
+            </Container>"###
+        ));
     }
 
     #[test]
-    fn literal_text_is_folded() {
-        let input = TokenStream::from_str("<Text>\"a\" \"b\"</Text> \"c\" \"d\"").unwrap();
-        let output = expand_macro(input).to_string();
-        assert!(output.contains("\"ab\""), "{output}");
-        assert!(output.contains("\"cd\""), "{output}");
-        // A level without `{..}` or sub-Views is built directly
-        assert!(!output.contains("Children"), "{output}");
+    fn snapshot_dynamic_level() {
+        insta::assert_snapshot!(expand(
+            r###"<Container>
+                "## " {title}
+                {items.iter().map(|item| rsx! { <Text>"- " {*item}</Text> })}
+                <Card title="nested"><Text>"child"</Text></Card>
+                <Row><StringSelect on:select=pick(id) options=Color/></Row>
+            </Container>"###
+        ));
+    }
+
+    #[test]
+    fn snapshot_modal() {
+        insta::assert_snapshot!(expand(
+            r###"<Modal title="Feedback" custom_id="feedback">
+                <Label text="Topic"><TextInput name="topic" max_len=100/></Label>
+                <Label text="Kind"><RadioGroup name="kind" options=Kind/></Label>
+            </Modal>"###
+        ));
     }
 }

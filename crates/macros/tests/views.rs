@@ -5,8 +5,8 @@ use composure::{
     command::{Ephemeral, HandlerError, IntoResponse, ModalView, Update, View, dispatch},
     component, rsx,
     types::{
-        AllowedMentions, ButtonStyle, Component, File, Interaction, InteractionResponse,
-        TextInputStyle,
+        AllowedMentions, ButtonStyle, ChannelType, Component, File, Interaction,
+        InteractionResponse, SelectDefaultValue, SeparatorSpacing, Snowflake, TextInputStyle,
     },
     view,
 };
@@ -467,51 +467,162 @@ fn views_past_discords_limits_are_errors() {
     );
 }
 
-/// Every special attribute, so the macro's table assertions run for each
+/// Every attribute of every built-in tag, so each is checked to be a builder method; the guide
+/// test below reads this markup back. Values are literals, numbers or `{..}`, which it skips.
 #[test]
-fn every_special_attribute_is_in_the_tag_table() {
-    let file = File::new("a.png", vec![1]);
+fn every_attribute_compiles() {
+    let file = || File::new("a.png", vec![1]);
+    // every attribute: begin
     let _ = rsx! {
-        <Section accessory={Component::text("x")}><Text content="c"/></Section>
-        <Separator small/>
-        <Separator large/>
-        <Gallery><Item src="https://example.com/a.png"/><Item url="https://example.com/b.png"/></Gallery>
-        <File url="attachment://a.png"/>
-        <Section><Text>"t"</Text><Thumbnail src={file}/></Section>
-        <Row>
-            <Button primary custom_id="a">"a"</Button>
-            <Button secondary custom_id="b" label="b"/>
-            <Button success custom_id="c">"c"</Button>
-            <Button danger custom_id="d">"d"</Button>
-            <Button style={ButtonStyle::Primary} url="https://example.com">"e"</Button>
-        </Row>
-        <Row>
-            <StringSelect custom_id="s" options=Color min=1 max=2>
-                <Option value="x" label="X"/>
-            </StringSelect>
-        </Row>
+        <Container id=1 accent_color=0x123456 spoiler>
+            <Section id=2 accessory={Component::text("x")}><Text id=3 content="c"/></Section>
+            <Section><Text>"t"</Text><Thumbnail id=4 src={file()} description="d" spoiler/></Section>
+            <Section><Text>"t"</Text><Thumbnail url="https://example.com/a.png"/></Section>
+            <Gallery id=5>
+                <Item src="https://example.com/a.png" description="d" spoiler/>
+                <Item url="https://example.com/b.png"/>
+            </Gallery>
+            <File id=6 src={file()} spoiler/>
+            <File url="attachment://a.png"/>
+            <Separator id=7 small divider=false/>
+            <Separator large spacing={SeparatorSpacing::Small}/>
+            <Row id=8>
+                <Button id=9 primary on:click={count(1)} emoji="👍" disabled=false>"a"</Button>
+                <Button secondary custom_id="b" label="b"/>
+                <Button success custom_id="c">"c"</Button>
+                <Button danger custom_id="d">"d"</Button>
+                <Button style={ButtonStyle::Primary} url="https://example.com">"e"</Button>
+            </Row>
+            <Row><Button sku_id={Snowflake::from_u64(1)}/></Row>
+            <Row>
+                <StringSelect id=10 on:select={count(2)} options=Color placeholder="p" min=1 max=2 disabled=false>
+                    <Option value="x" label="X" description="d" emoji="🎨" default/>
+                </StringSelect>
+            </Row>
+            <Row><StringSelect custom_id="s" min_values=1 max_values=2/></Row>
+            <Row><UserSelect custom_id="u" default_values={vec![SelectDefaultValue::user(Snowflake::from_u64(1))]}/></Row>
+            <Row><RoleSelect custom_id="r"/></Row>
+            <Row><MentionableSelect custom_id="m"/></Row>
+            <Row><ChannelSelect custom_id="c" channel_types={vec![ChannelType::GuildText]}/></Row>
+        </Container>
     };
     let _ = rsx! {
-        <Modal title="t" custom_id="m">
-            <Label text="a"><TextInput name="a" paragraph min_len=1 max_len=2/></Label>
-            <Label label="b"><TextInput name="b" style={TextInputStyle::Short}/></Label>
-            <Label text="c"><RadioGroup name="c" options=Color/></Label>
-            <Label text="d"><CheckboxGroup name="d" options=Color min=0 max=1/></Label>
-            <Label text="e"><FileUpload name="e" min=0 max=1/></Label>
+        <Modal title="t" on:submit={count(3)}>
+            <Label id=11 text="a" description="d">
+                <TextInput id=12 name="a" paragraph min_len=1 max_len=2 placeholder="p" value="v" required/>
+            </Label>
+            <Label label="b"><TextInput name="b" style={TextInputStyle::Short} min_length=1 max_length=2/></Label>
+            <Label text="c"><RadioGroup id=13 name="c" options=Color required/></Label>
+            <Label text="d">
+                <CheckboxGroup id=14 name="d" options=Color min=0 max=1 min_values=0 max_values=1 required/>
+            </Label>
+            <Label text="e">
+                <FileUpload id=15 name="e" min=0 max=1 min_values=0 max_values=1 file_types={vec!["image".to_string()]} required/>
+            </Label>
         </Modal>
     };
     let _ = rsx! {
         <Modal title="t" custom_id="m">
-            <Label text="a"><Checkbox name="a"/></Label>
-            <Label text="b"><UserSelect name="b" min=0 max=1/></Label>
+            <Label text="a"><Checkbox id=16 name="a" default/></Label>
+            <Label text="b"><StringSelect name="b" required=false/></Label>
         </Modal>
     };
+    // every attribute: end
 }
 
-/// The guide's tag reference documents every tag and attribute the macro knows (and so
-/// `composure::command::tags` lists)
+/// The tags in `every_attribute_compiles` and their attributes, read from this file
+fn tags_and_attributes() -> Vec<(String, Vec<String>)> {
+    let source = include_str!("views.rs").replace("\r\n", "\n");
+    let markup = source
+        .split_once("// every attribute: begin")
+        .and_then(|(_, rest)| rest.split_once("// every attribute: end"))
+        .expect("the markup")
+        .0
+        .to_string();
+    let chars: Vec<char> = markup.chars().collect();
+    let mut tags: Vec<(String, Vec<String>)> = Vec::new();
+    let name = |i: &mut usize| {
+        let start = *i;
+        while *i < chars.len() && (chars[*i].is_alphanumeric() || chars[*i] == '_') {
+            *i += 1;
+        }
+        chars[start..*i].iter().collect::<String>()
+    };
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] != '<' || !chars.get(i + 1).is_some_and(|c| c.is_uppercase()) {
+            i += 1;
+            continue;
+        }
+        i += 1;
+        let tag = name(&mut i);
+        let mut attrs = Vec::new();
+        loop {
+            while chars[i].is_whitespace() {
+                i += 1;
+            }
+            if chars[i] == '>' || chars[i] == '/' {
+                break;
+            }
+            let attr = name(&mut i);
+            // `on:click=..`: the `on` attribute
+            while chars[i] == ':' {
+                i += 1;
+                name(&mut i);
+            }
+            attrs.push(attr);
+            if chars[i] == '=' {
+                i += 1;
+                match chars[i] {
+                    '"' => {
+                        i += 1;
+                        while chars[i] != '"' {
+                            i += 1;
+                        }
+                        i += 1;
+                    }
+                    '{' => {
+                        let mut depth = 0;
+                        loop {
+                            match chars[i] {
+                                '{' => depth += 1,
+                                '}' => depth -= 1,
+                                _ => {}
+                            }
+                            i += 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                    }
+                    _ => {
+                        while !chars[i].is_whitespace() && chars[i] != '>' && chars[i] != '/' {
+                            i += 1;
+                        }
+                    }
+                }
+            }
+        }
+        match tags.iter_mut().find(|(t, _)| *t == tag) {
+            Some((_, known)) => {
+                for attr in attrs {
+                    if !known.contains(&attr) {
+                        known.push(attr);
+                    }
+                }
+            }
+            None => tags.push((tag, attrs)),
+        }
+    }
+    tags
+}
+
+/// The guide's tag reference documents every tag and attribute (`every_attribute_compiles` uses
+/// each, so each is a builder method)
 #[test]
 fn the_guide_documents_every_tag_and_attribute() {
+    let tags = tags_and_attributes();
+    assert_eq!(tags.len(), 23, "every built-in tag: {tags:?}");
     let guide = include_str!("../../../book/src/views.md").replace("\r\n", "\n");
     let reference = guide
         .split_once("## Tag reference")
@@ -533,10 +644,10 @@ fn the_guide_documents_every_tag_and_attribute() {
             .copied()
             .unwrap_or_else(|| panic!("no section for `<{tag}>`"))
     };
-    for (tag, attrs) in composure::command::tags::ALL {
+    for (tag, attrs) in &tags {
         let mut text = section(tag).to_string();
         // Sections that say "as <StringSelect>" or "every input below"
-        match *tag {
+        match tag.as_str() {
             "UserSelect" | "RoleSelect" | "MentionableSelect" | "ChannelSelect" => {
                 text += section("StringSelect")
             }
@@ -545,8 +656,8 @@ fn the_guide_documents_every_tag_and_attribute() {
             }
             _ => {}
         }
-        for attr in *attrs {
-            let documented = match *attr {
+        for attr in attrs {
+            let documented = match attr.as_str() {
                 "id" => intro.contains("`id`"),
                 "on" => text.contains("`on:"),
                 attr => text.contains(&format!("`{attr}`")) || text.contains(&format!("`{attr}=")),

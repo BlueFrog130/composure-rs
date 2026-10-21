@@ -32,7 +32,6 @@ mod group;
 mod handler;
 mod meta;
 mod modal;
-mod tags;
 mod view;
 
 /// Makes a unit struct an App: the Interaction Handler routing to the Commands, Groups, Component
@@ -302,8 +301,13 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 /// need the markup to be in a `#[view]`. A `<Section>`'s `<Button>` or `<Thumbnail>` child is
 /// its accessory. Wrap attribute values that use `<..>` in braces.
 ///
-/// Every error in the markup is reported, not just the first. A tag with an error is left out
-/// and the rest still expands (to `View::default()` when nothing parsed), so `{..}` blocks keep
+/// As Leptos's `view!` does, markup expands to builder calls: a tag is its type's `builder()`
+/// (`Container::builder()`), each attribute a method (`.accent_color(..)`), each child a
+/// `.child(..)` whose bound says where it may go (`RowChild`, ...), then `.build()`. So the
+/// compiler checks attributes and placement and the IDE completes and documents them.
+///
+/// Every error in the markup is reported, not just the first, each at the offending token. The
+/// rest still expands (to an empty View when nothing parsed), so `{..}` blocks keep
 /// type-checking and completing in incomplete markup. Discord's limits the markup shows (5
 /// buttons in a row, 3 texts in a section, 5 children in a modal, 25 options) are compile
 /// errors; the rest are checked when the View is answered with or sent.
@@ -368,11 +372,4 @@ pub fn view(args: TokenStream, item: TokenStream) -> TokenStream {
     view::expand_attr(args.into(), item.into())
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
-}
-
-/// `composure::command::tags`, generated from the tag table; invoked once by `composure`
-#[doc(hidden)]
-#[proc_macro]
-pub fn __view_tags(_input: TokenStream) -> TokenStream {
-    tags::expand_module().into()
 }

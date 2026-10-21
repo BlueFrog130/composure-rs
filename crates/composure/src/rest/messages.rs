@@ -483,8 +483,8 @@ mod tests {
 
     #[test]
     fn create_message_from_a_view() {
-        use crate::command::{MarkupRoot, View, ViewError, custom_id::CustomIdError};
-        use crate::types::Component;
+        use crate::command::{View, ViewError, custom_id::CustomIdError};
+        use crate::types::{ButtonComponent, Component};
 
         let c = BotClient::new(MockTransport::default(), "t", Snowflake::from_u64(1));
         let channel = Snowflake::from_u64(5);
@@ -506,9 +506,13 @@ mod tests {
         assert!(body.contains(r#""flags":32768"#), "{body}");
 
         // A View that cannot be sent fails before any request
-        let mut root = MarkupRoot::default();
-        let _ = root.id(Err(CustomIdError::TooLong(120)));
-        let broken = root.view(vec![]);
+        let broken = View::builder()
+            .child(
+                ButtonComponent::builder()
+                    .custom_id(Err(CustomIdError::TooLong(120)))
+                    .build(),
+            )
+            .build();
         assert_eq!(
             CreateMessage::try_from(&broken).unwrap_err(),
             ViewError::CustomId(CustomIdError::TooLong(120))

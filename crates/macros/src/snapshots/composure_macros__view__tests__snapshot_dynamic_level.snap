@@ -1,0 +1,72 @@
+---
+source: crates/macros/src/view.rs
+expression: "expand(r###\"<Container>\n                \"## \" {title}\n                {items.iter().map(|item| rsx! { <Text>\"- \" {*item}</Text> })}\n                <Card title=\"nested\"><Text>\"child\"</Text></Card>\n                <Row><StringSelect on:select=pick(id) options=Color/></Row>\n            </Container>\"###)"
+---
+fn view() -> View {
+    {
+        let __view = {
+            #[allow(unused_braces)]
+            {
+                ::composure::command::View::builder()
+                    .reserve(1usize)
+                    .child({
+                        {
+                            let _: ::composure::types::Container;
+                            ::composure::types::Container::builder()
+                                .reserve(5usize)
+                                .child("## ")
+                                .child({ title })
+                                .child({
+                                    items
+                                        .iter()
+                                        .map(|item| {
+                                            rsx! {
+                                                < Text > "- " { * item } </ Text >
+                                            }
+                                        })
+                                })
+                                .child({
+                                    {
+                                        #[allow(unused_imports)]
+                                        use ::composure::command::elements::*;
+                                        Card::builder()
+                                    }
+                                        .title("nested")
+                                        .children(
+                                            ::composure::command::View::builder()
+                                                .reserve(1usize)
+                                                .child({
+                                                    {
+                                                        let _: ::composure::types::TextDisplay;
+                                                        ::composure::types::TextDisplay::builder()
+                                                            .child("child")
+                                                            .build()
+                                                    }
+                                                })
+                                                .build(),
+                                        )
+                                        .build()
+                                })
+                                .child({
+                                    {
+                                        let _: ::composure::types::ActionRow;
+                                        ::composure::types::ActionRow::builder()
+                                            .reserve(1usize)
+                                            .child({
+                                                ::composure::types::StringSelect::builder()
+                                                    .on_select(pick::custom_id(id))
+                                                    .options::<Color>()
+                                                    .build()
+                                            })
+                                            .build()
+                                    }
+                                })
+                                .build()
+                        }
+                    })
+                    .build()
+            }
+        };
+        __view
+    }
+}

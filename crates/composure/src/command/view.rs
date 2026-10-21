@@ -29,7 +29,7 @@ use crate::types::{
 };
 
 use super::{
-    CommandOutput, ComponentCtx, HandlerError, IntoResponse, ModalChoice, ModalCtx, Update,
+    CommandOutput, ComponentCtx, Extras, HandlerError, IntoResponse, ModalChoice, ModalCtx, Update,
     custom_id::CustomIdError, limits,
 };
 
@@ -44,11 +44,8 @@ use super::{
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct View {
-    components: Vec<Component>,
-    files: Vec<File>,
-    flags: MessageFlags,
-    allowed_mentions: Option<Box<AllowedMentions>>,
-    error: Option<CustomIdError>,
+    pub(crate) components: Vec<Component>,
+    pub(crate) extras: Extras,
 }
 
 impl Default for View {
@@ -62,10 +59,7 @@ impl View {
     pub fn new(components: Vec<Component>) -> Self {
         Self {
             components,
-            files: Vec::new(),
-            flags: MessageFlags::empty(),
-            allowed_mentions: None,
-            error: None,
+            extras: Extras::default(),
         }
     }
 
@@ -77,52 +71,52 @@ impl View {
     /// The files uploaded with the message: added with [`file`](Self::file), or by `<File>`,
     /// `<Thumbnail>` and `<Item>` given a [`File`]
     pub fn files(&self) -> &[File] {
-        &self.files
+        self.extras.files()
     }
 
     /// The message flags set with [`ephemeral`](Self::ephemeral) and
     /// [`suppress_notifications`](Self::suppress_notifications); `IS_COMPONENTS_V2` is added
     /// when the message is sent
     pub fn flags(&self) -> MessageFlags {
-        self.flags
+        self.extras.flags()
     }
 
     /// Only the invoking user sees the message. Ignored when it updates a message, whose
     /// ephemerality cannot change.
     pub fn ephemeral(mut self) -> Self {
-        self.flags |= MessageFlags::Ephemeral;
+        self.extras.inner().flags |= MessageFlags::Ephemeral;
         self
     }
 
     /// The message does not trigger push and desktop notifications
     pub fn suppress_notifications(mut self) -> Self {
-        self.flags |= MessageFlags::SuppressNotifications;
+        self.extras.inner().flags |= MessageFlags::SuppressNotifications;
         self
     }
 
     /// Who the message may ping
     pub fn allowed_mentions(mut self, allowed_mentions: AllowedMentions) -> Self {
-        self.allowed_mentions = Some(Box::new(allowed_mentions));
+        self.extras.inner().allowed_mentions = Some(allowed_mentions);
         self
     }
 
     /// Uploads `file` with the message; show it with `<File url="attachment://<name>">`, or give
     /// the `File` to `<File>` directly
     pub fn file(mut self, file: File) -> Self {
-        self.files.push(file);
+        self.extras.inner().files.push(file);
         self
     }
 
     #[cfg_attr(not(feature = "rest"), allow(dead_code))]
     pub(crate) fn mentions(&self) -> Option<&AllowedMentions> {
-        self.allowed_mentions.as_deref()
+        self.extras.mentions()
     }
 
     /// The flags a REST body sends: `IS_COMPONENTS_V2`, plus ephemeral where the Endpoint takes
     /// it
     #[cfg_attr(not(feature = "rest"), allow(dead_code))]
     pub(crate) fn message_flags(&self, ephemeral: bool) -> MessageFlags {
-        let flags = MessageFlags::IsComponentsV2 | self.flags;
+        let flags = MessageFlags::IsComponentsV2 | self.extras.flags();
         if ephemeral {
             flags
         } else {
@@ -133,7 +127,7 @@ impl View {
     /// Whether the View can be sent: its `custom_id`s were built and it is within Discord's
     /// [limits](crate::types::limits)
     pub fn check(&self) -> Result<(), ViewError> {
-        if let Some(error) = &self.error {
+        if let Some(error) = self.extras.custom_id_error() {
             return Err(ViewError::CustomId(error.clone()));
         }
         limits::check_message(&self.components)
@@ -143,7 +137,7 @@ impl View {
     /// View through REST with the bodies' `TryFrom<&View>` (`CreateMessage::try_from(&view)`)
     /// instead.
     pub fn into_components(self) -> Result<Vec<Component>, CustomIdError> {
-        match self.error {
+        match self.extras.into_inner().error {
             Some(error) => Err(error),
             None => Ok(self.components),
         }
@@ -154,9 +148,10 @@ impl View {
     pub fn into_message_data(self) -> Result<MessageCallbackData, ViewError> {
         self.check()?;
         let mut data = MessageCallbackData::components_v2(self.components);
-        data.flags = Some(MessageFlags::IsComponentsV2 | self.flags);
-        data.allowed_mentions = self.allowed_mentions.map(|mentions| *mentions);
-        data.files = self.files;
+        let extras = self.extras.into_inner();
+        data.flags = Some(MessageFlags::IsComponentsV2 | extras.flags);
+        data.allowed_mentions = extras.allowed_mentions;
+        data.files = extras.files;
         Ok(data)
     }
 }
@@ -232,8 +227,8 @@ impl From<CustomIdError> for ViewError {
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct ModalView {
-    data: ModalCallbackData,
-    error: Option<CustomIdError>,
+    pub(crate) data: ModalCallbackData,
+    pub(crate) error: Option<CustomIdError>,
 }
 
 impl ModalView {
@@ -273,141 +268,21 @@ impl IntoResponse for ModalView {
     }
 }
 
-#[cfg(feature = "macros")]
-composure_macros::__view_tags!();
-
-/// What one `rsx!` invocation collects besides its components, shared by every markup level:
-/// the first `custom_id` error, files to upload, and the flags and mentions of placed Views
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct MarkupRoot {
-    files: Vec<File>,
-    flags: MessageFlags,
-    allowed_mentions: Option<Box<AllowedMentions>>,
-    error: Option<CustomIdError>,
-}
-
-impl Default for MarkupRoot {
-    fn default() -> Self {
-        Self {
-            files: Vec::new(),
-            flags: MessageFlags::empty(),
-            allowed_mentions: None,
-            error: None,
-        }
-    }
-}
-
-impl MarkupRoot {
-    /// A `custom_id`, or an empty one with the error kept
-    pub fn id(&mut self, custom_id: Result<String, CustomIdError>) -> String {
-        custom_id.unwrap_or_else(|error| {
-            self.error.get_or_insert(error);
-            String::new()
-        })
-    }
-
-    /// A media URL, registering a [`File`] to upload
-    pub fn media(&mut self, media: impl IntoMedia) -> String {
-        media.into_media(self)
-    }
-
-    /// Takes over a placed View's files, flags, mentions and error, returning its components
-    fn merge(&mut self, view: View) -> Vec<Component> {
-        if self.error.is_none() {
-            self.error = view.error;
-        }
-        self.files.extend(view.files);
-        self.flags |= view.flags;
-        if self.allowed_mentions.is_none() {
-            self.allowed_mentions = view.allowed_mentions;
-        }
-        view.components
-    }
-
-    pub fn view(self, components: Vec<Component>) -> View {
-        View {
-            components,
-            files: self.files,
-            flags: self.flags,
-            allowed_mentions: self.allowed_mentions,
-            error: self.error,
-        }
-    }
-
-    pub fn modal(self, mut data: ModalCallbackData, components: Vec<Component>) -> ModalView {
-        data.components = Some(components);
-        ModalView {
-            data,
-            error: self.error,
-        }
-    }
-}
-
-/// Components being collected by `rsx!` for one level of markup with `{..}` children or placed
-/// Views: adjacent text joins into one [`TextDisplay`](crate::types::TextDisplay). Levels known
-/// at compile time skip it and build their `Vec` directly.
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct Children<'r> {
-    components: Vec<Component>,
-    text: Option<String>,
-    root: &'r mut MarkupRoot,
-}
-
-impl<'r> Children<'r> {
-    pub fn new(root: &'r mut MarkupRoot) -> Self {
-        Self {
-            components: Vec::new(),
-            text: None,
-            root,
-        }
-    }
-
-    /// The invocation's [`MarkupRoot`]
-    pub fn root(&mut self) -> &mut MarkupRoot {
-        self.root
-    }
-
-    pub fn text(&mut self, text: &str) {
-        self.text.get_or_insert_with(String::new).push_str(text);
-    }
-
-    pub fn component(&mut self, component: Component) {
-        self.flush();
-        self.components.push(component);
-    }
-
-    fn flush(&mut self) {
-        if let Some(text) = self.text.take() {
-            self.components.push(Component::text(text));
-        }
-    }
-
-    /// The level's components
-    pub fn finish(mut self) -> Vec<Component> {
-        self.flush();
-        self.components
-    }
-}
-
-/// What a `{expr}` in `rsx!` markup can be: text (strings, numbers), components, Views and
-/// Props, and `Option`s, `Vec`s, arrays and iterator adapters (`map`, `filter`, ...) of those.
+/// What renders to a [`View`]: a View, or a `#[view]`'s Props. Placed in markup, its
+/// components go in place and its files, flags and mentions join the enclosing View.
 #[diagnostic::on_unimplemented(
-    message = "`{Self}` cannot be placed in `rsx!` markup",
-    note = "use text (&str, String, numbers), a Component, a View, a #[view]'s Props, or an Option, Vec, or iterator of them; collect other iterators into a Vec"
+    message = "`{Self}` is not a View",
+    label = "not a View",
+    note = "a View is `rsx!`'s output or a #[view]'s Props"
 )]
-pub trait IntoChildren {
-    /// Adds `self` to the markup level being built
-    fn push_into(self, children: &mut Children<'_>);
+pub trait IntoView {
+    /// The View
+    fn into_view(self) -> View;
 }
 
-/// Its components in place; its files, flags and mentions go to the enclosing View
-impl IntoChildren for View {
-    fn push_into(self, children: &mut Children<'_>) {
-        for component in children.root.merge(self) {
-            children.component(component);
-        }
+impl IntoView for View {
+    fn into_view(self) -> View {
+        self
     }
 }
 
@@ -420,71 +295,42 @@ impl IntoChildren for View {
 )]
 pub trait IntoMedia {
     /// The media's URL; a file is registered on the View being built
-    fn into_media(self, root: &mut MarkupRoot) -> String;
+    fn into_media(self, extras: &mut Extras) -> String;
 }
 
 impl IntoMedia for &str {
-    fn into_media(self, _root: &mut MarkupRoot) -> String {
+    fn into_media(self, _extras: &mut Extras) -> String {
         self.to_string()
     }
 }
 
 impl IntoMedia for String {
-    fn into_media(self, _root: &mut MarkupRoot) -> String {
+    fn into_media(self, _extras: &mut Extras) -> String {
         self
     }
 }
 
 impl IntoMedia for &String {
-    fn into_media(self, _root: &mut MarkupRoot) -> String {
+    fn into_media(self, _extras: &mut Extras) -> String {
         self.clone()
     }
 }
 
 /// Uploaded with the message, shown as `attachment://<name>`
 impl IntoMedia for File {
-    fn into_media(self, root: &mut MarkupRoot) -> String {
+    fn into_media(self, extras: &mut Extras) -> String {
         let url = format!("attachment://{}", self.name);
-        root.files.push(self);
+        extras.inner().files.push(self);
         url
     }
 }
 
 /// An attachment Discord already has, by its URL
 impl IntoMedia for &Attachment {
-    fn into_media(self, _root: &mut MarkupRoot) -> String {
+    fn into_media(self, _extras: &mut Extras) -> String {
         self.url.clone()
     }
 }
-
-impl IntoChildren for Component {
-    fn push_into(self, children: &mut Children<'_>) {
-        children.component(self);
-    }
-}
-
-macro_rules! into_children_component {
-    ($($ty:ty),*) => {$(
-        impl IntoChildren for $ty {
-            fn push_into(self, children: &mut Children<'_>) {
-                children.component(self.into());
-            }
-        }
-    )*};
-}
-
-into_children_component!(
-    crate::types::ActionRow,
-    crate::types::ButtonComponent,
-    crate::types::Container,
-    crate::types::Section,
-    crate::types::TextDisplay,
-    crate::types::Thumbnail,
-    crate::types::MediaGallery,
-    crate::types::FileComponent,
-    crate::types::Separator,
-    crate::types::Label
-);
 
 /// What a `{expr}` in text-only markup (`<Text>`, a button label, an option) can be: strings,
 /// numbers, and `Option`s of them; call `.to_string()` on other `Display` types
@@ -552,118 +398,6 @@ text!(
     Snowflake,
     std::fmt::Arguments<'_>
 );
-
-macro_rules! into_children_text {
-    ($($ty:ty),*) => {$(
-        impl IntoChildren for $ty {
-            fn push_into(self, children: &mut Children<'_>) {
-                let text = children.text.get_or_insert_with(::std::string::String::new);
-                IntoText::push_text(self, text);
-            }
-        }
-    )*};
-}
-
-into_children_text!(
-    &str,
-    String,
-    &String,
-    char,
-    u8,
-    u16,
-    u32,
-    u64,
-    u128,
-    usize,
-    i8,
-    i16,
-    i32,
-    i64,
-    i128,
-    isize,
-    f32,
-    f64,
-    Snowflake,
-    std::fmt::Arguments<'_>
-);
-
-impl<T: IntoChildren> IntoChildren for Option<T> {
-    fn push_into(self, children: &mut Children<'_>) {
-        if let Some(child) = self {
-            child.push_into(children);
-        }
-    }
-}
-
-impl<T: IntoChildren> IntoChildren for Vec<T> {
-    fn push_into(self, children: &mut Children<'_>) {
-        for child in self {
-            child.push_into(children);
-        }
-    }
-}
-
-impl<T: IntoChildren, const N: usize> IntoChildren for [T; N] {
-    fn push_into(self, children: &mut Children<'_>) {
-        for child in self {
-            child.push_into(children);
-        }
-    }
-}
-
-macro_rules! into_children_iter {
-    ($($ty:ident<$($param:ident),*>),*) => {$(
-        impl<$($param),*> IntoChildren for ::core::iter::$ty<$($param),*>
-        where
-            ::core::iter::$ty<$($param),*>: Iterator<Item: IntoChildren>,
-        {
-            fn push_into(self, children: &mut Children<'_>) {
-                for child in self {
-                    child.push_into(children);
-                }
-            }
-        }
-    )*};
-}
-
-into_children_iter!(
-    Map<I, F>,
-    Filter<I, P>,
-    FilterMap<I, F>,
-    Chain<A, B>,
-    Take<I>,
-    Skip<I>,
-    Rev<I>,
-    Once<T>
-);
-
-impl<I: Iterator, U: IntoIterator<Item: IntoChildren>, F: FnMut(I::Item) -> U> IntoChildren
-    for ::core::iter::FlatMap<I, U, F>
-{
-    fn push_into(self, children: &mut Children<'_>) {
-        for child in self {
-            child.push_into(children);
-        }
-    }
-}
-
-impl<I: Iterator<Item: IntoIterator<Item: IntoChildren>>> IntoChildren
-    for ::core::iter::Flatten<I>
-{
-    fn push_into(self, children: &mut Children<'_>) {
-        for child in self {
-            child.push_into(children);
-        }
-    }
-}
-
-impl<T: IntoChildren> IntoChildren for std::vec::IntoIter<T> {
-    fn push_into(self, children: &mut Children<'_>) {
-        for child in self {
-            child.push_into(children);
-        }
-    }
-}
 
 /// An attribute value in `rsx!` markup, converted to the component field's type: `"text"` for
 /// a `String` or `Option<String>`, a `T` for an `Option<T>`, an emoji as `"👍"`.

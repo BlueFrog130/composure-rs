@@ -7,9 +7,5 @@ error: open tag has no corresponding close tag
 error[E0599]: no method named `missing` found for type `u32` in the current scope
  --> tests/ui/view_unclosed_tag.rs:6:22
   |
-5 |       let _ = rsx! {
-  |  _____________-
-6 | |         <Text>{count.missing()}</Text>
-  | |                     -^^^^^^^ method not found in `u32`
-  | |_____________________|
-  |
+6 |         <Text>{count.missing()}</Text>
+  |                      ^^^^^^^ method not found in `u32`

@@ -30,3 +30,6 @@ trybuild = "1"
 serde = { version = "1.0.229", features = ["derive"] }
 # Line/column of spans outside a compiler, for the span tests
 proc-macro2 = { version = "1", features = ["span-locations"] }
+# Expansion snapshots (src/snapshots), as Leptos's `view!` keeps them
+insta = "1"
+prettyplease = "0.3"

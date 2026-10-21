@@ -135,13 +135,14 @@ Text cannot go in a `<Row>`. Bare words without quotes are a compile error
 
 ### Expressions
 
-`{expr}` evaluates Rust inside markup. Where components can go, the value is anything
-implementing [`IntoChildren`](https://docs.rs/composure/latest/composure/command/trait.IntoChildren.html):
+`{expr}` evaluates Rust inside markup. Where components can go, the value is anything the
+parent takes (each parent has a trait, like
+[`ContainerChild`](https://docs.rs/composure/latest/composure/command/trait.ContainerChild.html) or [`RowChild`](https://docs.rs/composure/latest/composure/command/trait.RowChild.html)):
 
 | Value | Becomes |
 |---|---|
 | `&str`, `String`, `&String`, `char`, integers, floats, [`Snowflake`](https://docs.rs/composure/latest/composure/types/struct.Snowflake.html), `format_args!(..)` | text, joined with adjacent text |
-| [`Component`](https://docs.rs/composure/latest/composure/types/enum.Component.html) and every component struct ([`Container`](https://docs.rs/composure/latest/composure/types/struct.Container.html), [`ButtonComponent`](https://docs.rs/composure/latest/composure/types/struct.ButtonComponent.html), ...) | that component |
+| [`Component`](https://docs.rs/composure/latest/composure/types/enum.Component.html), and the component structs the parent takes ([`ButtonComponent`](https://docs.rs/composure/latest/composure/types/struct.ButtonComponent.html) in a `<Row>`, ...) | that component |
 | [`View`](https://docs.rs/composure/latest/composure/command/struct.View.html), a `#[view]`'s Props | its components, in place |
 | `Option<T>` | nothing for `None` |
 | `Vec<T>`, arrays, iterator adapters (`map`, `filter`, `filter_map`, `flat_map`, `flatten`, `chain`, `take`, `skip`, `rev`, `once`, `vec::IntoIter`) | each item in order |
@@ -175,15 +176,22 @@ Attributes are written `name=value`; the value is a Rust expression (a literal, 
 call, a block `{..}`). A bare attribute is `true`: `<Button disabled>` is
 `<Button disabled=true>`. Each attribute may appear once.
 
-Apart from the few attributes a tag handles itself (marked *special* in the
-[reference](#tag-reference): `url`, `on:click`, the style flags, ...), every attribute sets
-the field of the same name on the component's struct. That means:
+As in [Leptos](https://leptos.dev)'s `view!`, markup is a chain of builder calls: a tag is its
+type's `builder()` (`<Container>` is
+[`Container::builder()`](https://docs.rs/composure/latest/composure/types/struct.Container.html#method.builder)), each attribute a method of the
+builder ([`ContainerBuilder::accent_color`](https://docs.rs/composure/latest/composure/command/struct.ContainerBuilder.html#method.accent_color)), each child
+a `.child(..)`, then `.build()`. That means:
 
-- every public field of the component's type is an attribute, including `id`
-- the value is converted with [`IntoAttr`](https://docs.rs/composure/latest/composure/command/trait.IntoAttr.html): a `&str` works for a
-  `String` or `Option<String>` field, a `T` for an `Option<T>` field, `"👍"` for an emoji
-- an attribute the type does not have is a compile error naming the type
-  (`no field `colour` on type `Container``)
+- the builder's methods are the attributes, each documented; your editor completes and
+  documents them as you type
+- values are converted with [`IntoAttr`](https://docs.rs/composure/latest/composure/command/trait.IntoAttr.html): a `&str` works for a
+  `String` or `Option<String>`, a `T` for an `Option<T>`, `"👍"` for an emoji
+- an attribute the tag does not have is a compile error from the compiler
+  (`no method named `colour` found for struct `ContainerBuilder``, with the closest name)
+- so is a child where Discord does not allow it (`` `&str` cannot go in a `<Row>` ``), pointing
+  at the child
+
+The builders also work by hand, outside markup.
 
 Values that contain `<..>` (generics, closures with typed parameters) must be wrapped in
 braces, or the markup parser reads `<` as a tag: `options={Vec::<SelectOption>::new()}`.
@@ -194,17 +202,17 @@ braces, or the markup parser reads `<` as a tag: `options={Vec::<SelectOption>::
 
 ### Errors
 
-`rsx!` reports every error in the markup at once, not just the first: a misplaced tag, a bad
-attribute, an unclosed or mismatched tag. A tag with an error is left out and the rest is still
-expanded, so the `{..}` blocks around it keep type-checking, and rust-analyzer keeps completing
-them while a tag is half-typed. A `#[view]` with markup errors still gets its Props, builder and
-handlers, so code using the View doesn't report errors of its own.
+`rsx!` reports every error in the markup at once, not just the first: a missing attribute,
+an unclosed or mismatched tag; and the compiler reports misplaced tags and unknown attributes.
+Each error points at the token that caused it, and repeats of the same error are dropped. The
+markup is still expanded, so the `{..}` blocks around a mistake keep type-checking. A `#[view]`
+with markup errors still gets its Props, builder and handlers, so code using the View doesn't
+report errors of its own.
 
-Built-in tags expand to their types at the tag's own span, so hovering `<Container>` (or
-`</Container>`) shows the type's docs and go-to-definition opens it. rust-analyzer also completes
-tag names and the special attributes (`<Button pri` offers `primary`) and shows their docs on
-hover, from a hidden module the macro refers to; field attributes complete and document as the
-fields they set.
+Your editor sees the builders: hovering `<Container>` (or `</Container>`) shows the type's
+docs and go-to-definition opens it, attributes complete and show their docs like methods, and a
+tag being typed (`<Con`, even inside another tag) completes from the built-in tags and the
+sub-Views in scope.
 
 ## View functions
 
@@ -236,7 +244,7 @@ The macro keeps the function body and adds:
 - a **builder**, `Progress::builder().label("Build").done(3).build()`, which is what markup
   uses. Setters take anything [`IntoAttr`](https://docs.rs/composure/latest/composure/command/trait.IntoAttr.html) converts, and leaving out
   a required Prop is a compile error.
-- [`IntoResponse`](https://docs.rs/composure/latest/composure/command/trait.IntoResponse.html), [`IntoChildren`](https://docs.rs/composure/latest/composure/command/trait.IntoChildren.html),
+- [`IntoResponse`](https://docs.rs/composure/latest/composure/command/trait.IntoResponse.html), [`IntoView`](https://docs.rs/composure/latest/composure/command/trait.IntoView.html),
   [`Rerender`](https://docs.rs/composure/latest/composure/command/trait.Rerender.html) for the Props, and the
   [`ViewHandler`](https://docs.rs/composure/latest/composure/command/trait.ViewHandler.html) running its inline handlers.
 
