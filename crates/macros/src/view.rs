@@ -41,9 +41,13 @@ pub fn expand_macro(input: TokenStream) -> TokenStream {
     let mut gen_ = Gen::new(None);
     let view = gen_.view(input);
     let errors = gen_.errors.into_compile_error();
+    // The errors last: their text can name what is being typed, and rust-analyzer maps its
+    // completion cursor between expansions by offset (see `completion_refs`)
+    let v = Ident::new("__view", Span::mixed_site());
     quote! {{
+        let #v = #view;
         #errors
-        #view
+        #v
     }}
 }
 
@@ -687,9 +691,10 @@ impl Gen {
     /// `ModalView` when nothing did), so `{..}` blocks keep type-checking in incomplete markup
     fn view(&mut self, tokens: TokenStream) -> TokenStream {
         let parser = rstml::Parser::new(rstml::ParserConfig::new().recover_block(true));
-        let completion = completion_refs(tokens.clone());
+        let raw = tokens.clone();
         let (nodes, diagnostics) = parser.parse_recoverable(tokens).split_vec();
         let incomplete = !diagnostics.is_empty();
+        let completion = completion_refs(raw, incomplete);
         for diagnostic in diagnostics {
             // Each spanned child becomes its own `error:`; rstml's notes ("treating all inputs
             // after open tag as it content") only add noise, its helps point at the open tag
@@ -2165,11 +2170,17 @@ fn attr_docs(nodes: &[Node], out: &mut TokenStream) {
     }
 }
 
-/// The identifier rust-analyzer inserts at the cursor to complete in a macro (`raCompletionMarker`;
-/// older versions `intellijRulezz`)
-fn is_completion_marker(ident: &Ident) -> bool {
-    let name = ident.to_string();
-    name.contains("raCompletionMarker") || name.contains("intellijRulezz")
+/// The identifier rust-analyzer inserts at the cursor to complete in a macro (older versions
+/// `intellijRulezz`)
+const COMPLETION_MARKERS: [&str; 2] = ["raCompletionMarker", "intellijRulezz"];
+
+/// What was typed at `ident`, without rust-analyzer's completion marker
+fn typed(ident: &Ident) -> String {
+    let mut name = ident.to_string();
+    for marker in COMPLETION_MARKERS {
+        name = name.replace(marker, "");
+    }
+    name
 }
 
 /// Keywords an expression continues after, so a word after them is in an attribute's value
@@ -2178,11 +2189,17 @@ const KEYWORDS: &[&str] = &[
     "return", "unsafe", "while",
 ];
 
-/// When rust-analyzer expands the markup to complete at a cursor, a path into
-/// `composure::command::tags` holding the marker identifier, so the tags (after `<`) or the tag's
-/// attributes (inside an open tag) are offered. Read from the raw tokens, since half-typed markup
-/// often does not parse. Nothing is emitted outside completion.
-fn completion_refs(tokens: TokenStream) -> TokenStream {
+/// Paths into `composure::command::tags` for names being typed, so rust-analyzer completes them:
+/// `<Con` (in markup that does not parse yet) gets `use tags::Con as _;`, which offers the tags;
+/// `<Button pri` gets `let _ = tags::Button::pri;`, which offers that tag's special attributes
+/// (field attributes complete through the field they set). Read from the raw tokens, since
+/// half-typed markup often does not parse.
+///
+/// rust-analyzer completes by expanding the macro again with a marker identifier at the cursor
+/// (`priraCompletionMarker`) and maps the cursor between the two expansions by offset, so both
+/// must expand alike: the marker is ignored here, and the errors (whose text can name what is
+/// typed) come after all the code.
+fn completion_refs(tokens: TokenStream, incomplete: bool) -> TokenStream {
     let trees: Vec<TokenTree> = tokens.into_iter().collect();
     let punct =
         |i: usize, c: char| matches!(trees.get(i), Some(TokenTree::Punct(p)) if p.as_char() == c);
@@ -2190,15 +2207,21 @@ fn completion_refs(tokens: TokenStream) -> TokenStream {
     for (i, tree) in trees.iter().enumerate() {
         let ident = match tree {
             TokenTree::Group(group) => {
-                out.extend(completion_refs(group.stream()));
+                out.extend(completion_refs(group.stream(), incomplete));
                 continue;
             }
-            TokenTree::Ident(ident) if is_completion_marker(ident) => ident,
+            TokenTree::Ident(ident) => ident,
             _ => continue,
         };
-        // A tag name: `<Con|`, `</Con|`
+        let name = typed(ident);
+        if name.is_empty() {
+            continue;
+        }
+        // A tag name: `<Con`, `</Con`
         if i >= 1 && (punct(i - 1, '<') || (i >= 2 && punct(i - 1, '/') && punct(i - 2, '<'))) {
-            out.extend(quote!(use ::composure::command::tags::#ident as _;));
+            if incomplete && tags::find(&name).is_none() && tags::starts(&name) {
+                out.extend(quote!(use ::composure::command::tags::#ident as _;));
+            }
             continue;
         }
         // An attribute name follows the tag name or a whole attribute (`custom_id="x"`, `{..}`,
@@ -2221,6 +2244,8 @@ fn completion_refs(tokens: TokenStream) -> TokenStream {
         });
         if let Some(Some(tag)) = open
             && let Some(def) = tags::find(&tag)
+            && !def.has(&name)
+            && def.starts_special(&name)
         {
             let module = Ident::new(def.name, Span::call_site());
             out.extend(quote!(let _ = ::composure::command::tags::#module::#ident;));
@@ -2692,7 +2717,6 @@ pub fn expand_attr(args: TokenStream, item: TokenStream) -> syn::Result<TokenStr
     let errors = std::mem::take(&mut gen_.errors).into_compile_error();
 
     Ok(quote! {
-        #errors
 
 
         #[allow(non_snake_case)]
@@ -2738,6 +2762,8 @@ pub fn expand_attr(args: TokenStream, item: TokenStream) -> syn::Result<TokenStr
 
         #handler
         #route
+
+        #errors
     })
 }
 
@@ -3109,9 +3135,8 @@ mod tests {
     fn attribute_names_complete_from_the_tag_module() {
         for markup in [
             "<Row><Button pri$</Row>",
-            "<Row><Button $</Row>",
             "<Row><Button pri$ custom_id=\"x\">\"a\"</Button></Row>",
-            "<Row><Button primary custom_id=\"x\" dis$/></Row>",
+            "<Row><Button primary custom_id=\"x\" sec$/></Row>",
         ] {
             let output = completing(markup);
             assert!(
@@ -3137,6 +3162,27 @@ mod tests {
             let output = completing(markup);
             let marker = format!("::{partial}raCompletionMarker");
             assert!(!output.contains(&marker), "{markup}: {output}");
+        }
+    }
+
+    /// rust-analyzer maps the cursor between the expansions with and without its marker by
+    /// offset, so they may differ only by the marker
+    #[test]
+    fn the_completion_marker_changes_nothing_else() {
+        for markup in [
+            "<Con$",
+            "<Row><Butt$</Row>",
+            "<Row><Button pri$ custom_id=\"x\">\"a\"</Button></Row>",
+            "<Row><Button pri$</Row>",
+            "<Container acc$>\"a\"</Container>",
+            "<Text>{x$}</Text> <Con",
+            "<Unknown$ a=1/>",
+        ] {
+            let typed = expand_macro(TokenStream::from_str(&markup.replace('$', "")).unwrap())
+                .to_string()
+                .replace(' ', "");
+            let completing = completing(markup).replace("raCompletionMarker", "");
+            assert_eq!(typed, completing, "{markup}");
         }
     }
 

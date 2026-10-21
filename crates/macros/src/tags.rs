@@ -514,9 +514,25 @@ impl TagDef {
     pub fn has(&self, attr: &str) -> bool {
         self.attrs.iter().any(|a| a.name == attr)
     }
+
+    /// Whether `partial` starts a special attribute's name. Field names complete through the
+    /// field assignment the attribute expands to, without the second error a reference to a
+    /// missing item adds.
+    pub fn starts_special(&self, partial: &str) -> bool {
+        self.attrs
+            .iter()
+            .any(|a| !a.field && a.name.starts_with(partial))
+    }
 }
 
-/// `composure::command::tags`: one module per tag with one const per attribute, all documented,
+/// Whether `partial` starts a tag's name (or an alias's)
+pub fn starts(partial: &str) -> bool {
+    TAGS.iter().any(|tag| {
+        tag.name.starts_with(partial) || tag.aliases.iter().any(|a| a.starts_with(partial))
+    })
+}
+
+/// `composure::command::tags`: one module per tag with one unit struct per attribute, all documented,
 /// plus `ALL` for the guide's consistency test and an exhaustive pattern per type, so a field
 /// added to a component fails to compile until it is listed here
 pub fn expand_module() -> TokenStream {
@@ -530,7 +546,7 @@ pub fn expand_module() -> TokenStream {
             let doc = attr.doc;
             quote! {
                 #[doc = #doc]
-                pub const #ident: () = ();
+                pub struct #ident;
             }
         });
         let ty = Ident::new(tag.ty, Span::call_site());
@@ -544,7 +560,7 @@ pub fn expand_module() -> TokenStream {
         let check = format_ident!("__fields_{}", tag.name);
         modules.extend(quote! {
             #[doc = #doc]
-            #[allow(non_snake_case, non_upper_case_globals)]
+            #[allow(non_snake_case, non_camel_case_types)]
             pub mod #name {
                 #(#consts)*
             }
@@ -572,7 +588,8 @@ pub fn expand_module() -> TokenStream {
         pub mod tags {
             #modules
 
-            /// Each tag and its attributes
+            /// Each tag and its attributes (hidden, so completion offers only the tags)
+            #[doc(hidden)]
             pub const ALL: &[(&str, &[&str])] = &[#(#all),*];
         }
     }
