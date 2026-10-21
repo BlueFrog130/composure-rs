@@ -10,7 +10,9 @@ use crate::{
     },
 };
 
-use super::{CommandOutput, Ctx, HandlerError, IntoResponse, Theme, response::check_components_v2};
+use super::{
+    CommandOutput, Ctx, ErrorRenderer, HandlerError, IntoResponse, response::check_components_v2,
+};
 use crate::trace::Instrument;
 
 /// Background Work handed to the Adapter: runs after the response is sent; an `Err` is logged.
@@ -104,11 +106,10 @@ impl<'a, S: Platform, D: Clone + Send + Sync + 'static> Ctx<'a, S, D> {
         F: FnOnce(DeferredCtx<S, D>) -> Fut,
         Fut: Future<Output: CommandOutput> + Send + 'static,
     {
-        let theme = self.configured_theme();
+        let errors = self.errors();
         let ctx = DeferredCtx {
             interaction: Arc::clone(self.shared_interaction()),
             state: self.state().clone(),
-            theme,
         };
         let client = ctx.client();
         let output = work(ctx);
@@ -117,7 +118,7 @@ impl<'a, S: Platform, D: Clone + Send + Sync + 'static> Ctx<'a, S, D> {
         let span = info_span!("background_work");
         let work = async move {
             debug!("background work started");
-            let result = complete(client, output, theme, on_error).await;
+            let result = complete(client, output, errors, on_error).await;
             #[cfg(feature = "tracing")]
             match &result {
                 Ok(()) => debug!("background work done"),
@@ -147,30 +148,26 @@ enum Target {
 async fn complete<T: Transport>(
     client: InteractionClient<T>,
     output: impl Future<Output: CommandOutput> + Send,
-    theme: Option<&'static Theme>,
+    errors: ErrorRenderer,
     on_error: Target,
 ) -> Result<(), HandlerError> {
     let error = match output.await.into_result().and_then(|response| {
         check_components_v2(&response)?;
         Ok(response)
     }) {
-        Ok(response) => return send(&client, response, theme, Target::Original).await,
+        Ok(response) => return send(&client, response, Target::Original).await,
         Err(error) => error,
     };
-    send(&client, error.response_with(theme), theme, on_error).await?;
+    send(&client, errors(&error), on_error).await?;
     Err(error)
 }
 
-/// Themes `response` and sends its message as an edit of the original response or a follow-up
+/// Sends `response`'s message as an edit of the original response or a follow-up
 async fn send<T: Transport>(
     client: &InteractionClient<T>,
-    mut response: InteractionResponse,
-    theme: Option<&'static Theme>,
+    response: InteractionResponse,
     target: Target,
 ) -> Result<(), HandlerError> {
-    if let Some(theme) = theme {
-        theme.apply(&mut response);
-    }
     let Some(data) = response.into_message_data() else {
         return Ok(());
     };
@@ -276,7 +273,6 @@ impl IntoResponse for DeferredUpdate {
 pub struct DeferredCtx<S, D = ApplicationCommandInteractionData> {
     interaction: Arc<DataInteraction<D>>,
     state: S,
-    theme: Option<&'static Theme>,
 }
 
 impl<S: Clone, D> Clone for DeferredCtx<S, D> {
@@ -284,7 +280,6 @@ impl<S: Clone, D> Clone for DeferredCtx<S, D> {
         Self {
             interaction: self.interaction.clone(),
             state: self.state.clone(),
-            theme: self.theme,
         }
     }
 }
@@ -303,11 +298,6 @@ impl<S: Platform, D> DeferredCtx<S, D> {
     /// Platform resources passed through by the Adapter
     pub fn state(&self) -> &S {
         &self.state
-    }
-
-    /// The App's colors and branding; [`Theme::DEFAULT`] when the App has none
-    pub fn theme(&self) -> &'static Theme {
-        self.theme.unwrap_or(&Theme::DEFAULT)
     }
 
     /// The invoking user, in guilds and DMs alike
@@ -476,50 +466,47 @@ mod tests {
         assert_eq!(platform.transport.sleeps(), [Duration::from_millis(250)]);
     }
 
-    const THEME: Theme = Theme::new().with_primary(0x123456).with_footer("Bot", None);
-
-    #[test]
-    fn themed_defer_fills_in_the_edit() {
-        let platform = TestPlatform::default();
-        let interaction = interaction();
-        let ctx = Ctx::new(&interaction, &platform).with_theme(Some(&THEME));
-        let _ = ctx.defer(async |ctx| {
-            assert_eq!(ctx.theme(), &THEME);
-            crate::types::Embed::new().with_title("done")
-        });
-        platform.run().unwrap();
-        let (_, body) = &platform.edits()[0];
-        assert_eq!(body["embeds"][0]["color"], 0x123456);
-        assert_eq!(body["embeds"][0]["footer"]["text"], "Bot");
+    /// An [`ErrorRenderer`] answering with a Container
+    fn render(error: &HandlerError) -> InteractionResponse {
+        crate::types::Container::new(vec![crate::types::Component::text(error.user_message())])
+            .with_accent_color(0xff0000)
+            .into_response()
     }
 
     #[test]
-    fn themed_defer_fills_container_accents_and_keeps_v2() {
+    fn deferred_container_keeps_v2() {
         let platform = TestPlatform::default();
         let interaction = interaction();
-        let ctx = Ctx::new(&interaction, &platform).with_theme(Some(&THEME));
+        let ctx = Ctx::new(&interaction, &platform);
         let _ = Ephemeral(ctx.defer(async |_| {
             crate::types::Container::new(vec![crate::types::Component::text("done")])
         }));
         platform.run().unwrap();
         let (_, body) = &platform.edits()[0];
         assert_eq!(body["components"][0]["type"], 17);
-        assert_eq!(body["components"][0]["accent_color"], 0x123456);
         assert_eq!(body["flags"], MessageFlags::IsComponentsV2.bits());
         assert_eq!(body.get("content"), None);
     }
 
     #[test]
-    fn themed_defer_errors_are_error_embeds() {
+    fn deferred_errors_use_the_apps_renderer() {
         let platform = TestPlatform::default();
         let interaction = interaction();
-        let ctx = Ctx::new(&interaction, &platform).with_theme(Some(&THEME));
+        let ctx = Ctx::new(&interaction, &platform).with_errors(render);
         let _ = ctx.defer(async |_| Err::<String, _>(HandlerError::user("nope")));
         assert!(platform.run().is_err());
         let (_, body) = &platform.edits()[0];
-        assert_eq!(body["embeds"][0]["color"], Theme::DEFAULT.error);
-        assert_eq!(body["embeds"][0]["description"], "nope");
-        assert_eq!(body.get("flags"), None);
+        assert_eq!(body["components"][0]["accent_color"], 0xff0000);
+        assert_eq!(body["components"][0]["components"][0]["content"], "nope");
+        assert_eq!(body["flags"], MessageFlags::IsComponentsV2.bits());
+
+        // Without one: the ephemeral text of `HandlerError::response`
+        let platform = TestPlatform::default();
+        let ctx = Ctx::new(&interaction, &platform);
+        let _ = ctx.defer(async |_| Err::<String, _>(HandlerError::user("nope")));
+        assert!(platform.run().is_err());
+        let (_, body) = &platform.edits()[0];
+        assert_eq!(body["content"], "nope");
     }
 
     fn component() -> Arc<crate::types::MessageComponentInteraction> {

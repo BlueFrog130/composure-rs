@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::Theme;
+use super::{ErrorRenderer, HandlerError};
 use crate::types::{
     ApplicationCommandInteractionData, DataInteraction, Entitlement, Member, MessageComponentData,
     ModalSubmitData, Snowflake, User,
@@ -12,7 +12,7 @@ pub struct Ctx<'a, S = (), D = ApplicationCommandInteractionData> {
     /// Shared so deferred work keeps the Interaction without copying it
     interaction: &'a Arc<DataInteraction<D>>,
     state: &'a S,
-    theme: Option<&'static Theme>,
+    errors: ErrorRenderer,
 }
 
 /// [`Ctx`] of a Component Handler: the clicked component's data (custom_id, select values)
@@ -30,32 +30,27 @@ impl<S, D> Clone for Ctx<'_, S, D> {
 impl<S, D> Copy for Ctx<'_, S, D> {}
 
 impl<'a, S, D> Ctx<'a, S, D> {
-    /// A context for `interaction` with the Adapter's `state`, without a theme. Dispatch builds
-    /// these; build one by hand to call a handler directly.
+    /// A context for `interaction` with the Adapter's `state`, rendering errors with
+    /// [`HandlerError::response`]. Dispatch builds these; build one by hand to call a handler
+    /// directly.
     pub fn new(interaction: &'a Arc<DataInteraction<D>>, state: &'a S) -> Self {
         Self {
             interaction,
             state,
-            theme: None,
+            errors: HandlerError::response,
         }
     }
 
-    /// This Ctx with the App's theme; `None` leaves responses unthemed
-    pub fn with_theme(mut self, theme: Option<&'static Theme>) -> Self {
-        self.theme = theme;
+    /// This Ctx with the App's [`ErrorRenderer`], for errors from deferred work
+    pub fn with_errors(mut self, errors: ErrorRenderer) -> Self {
+        self.errors = errors;
         self
     }
 
-    /// The App's colors and branding: `ctx.theme().success("Saved")`.
-    /// [`Theme::DEFAULT`] when the App has none.
-    pub fn theme(&self) -> &'static Theme {
-        self.theme.unwrap_or(&Theme::DEFAULT)
-    }
-
-    /// The App's theme, `None` when it has none
+    /// The App's [`ErrorRenderer`]
     #[cfg(feature = "rest")]
-    pub(crate) fn configured_theme(&self) -> Option<&'static Theme> {
-        self.theme
+    pub(crate) fn errors(&self) -> ErrorRenderer {
+        self.errors
     }
 
     /// The Interaction being answered: ids, token, user, member, guild, channel, data

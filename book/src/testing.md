@@ -32,8 +32,8 @@ assert_eq!(echo("ab", Some(2)), "abab");
 ## Running an Interaction
 
 [`testing::answer`](https://docs.rs/composure/latest/composure/testing/fn.answer.html) runs an App the
-way an Adapter does: route the Interaction, call the handler, apply the Theme, and answer an error
-with the ephemeral message users would see. Build the Interaction with the module's builders, and
+way an Adapter does: route the Interaction, call the handler, and answer an error the way the
+App renders errors (an ephemeral message by default). Build the Interaction with the module's builders, and
 read the response with [`ResponseExt`](https://docs.rs/composure/latest/composure/testing/trait.ResponseExt.html):
 
 ```rust

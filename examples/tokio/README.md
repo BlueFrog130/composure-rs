@@ -4,7 +4,7 @@
 [![Guide](https://img.shields.io/badge/guide-mdBook-blue?logo=mdbook)](https://bluefrog130.github.io/composure-rs/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
 
-Serves the [example bot](../bot)'s shared commands from a plain process with [`composure_adapter_tokio`](../../crates/adapters/tokio) (an HTTP server on tokio, each Interaction on its own task), plus what only a server has. `src/lib.rs` declares its App with `#[app(handlers(Bot, file, uptime, primes), theme = THEME)] pub struct TokioBot;`; [`src/main.rs`](src/main.rs) serves it with a `Server` as the `Host` data.
+Serves the [example bot](../bot)'s shared commands from a plain process with [`composure_adapter_tokio`](../../crates/adapters/tokio) (an HTTP server on tokio, each Interaction on its own task), plus what only a server has. `src/lib.rs` declares its App with `#[app(handlers(Bot, file, uptime, primes))] pub struct TokioBot;`; [`src/main.rs`](src/main.rs) serves it with a `Server` as the `Host` data.
 
 [`src/server.rs`](src/server.rs): the server's disk, process and threads, through `Ctx<Host<Server>>`
 
@@ -12,7 +12,7 @@ Serves the [example bot](../bot)'s shared commands from a plain process with [`c
 |---|---|
 | `/file` | Reading the local filesystem with `tokio::fs`, sandboxed to `FILES_DIR` (default [`files/`](files)); `#[autocomplete]` listing the directory; text inline, long or binary files attached |
 | `/uptime` | Process data handed to `with_data` (`Server::started`), the process id and the runtime's worker threads |
-| `/primes` | A Deferred Response: `ctx.defer(..)` answers "thinking..." at once, then Background Work (a tokio task shutdown waits for) edits in progress, runs the sieve on `tokio::task::spawn_blocking`, and replaces the reply with a themed success embed |
+| `/primes` | A Deferred Response: `ctx.defer(..)` answers "thinking..." at once, then Background Work (a tokio task shutdown waits for) edits in progress, runs the sieve on `tokio::task::spawn_blocking`, and replaces the reply with a success embed in the bot's style |
 
 ## Run locally
 

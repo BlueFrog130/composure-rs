@@ -12,7 +12,7 @@ use composure::{
         ResponseExt, TestKey, TestPlatform, json_response, users,
     },
 };
-use composure_example_bot::{Bot, Config, THEME};
+use composure_example_bot::{Bot, Config, style};
 use serde_json::{Value, json};
 
 /// Discord, answering the reads the example makes
@@ -73,7 +73,7 @@ fn chat_input_commands() {
     );
     let embed = &response.embeds()[0];
     assert_eq!(embed["title"], "1 x Mint chip");
-    assert_eq!(embed["color"], THEME.primary);
+    assert_eq!(embed["color"], style::PRIMARY);
     assert_eq!(embed["footer"]["text"], "composure example");
 
     assert_eq!(text(testing::command("greet")), "Howdy from Composure!");
@@ -87,7 +87,7 @@ fn group_and_context_menu_commands() {
     let response = testing::answer(&Bot, ban, &platform());
     let error = &response.embeds()[0];
     assert_eq!(error["description"], "You can't ban yourself.");
-    assert_eq!(error["color"], THEME.error);
+    assert_eq!(error["color"], style::ERROR);
     assert_eq!(error["footer"]["text"], "composure example");
     assert!(response.is_ephemeral());
 
@@ -98,7 +98,7 @@ fn group_and_context_menu_commands() {
     let response = testing::answer(&Bot, ban, &platform());
     let embed = &response.embeds()[0];
     assert_eq!(embed["description"], "Would ban Bob (spam)");
-    assert_eq!(embed["color"], THEME.warning);
+    assert_eq!(embed["color"], style::WARNING);
     assert!(response.is_ephemeral());
 
     let mut alice = users::alice();
@@ -235,11 +235,11 @@ fn files_upload_as_multipart() {
 }
 
 #[test]
-fn errors_become_ephemeral_themed_embeds() {
+fn errors_become_ephemeral_styled_embeds() {
     let response = testing::answer(&Bot, testing::command("nope"), &platform());
     let error = &response.embeds()[0];
     assert_eq!(error["description"], "Unknown command.");
-    assert_eq!(error["color"], THEME.error);
+    assert_eq!(error["color"], style::ERROR);
     assert!(response.is_ephemeral());
 
     // `text` is required
@@ -275,14 +275,14 @@ fn buttons_carry_state_in_the_custom_id() {
 }
 
 #[test]
-fn components_v2_card_is_themed_and_updates_in_place() {
+fn components_v2_card_keeps_its_accent_and_updates_in_place() {
     let response = testing::answer(&Bot, testing::command("card"), &platform());
     let data = &response.json()["data"];
     assert_eq!(data["flags"], 1 << 15, "IS_COMPONENTS_V2");
     assert_eq!(data.get("content"), None);
     let container = &data["components"][0];
     assert_eq!(container["type"], 17);
-    assert_eq!(container["accent_color"], THEME.primary);
+    assert_eq!(container["accent_color"], style::PRIMARY);
     assert_eq!(container["components"][0]["accessory"]["style"], 5);
     assert_eq!(container["components"][2]["content"], "-# 0 likes");
     assert_eq!(
@@ -294,7 +294,7 @@ fn components_v2_card_is_themed_and_updates_in_place() {
     assert_eq!(response.response_type(), 7);
     let container = &response.json()["data"]["components"][0];
     assert_eq!(container["components"][2]["content"], "-# 3 likes");
-    assert_eq!(container["accent_color"], THEME.primary);
+    assert_eq!(container["accent_color"], style::PRIMARY);
     assert_eq!(
         container["components"][3]["components"][1]["custom_id"],
         "card:review:3"

@@ -21,7 +21,7 @@ rstml = { version = "0.13.1", default-features = false }
 syn = { version = "3", features = ["full", "visit-mut"] }
 
 [dev-dependencies]
-composure = { path = "../composure", features = ["macros"] }
+composure = { path = "../composure", features = ["macros", "testing"] }
 futures = { version = "0.3.34", default-features = false, features = [
 	"executor",
 ] }

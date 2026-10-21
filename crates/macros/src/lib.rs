@@ -40,7 +40,7 @@ mod view;
 /// ```ignore
 /// /// Everything the bot serves
 /// #[app(handlers(ping, echo, Admin, counter_click, on_feedback, Card, Moderation),
-///       theme = THEME, events = MyEvents)]
+///       events = MyEvents, errors = render_error)]
 /// pub struct Bot;
 /// ```
 ///
@@ -49,14 +49,16 @@ mod view;
 ///   listed handles (components, modals, autocomplete, commands) to `handler`
 /// - Apps nest: a module can declare its own `#[app]` next to its handlers and be listed in the
 ///   root one
-/// - `theme = THEME` (a `Theme` constant): fills in unset colors and branding on this App's
-///   responses; a nested App's own Theme wins for its Routes, the outer one fills in the rest
 /// - `events = MyEvents` (a unit struct implementing `EventHandler`): handles Webhook Events;
 ///   at most one App in a tree sets it
+/// - `errors = render_error` (a `fn(&HandlerError) -> InteractionResponse`, an `ErrorRenderer`):
+///   the response handler errors are answered with, here and from deferred work, instead of
+///   `HandlerError::response`'s ephemeral text; at most one App in a tree sets it, and the
+///   root uses it for the whole tree
 ///
 /// Two Commands with the same name and type, two handlers with the same `custom_id` prefix, more
-/// Commands than Discord allows in one Scope, or a placed sub-View with handlers that is not
-/// listed fail to compile.
+/// Commands than Discord allows in one Scope, a placed sub-View with handlers that is not
+/// listed, or two Apps setting `events` (or `errors`) fail to compile.
 #[proc_macro_attribute]
 pub fn app(args: TokenStream, item: TokenStream) -> TokenStream {
     app::expand(args.into(), item.into())

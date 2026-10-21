@@ -4,7 +4,7 @@
 [![Guide](https://img.shields.io/badge/guide-mdBook-blue?logo=mdbook)](https://bluefrog130.github.io/composure-rs/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
 
-Serves the [example bot](../bot)'s shared commands from a Worker with `CloudflareInteractionBot`, plus what only Workers has, and a cron trigger using the Bot Client outside Interactions. `src/lib.rs` declares its App with `#[app(handlers(Bot, Note), theme = THEME)] pub struct CloudflareBot;`.
+Serves the [example bot](../bot)'s shared commands from a Worker with `CloudflareInteractionBot`, plus what only Workers has, and a cron trigger using the Bot Client outside Interactions. `src/lib.rs` declares its App with `#[app(handlers(Bot, Note))] pub struct CloudflareBot;`.
 
 [`src/notes.rs`](src/notes.rs): Workers KV
 

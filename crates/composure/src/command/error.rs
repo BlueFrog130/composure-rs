@@ -2,7 +2,19 @@ use std::fmt;
 
 use crate::types::InteractionResponse;
 
-use super::{Ephemeral, IntoResponse, Theme};
+/// Renders a handler's error as the response the user gets instead of Discord's "interaction
+/// failed": [`HandlerError::response`] unless an App sets `#[app(errors = ..)]`
+///
+/// ```
+/// use composure::{command::HandlerError, types::{Component, Container, InteractionResponse}};
+///
+/// fn render(error: &HandlerError) -> InteractionResponse {
+///     let message = Container::new(vec![Component::text(error.user_message())]).with_accent_color(0xf38ba8);
+///     InteractionResponse::respond_with_components(vec![message.into()])
+/// }
+/// # let _: composure::command::ErrorRenderer = render;
+/// ```
+pub type ErrorRenderer = fn(&HandlerError) -> InteractionResponse;
 
 /// Why an Interaction could not be answered normally. Adapters log it and answer with
 /// [`HandlerError::response`] instead.
@@ -123,22 +135,15 @@ impl HandlerError {
         }
     }
 
-    /// The ephemeral message the invoking user sees instead of Discord's "interaction failed"
+    /// The ephemeral message the invoking user sees instead of Discord's "interaction failed",
+    /// with [`user_message`](Self::user_message): the [`ErrorRenderer`] Apps use by default
     pub fn response(&self) -> InteractionResponse {
-        self.response_with(None)
+        InteractionResponse::respond_with_ephemeral_message(self.user_message().to_string())
     }
 
-    /// [`HandlerError::response`], as an [`Theme::error`] embed when there is a theme. Adapters
-    /// pass the handler's [`InteractionHandler::theme`](super::InteractionHandler::theme).
-    pub fn response_with(&self, theme: Option<&Theme>) -> InteractionResponse {
-        let message = self.user_message();
-        match theme {
-            Some(theme) => Ephemeral(theme.error(message)).into_response(),
-            None => InteractionResponse::respond_with_ephemeral_message(message.to_string()),
-        }
-    }
-
-    fn user_message(&self) -> &str {
+    /// What the invoking user should read: the message of [`HandlerError::user`] errors, a
+    /// generic one otherwise (the details are for the logs)
+    pub fn user_message(&self) -> &str {
         match self.kind {
             ErrorKind::User => &self.message,
             ErrorKind::UnknownCommand => "Unknown command.",

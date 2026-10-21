@@ -10,8 +10,8 @@ use crate::types::{
 };
 
 use super::{
-    Command, CommandDefinition, ComponentHandler, Ctx, EventCtx, HandlerError, Invocation,
-    ModalHandler, ScopedDefinition, Theme, ViewHandler, ViewInfo, custom_id,
+    Command, CommandDefinition, ComponentHandler, Ctx, ErrorRenderer, EventCtx, HandlerError,
+    Invocation, ModalHandler, ScopedDefinition, ViewHandler, ViewInfo, custom_id,
     set::{scope_eq, str_eq},
 };
 
@@ -45,6 +45,8 @@ pub enum RouteInfo {
         routes: &'static [RouteInfo],
         /// Whether this App sets `events`
         events: bool,
+        /// Whether this App sets `errors`
+        errors: bool,
     },
 }
 
@@ -77,7 +79,7 @@ impl RouteInfo {
     /// Whether this App or one it lists sets `events`
     pub const fn has_events(&self) -> bool {
         match self {
-            Self::App { routes, events } => *events || count(routes, &Query::Events) > 0,
+            Self::App { routes, events, .. } => *events || count(routes, &Query::Events) > 0,
             _ => false,
         }
     }
@@ -94,16 +96,17 @@ pub trait RouteDefinition {
     /// What it is, for the App's compile-time checks
     const ROUTE: RouteInfo;
 
-    /// An App's `theme`; `None` for everything else
-    const THEME: Option<&'static Theme> = None;
+    /// The `errors` renderer an App sets, or one an App it lists (at any depth) sets; `None` for
+    /// everything else
+    const ERRORS: Option<ErrorRenderer> = None;
 
     /// Appends the Command Definitions of this Route (and of the Routes an App lists), for Sync
     fn definitions(_into: &mut Vec<ScopedDefinition>) {}
 }
 
 /// Answers the Interactions routed to it, or `None` when they are not its own. Every method
-/// defaults to `None`; each kind of Route overrides the ones it answers. `theme` is the one of
-/// the closest App listing it.
+/// defaults to `None`; each kind of Route overrides the ones it answers. `errors` is the root App's
+/// [`ErrorRenderer`], for Background Work that fails after the response.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be routed with State `{S}`",
     label = "listed in an `#[app]` served with State `{S}`"
@@ -113,7 +116,7 @@ pub trait Route<S>: RouteDefinition {
     fn dispatch(
         _interaction: &Arc<ApplicationCommandInteraction>,
         _state: &S,
-        _theme: Option<&'static Theme>,
+        _errors: ErrorRenderer,
     ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
         async { None }
     }
@@ -122,7 +125,7 @@ pub trait Route<S>: RouteDefinition {
     fn dispatch_autocomplete(
         _interaction: &Arc<ApplicationCommandInteraction>,
         _state: &S,
-        _theme: Option<&'static Theme>,
+        _errors: ErrorRenderer,
     ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
         async { None }
     }
@@ -131,7 +134,7 @@ pub trait Route<S>: RouteDefinition {
     fn dispatch_component(
         _interaction: &Arc<MessageComponentInteraction>,
         _state: &S,
-        _theme: Option<&'static Theme>,
+        _errors: ErrorRenderer,
     ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
         async { None }
     }
@@ -140,7 +143,7 @@ pub trait Route<S>: RouteDefinition {
     fn dispatch_modal(
         _interaction: &Arc<ModalSubmitInteraction>,
         _state: &S,
-        _theme: Option<&'static Theme>,
+        _errors: ErrorRenderer,
     ) -> impl Future<Output = Option<Result<InteractionResponse, HandlerError>>> + Send {
         async { None }
     }
@@ -190,7 +193,7 @@ pub type __Routed = Option<Result<InteractionResponse, HandlerError>>;
 pub async fn __dispatch_command<C: Command<S>, S: Sync>(
     interaction: &Arc<ApplicationCommandInteraction>,
     state: &S,
-    theme: Option<&'static Theme>,
+    errors: ErrorRenderer,
 ) -> Option<Result<InteractionResponse, HandlerError>> {
     let data = &interaction.data;
     if data.name != C::NAME || data.t != C::KIND {
@@ -198,7 +201,7 @@ pub async fn __dispatch_command<C: Command<S>, S: Sync>(
     }
     Some(
         outlined(C::invoke(
-            Invocation::new(interaction, state).with_theme(theme),
+            Invocation::new(interaction, state).with_errors(errors),
         ))
         .await,
     )
@@ -209,14 +212,14 @@ pub async fn __dispatch_command<C: Command<S>, S: Sync>(
 pub async fn __dispatch_autocomplete<C: Command<S>, S: Sync>(
     interaction: &Arc<ApplicationCommandInteraction>,
     state: &S,
-    theme: Option<&'static Theme>,
+    errors: ErrorRenderer,
 ) -> Option<Result<InteractionResponse, HandlerError>> {
     let data = &interaction.data;
     if data.name != C::NAME || data.t != C::KIND {
         return None;
     }
     outlined(C::autocomplete(
-        Invocation::new(interaction, state).with_theme(theme),
+        Invocation::new(interaction, state).with_errors(errors),
     ))
     .await
 }
@@ -226,7 +229,7 @@ pub async fn __dispatch_autocomplete<C: Command<S>, S: Sync>(
 pub async fn __dispatch_component<H: ComponentHandler<S>, S: Sync>(
     interaction: &Arc<MessageComponentInteraction>,
     state: &S,
-    theme: Option<&'static Theme>,
+    errors: ErrorRenderer,
 ) -> Option<Result<InteractionResponse, HandlerError>> {
     let (prefix, fields) = custom_id::split(&interaction.data.custom_id);
     if prefix != H::PREFIX {
@@ -234,7 +237,7 @@ pub async fn __dispatch_component<H: ComponentHandler<S>, S: Sync>(
     }
     Some(
         outlined(H::invoke(
-            Ctx::new(interaction, state).with_theme(theme),
+            Ctx::new(interaction, state).with_errors(errors),
             fields,
         ))
         .await,
@@ -246,7 +249,7 @@ pub async fn __dispatch_component<H: ComponentHandler<S>, S: Sync>(
 pub async fn __dispatch_modal<H: ModalHandler<S>, S: Sync>(
     interaction: &Arc<ModalSubmitInteraction>,
     state: &S,
-    theme: Option<&'static Theme>,
+    errors: ErrorRenderer,
 ) -> Option<Result<InteractionResponse, HandlerError>> {
     let (prefix, fields) = custom_id::split(&interaction.data.custom_id);
     if prefix != H::PREFIX {
@@ -254,7 +257,7 @@ pub async fn __dispatch_modal<H: ModalHandler<S>, S: Sync>(
     }
     Some(
         outlined(H::invoke(
-            Ctx::new(interaction, state).with_theme(theme),
+            Ctx::new(interaction, state).with_errors(errors),
             fields,
         ))
         .await,
@@ -266,14 +269,14 @@ pub async fn __dispatch_modal<H: ModalHandler<S>, S: Sync>(
 pub async fn __dispatch_view_component<V: ViewHandler<S>, S: Sync>(
     interaction: &Arc<MessageComponentInteraction>,
     state: &S,
-    theme: Option<&'static Theme>,
+    errors: ErrorRenderer,
 ) -> Option<Result<InteractionResponse, HandlerError>> {
     let (prefix, fields) = custom_id::split(&interaction.data.custom_id);
     if prefix != V::INFO.prefix {
         return None;
     }
     outlined(V::component(
-        Ctx::new(interaction, state).with_theme(theme),
+        Ctx::new(interaction, state).with_errors(errors),
         fields,
     ))
     .await
@@ -284,41 +287,41 @@ pub async fn __dispatch_view_component<V: ViewHandler<S>, S: Sync>(
 pub async fn __dispatch_view_modal<V: ViewHandler<S>, S: Sync>(
     interaction: &Arc<ModalSubmitInteraction>,
     state: &S,
-    theme: Option<&'static Theme>,
+    errors: ErrorRenderer,
 ) -> Option<Result<InteractionResponse, HandlerError>> {
     let (prefix, fields) = custom_id::split(&interaction.data.custom_id);
     if prefix != V::INFO.prefix {
         return None;
     }
     outlined(V::modal(
-        Ctx::new(interaction, state).with_theme(theme),
+        Ctx::new(interaction, state).with_errors(errors),
         fields,
     ))
     .await
 }
 
-/// An App's theme filled into a response one of its Routes gave, before the Apps around it fill
-/// in what it left unset
+/// The [`ErrorRenderer`] of `R`'s tree: the `errors` an App in it sets, else
+/// [`HandlerError::response`]
 #[doc(hidden)]
-pub fn __themed(
-    mut result: Option<Result<InteractionResponse, HandlerError>>,
-    theme: Option<&'static Theme>,
-) -> Option<Result<InteractionResponse, HandlerError>> {
-    if let (Some(theme), Some(Ok(response))) = (theme, &mut result) {
-        theme.apply(response);
+pub const fn __errors<R: RouteDefinition + ?Sized>() -> ErrorRenderer {
+    match R::ERRORS {
+        Some(render) => render,
+        None => HandlerError::response,
     }
-    result
 }
 
 /// Compile-time checks for an App and every App it lists: no two Commands share a name and
 /// type, no Scope exceeds Discord's per-type limit, no two handlers share a `custom_id` prefix,
 /// sub-Views with handlers that listed Views place are listed too, and at most one App sets
-/// `events`. Used by `#[app]`.
+/// `events`, and at most one `errors`. Used by `#[app]`.
 #[doc(hidden)]
 pub const fn check_app(app: &RouteInfo) {
     let root = std::slice::from_ref(app);
     if count(root, &Query::Events) > 1 {
         panic!("more than one App sets `events`: a bot has one events URL");
+    }
+    if count(root, &Query::Errors) > 1 {
+        panic!("more than one App sets `errors`: a bot renders its errors one way");
     }
     check_routes(root, root);
 }
@@ -398,6 +401,8 @@ enum Query<'a> {
     View(&'a str),
     /// Apps setting `events`
     Events,
+    /// Apps setting `errors`
+    Errors,
 }
 
 /// How many Routes in the tree match `query`
@@ -406,9 +411,17 @@ const fn count(routes: &[RouteInfo], query: &Query) -> usize {
     let mut i = 0;
     while i < routes.len() {
         let hit = match (&routes[i], query) {
-            (RouteInfo::App { routes, events }, _) => {
+            (
+                RouteInfo::App {
+                    routes,
+                    events,
+                    errors,
+                },
+                _,
+            ) => {
                 n += count(routes, query);
-                *events && matches!(query, Query::Events)
+                (*events && matches!(query, Query::Events))
+                    || (*errors && matches!(query, Query::Errors))
             }
             (RouteInfo::Command { name, kind, .. }, Query::Command(other, other_kind)) => {
                 *kind as u8 == *other_kind as u8 && str_eq(name, other)

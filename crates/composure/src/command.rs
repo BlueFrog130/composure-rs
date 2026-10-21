@@ -33,7 +33,6 @@ mod platform;
 mod response;
 mod route;
 mod set;
-mod theme;
 mod view;
 
 pub use autocomplete::*;
@@ -50,5 +49,4 @@ pub use platform::*;
 pub use response::*;
 pub use route::*;
 pub use set::*;
-pub use theme::*;
 pub use view::*;

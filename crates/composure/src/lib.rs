@@ -40,7 +40,6 @@
 //! | [Responses](https://bluefrog130.github.io/composure-rs/responses.html) | What a handler can return; ephemeral messages, embeds, files, errors |
 //! | [Components and modals](https://bluefrog130.github.io/composure-rs/components.html) | Buttons, selects and forms with `#[component]`, `#[modal]`, `#[derive(Modal)]` |
 //! | [Views](https://bluefrog130.github.io/composure-rs/views.html) | `rsx!` markup and `#[view]`: every tag and attribute |
-//! | [Themes](https://bluefrog130.github.io/composure-rs/theming.html) | Consistent colors and branding on embeds and containers |
 //! | [REST and deferring](https://bluefrog130.github.io/composure-rs/deferring.html) | `ctx.bot()`, follow-ups, Deferred Responses, Background Work |
 //! | [Webhook Events](https://bluefrog130.github.io/composure-rs/events.html) | App installs, entitlements, lobby messages |
 //! | [Platforms](https://bluefrog130.github.io/composure-rs/platforms.html) | Adapters, State, platform-specific Commands, logging |
@@ -60,7 +59,7 @@
 //! # Modules
 //!
 //! - [`command`](mod@command): the handler runtime: [`Ctx`], responses ([`Ephemeral`](command::Ephemeral),
-//!   [`Update`](command::Update), ...), [`Theme`](command::Theme), [`View`](command::View),
+//!   [`Update`](command::Update), ...), [`View`](command::View),
 //!   errors, and the traits the macros implement
 //! - [`types`]: Discord's objects (Interactions, messages, embeds, components, users, ...),
 //!   shared by Interactions, responses and REST

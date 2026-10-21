@@ -1,4 +1,4 @@
-//! `#[app(handlers(..), theme = .., events = ..)]`: makes a unit struct an App routing to the
+//! `#[app(handlers(..), events = .., errors = ..)]`: makes a unit struct an App routing to the
 //! Commands, Groups, Component and Modal Handlers, Views and Apps it lists (ADR 0013). Also the
 //! `Route` impls the other attributes add to what they define.
 
@@ -9,8 +9,8 @@ use syn::{Expr, Fields, ItemStruct, Path};
 
 pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     let mut handlers: Option<Vec<Path>> = None;
-    let mut theme: Option<Expr> = None;
     let mut events: Option<Path> = None;
+    let mut errors: Option<Expr> = None;
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("handlers") {
             if handlers.is_some() {
@@ -22,18 +22,18 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 Ok(())
             })?;
             handlers = Some(paths);
-        } else if meta.path.is_ident("theme") {
-            if theme.is_some() {
-                return Err(meta.error("`theme` is set twice"));
-            }
-            theme = Some(meta.value()?.parse()?);
         } else if meta.path.is_ident("events") {
             if events.is_some() {
                 return Err(meta.error("`events` is set twice"));
             }
             events = Some(meta.value()?.parse()?);
+        } else if meta.path.is_ident("errors") {
+            if errors.is_some() {
+                return Err(meta.error("`errors` is set twice"));
+            }
+            errors = Some(meta.value()?.parse()?);
         } else {
-            return Err(meta.error("unknown setting; expected one of handlers, theme, events"));
+            return Err(meta.error("unknown setting; expected one of handlers, events, errors"));
         }
         Ok(())
     });
@@ -54,7 +54,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     let c = quote!(::composure::command);
     let t = quote!(::composure::types);
     let routed = quote!(#c::__Routed);
-    let theme_ty = quote!(::core::option::Option<&'static #c::Theme>);
+    let errors_ty = quote!(::core::option::Option<#c::ErrorRenderer>);
 
     let routes = handlers
         .iter()
@@ -69,19 +69,30 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
         .iter()
         .map(|h| quote_spanned!(h.span()=> <#h as #c::RouteDefinition>::definitions(into);));
     let has_events = events.is_some();
-    let own_theme = theme.as_ref().map(|theme| {
-        quote! {
-            const THEME: #theme_ty = ::core::option::Option::Some(&#theme);
+    let has_errors = errors.is_some();
+    // The App's own `errors`, else the one an App it lists has: at most one in the tree (checked
+    // below), so the first found is it
+    let errors_const = match &errors {
+        // Through a typed `let`, so functions and non-capturing closures coerce to the pointer
+        Some(errors) => quote_spanned! {errors.span()=> {
+            let errors: #c::ErrorRenderer = #errors;
+            ::core::option::Option::Some(errors)
+        }},
+        None => {
+            let children = handlers.iter().map(|h| {
+                quote_spanned! {h.span()=>
+                    let errors = match errors {
+                        ::core::option::Option::Some(errors) => ::core::option::Option::Some(errors),
+                        ::core::option::Option::None => <#h as #c::RouteDefinition>::ERRORS,
+                    };
+                }
+            });
+            quote! {{
+                let errors: #errors_ty = ::core::option::Option::None;
+                #(#children)*
+                errors
+            }}
         }
-    });
-    // Without its own theme, an App passes the outer one through and leaves responses alone
-    let (inherit, themed) = if theme.is_some() {
-        (
-            quote!(let theme = <Self as #c::RouteDefinition>::THEME.or(theme);),
-            quote!(#c::__themed(routed, <Self as #c::RouteDefinition>::THEME)),
-        )
-    } else {
-        (quote!(), quote!(routed))
     };
     // Children that cannot answer this kind of Interaction are skipped at compile time, so their
     // (always `None`) futures are not part of the App's
@@ -90,7 +101,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             quote_spanned! {h.span()=>
                 if const { <#h as #c::RouteDefinition>::ROUTE.#answers() }
                     && let ::core::option::Option::Some(result) =
-                        <#h as #c::Route<__S>>::#name(interaction, state, theme).await
+                        <#h as #c::Route<__S>>::#name(interaction, state, errors).await
                 {
                     break 'routed ::core::option::Option::Some(result);
                 }
@@ -100,15 +111,14 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             async fn #name(
                 interaction: &::std::sync::Arc<#t::#interaction>,
                 state: &__S,
-                theme: #theme_ty,
+                errors: #c::ErrorRenderer,
             ) -> #routed {
-                #inherit
+                let _ = (interaction, state, errors);
                 #[allow(unused_labels)]
-                let routed = 'routed: {
+                'routed: {
                     #(#calls)*
                     ::core::option::Option::None
-                };
-                #themed
+                }
             }
         }
     };
@@ -176,9 +186,10 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             const ROUTE: #c::RouteInfo = #c::RouteInfo::App {
                 routes: &[#(#routes),*],
                 events: #has_events,
+                errors: #has_errors,
             };
 
-            #own_theme
+            const ERRORS: #errors_ty = #errors_const;
 
             fn definitions(into: &mut ::std::vec::Vec<#c::ScopedDefinition>) {
                 let _ = &into;
@@ -208,8 +219,8 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
         where
             #ident: #c::Route<__S>,
         {
-            fn theme(&self) -> #theme_ty {
-                <Self as #c::RouteDefinition>::THEME
+            fn render_error(&self, error: &#c::HandlerError) -> #t::InteractionResponse {
+                #c::__errors::<Self>()(error)
             }
 
             async fn command(
@@ -218,7 +229,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 state: &__S,
             ) -> ::core::result::Result<#t::InteractionResponse, #c::HandlerError> {
                 let command = ::std::sync::Arc::new(command);
-                match <Self as #c::Route<__S>>::dispatch(&command, state, ::core::option::Option::None).await {
+                match <Self as #c::Route<__S>>::dispatch(&command, state, #c::__errors::<Self>()).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => ::core::result::Result::Err(
                         #c::HandlerError::unknown_command(&command.data.name),
@@ -232,7 +243,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 state: &__S,
             ) -> ::core::result::Result<#t::InteractionResponse, #c::HandlerError> {
                 let autocomplete = ::std::sync::Arc::new(autocomplete);
-                match <Self as #c::Route<__S>>::dispatch_autocomplete(&autocomplete, state, ::core::option::Option::None).await {
+                match <Self as #c::Route<__S>>::dispatch_autocomplete(&autocomplete, state, #c::__errors::<Self>()).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => #c::__unhandled_autocomplete(),
                 }
@@ -244,7 +255,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 state: &__S,
             ) -> ::core::result::Result<#t::InteractionResponse, #c::HandlerError> {
                 let component = ::std::sync::Arc::new(component);
-                match <Self as #c::Route<__S>>::dispatch_component(&component, state, ::core::option::Option::None).await {
+                match <Self as #c::Route<__S>>::dispatch_component(&component, state, #c::__errors::<Self>()).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => #c::__unhandled_component(),
                 }
@@ -256,7 +267,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 state: &__S,
             ) -> ::core::result::Result<#t::InteractionResponse, #c::HandlerError> {
                 let modal = ::std::sync::Arc::new(modal);
-                match <Self as #c::Route<__S>>::dispatch_modal(&modal, state, ::core::option::Option::None).await {
+                match <Self as #c::Route<__S>>::dispatch_modal(&modal, state, #c::__errors::<Self>()).await {
                     ::core::option::Option::Some(result) => result,
                     ::core::option::Option::None => #c::__unhandled_modal(),
                 }
@@ -296,9 +307,9 @@ fn forward(name: &str, interaction: &str, helper: &str) -> TokenStream {
         fn #name(
             interaction: &::std::sync::Arc<::composure::types::#interaction>,
             state: &__S,
-            theme: ::core::option::Option<&'static #c::Theme>,
+            errors: #c::ErrorRenderer,
         ) -> impl ::core::future::Future<Output = #c::__Routed> + ::core::marker::Send {
-            #c::#helper::<Self, __S>(interaction, state, theme)
+            #c::#helper::<Self, __S>(interaction, state, errors)
         }
     }
 }

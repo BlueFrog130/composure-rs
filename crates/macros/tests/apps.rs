@@ -1,23 +1,18 @@
-//! Apps listing Apps: routing through nested Apps, Theme cascade, events from a nested App,
+//! Apps listing Apps: routing through nested Apps, `errors` and events from a nested App,
 //! definitions of the whole tree.
 
 use composure::{
     app,
     command::{
         CommandSetDefinition, ComponentCtx, EventCtx, EventHandler, HandlerError,
-        InteractionHandler, NoHandler, Theme, View, dispatch, dispatch_event,
+        InteractionHandler, NoHandler, View, dispatch, dispatch_event,
     },
     component, rsx,
-    types::{Embed, EventBody, Interaction, Snowflake},
+    types::{Embed, EventBody, Interaction, InteractionResponse, Snowflake},
     view,
 };
 use futures::executor::block_on;
 use serde_json::{Value, json};
-
-const OUTER: Theme = Theme::new()
-    .with_primary(0x111111)
-    .with_footer("Outer", None);
-const INNER: Theme = Theme::new().with_primary(0x222222);
 
 /// Top-level
 #[composure::command]
@@ -31,15 +26,15 @@ fn deep() -> Embed {
     Embed::new().with_title("deep")
 }
 
-/// Reads the closest App's theme
+/// Fails, in a nested App
 #[composure::command]
-fn palette(ctx: composure::Ctx) -> String {
-    format!("{:x}", ctx.theme().primary)
+fn refuse() -> Result<String, HandlerError> {
+    Err(HandlerError::user("Not allowed"))
 }
 
 #[component("poke")]
-fn poke(ctx: ComponentCtx) -> String {
-    format!("poked {:x}", ctx.theme().primary)
+fn poke(_ctx: ComponentCtx) -> String {
+    "poked".into()
 }
 
 #[view]
@@ -60,19 +55,24 @@ impl<S: Sync> EventHandler<S> for Events {
     }
 }
 
-/// A module's App: its own Theme and the bot's events
-#[app(handlers(deep, palette, poke, Counter), theme = INNER, events = Events)]
+/// Errors as a public message, so the tests tell them from the default
+fn render(error: &HandlerError) -> InteractionResponse {
+    InteractionResponse::respond_with_message(format!("rendered: {}", error.user_message()))
+}
+
+/// A module's App: the bot's events and its error renderer
+#[app(handlers(deep, refuse, poke, Counter), events = Events, errors = render)]
 struct Inner;
 
 /// The root lists the module's App next to its own Command
-#[app(handlers(top, Inner), theme = OUTER)]
+#[app(handlers(top, Inner))]
 struct Outer;
 
-/// An App without a theme passes the outer one through
+/// An App without `errors` anywhere in its tree
 #[app(handlers(top))]
 struct Plain;
 
-#[app(handlers(Plain), theme = OUTER)]
+#[app(handlers(Plain))]
 struct Wrapped;
 
 fn interaction(t: u8, data: Value) -> Interaction {
@@ -101,7 +101,7 @@ fn nested_apps_route_everything_they_list() {
     let response = respond(&Outer, chat("deep"));
     assert_eq!(response["data"]["embeds"][0]["title"], "deep");
     let response = respond(&Outer, click("poke"));
-    assert_eq!(response["data"]["content"], "poked 222222");
+    assert_eq!(response["data"]["content"], "poked");
     let response = respond(&Outer, click(&format!("counter:add:{}", 1)));
     assert_eq!(response["type"], 7);
 
@@ -110,20 +110,23 @@ fn nested_apps_route_everything_they_list() {
 }
 
 #[test]
-fn the_closest_theme_wins_and_outer_ones_fill_in_the_rest() {
-    let response = respond(&Outer, chat("top"));
-    assert_eq!(response["data"]["embeds"][0]["color"], 0x111111);
+fn the_root_renders_errors_with_the_trees_errors() {
+    let error = block_on(dispatch(chat("refuse"), &Outer, &())).unwrap_err();
+    let rendered =
+        serde_json::to_value(InteractionHandler::<()>::render_error(&Outer, &error)).unwrap();
+    assert_eq!(rendered["data"]["content"], "rendered: Not allowed");
+    assert_eq!(rendered["data"].get("flags"), None);
 
-    let response = respond(&Outer, chat("deep"));
-    let embed = &response["data"]["embeds"][0];
-    assert_eq!(embed["color"], 0x222222);
-    assert_eq!(embed["footer"]["text"], "Outer");
+    // The same renderer reaches the Ctx, for errors from deferred work
+    assert!(<Outer as composure::command::RouteDefinition>::ERRORS.is_some());
 
-    let response = respond(&Outer, chat("palette"));
-    assert_eq!(response["data"]["content"], "222222");
-
-    let response = respond(&Wrapped, chat("top"));
-    assert_eq!(response["data"]["embeds"][0]["color"], 0x111111);
+    let rendered =
+        serde_json::to_value(InteractionHandler::<()>::render_error(&Wrapped, &error)).unwrap();
+    assert_eq!(rendered["data"]["content"], "Not allowed");
+    assert_eq!(
+        rendered["data"]["flags"], 64,
+        "the default is ephemeral text"
+    );
 }
 
 #[test]
@@ -144,14 +147,14 @@ fn definitions_cover_the_whole_tree() {
         .into_iter()
         .map(|d| serde_json::to_value(d.command).unwrap()["name"].clone())
         .collect();
-    assert_eq!(names, ["top", "deep", "palette"]);
+    assert_eq!(names, ["top", "deep", "refuse"]);
 }
 
 #[test]
 fn fallback_gets_what_nothing_in_the_tree_handles() {
     let handler = Outer.with_fallback(NoHandler);
     let response = respond(&handler, click("poke"));
-    assert_eq!(response["data"]["content"], "poked 222222");
+    assert_eq!(response["data"]["content"], "poked");
     let response = respond(&handler, click("unknown"));
     assert_eq!(
         response["data"]["content"],

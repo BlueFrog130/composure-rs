@@ -45,10 +45,9 @@ with a Deferred Response instead and finishes in the background; see
 | [`DeferredUpdate`](https://docs.rs/composure/latest/composure/command/struct.DeferredUpdate.html) | Nothing visible yet, then an edit of the component's message ([`ctx.defer_update`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.defer_update)) |
 | [`Ephemeral<T>`](https://docs.rs/composure/latest/composure/command/struct.Ephemeral.html) | `T`, visible only to the user who invoked it |
 | [`Update<T>`](https://docs.rs/composure/latest/composure/command/struct.Update.html) | `T` as an edit of the message the component is on (components and modals opened from one) |
-| [`Unthemed<T>`](https://docs.rs/composure/latest/composure/command/struct.Unthemed.html) | `T` without the App's [Theme](theming.md) filled in |
 | `Result<T, E>` with `E: Display` | `T`, or an [error message](#errors) |
 
-The wrappers compose: `Ephemeral(Unthemed(embed))`, `Update(view)`,
+The wrappers compose: `Ephemeral(embed)`, `Update(view)`,
 `Ephemeral(ctx.defer(..))`, `Result<Ephemeral<String>, HandlerError>`.
 
 `Ephemeral` on a deferral makes the "thinking" message ephemeral, and the final message with
@@ -157,7 +156,8 @@ depends on the [`HandlerError`](https://docs.rs/composure/latest/composure/comma
 | An Option that could not be read ([`ErrorKind::InvalidOption`](https://docs.rs/composure/latest/composure/command/enum.ErrorKind.html#variant.InvalidOption)) | the same generic message | WARN |
 | A Command the App does not list ([`ErrorKind::UnknownCommand`](https://docs.rs/composure/latest/composure/command/enum.ErrorKind.html#variant.UnknownCommand)) | "Unknown command." | WARN |
 
-With a [Theme](theming.md), the message is an embed in the Theme's `error` color.
+`#[app(errors = ..)]` answers errors your way instead, say as a Components V2 message in your
+colors ([Styling](views.md#styling)).
 
 Any `E: Display` works as the error type, and any [`std::error::Error`](https://doc.rust-lang.org/std/error/trait.Error.html) converts into a
 `HandlerError` with `?`, so REST errors, parse errors and the like propagate as they are.
