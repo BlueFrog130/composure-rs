@@ -186,6 +186,14 @@ cargo add composure_adapter_cloudflare   # or composure_adapter_tokio
 cargo add composure_sync                 # in a host-only `sync` binary
 ```
 
+Or start from a template, with a Command, a Sync binary, a test, and the platform's
+configuration (a `Dockerfile` for tokio):
+
+```sh
+cargo generate --git https://github.com/BlueFrog130/composure-rs templates/cloudflare --name my-bot
+cargo generate --git https://github.com/BlueFrog130/composure-rs templates/tokio --name my-bot
+```
+
 Then follow [Getting started](https://bluefrog130.github.io/composure-rs/getting_started.html):
 it takes you from an empty crate to a deployed bot.
 

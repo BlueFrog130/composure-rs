@@ -13,6 +13,8 @@ members = [
     "examples/tokio",
     "bots/composure",
 ]
+# cargo-generate templates: `{{project-name}}` placeholders, checked by scripts/check-templates.sh
+exclude = ["templates"]
 
 [workspace.package]
 edition = "2024"

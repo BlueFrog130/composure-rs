@@ -22,6 +22,18 @@ Composure splits this in three:
 - **Sync** ([`composure_sync`](https://docs.rs/composure_sync)), run at deploy time, which
   registers the App's Command Definitions with Discord.
 
+## Start from a template
+
+To skip the setup, generate a bot with [`cargo-generate`](https://github.com/cargo-generate/cargo-generate),
+then follow [Local development](local_development.md) to run it:
+
+```sh
+cargo generate --git https://github.com/BlueFrog130/composure-rs templates/cloudflare --name my-bot
+cargo generate --git https://github.com/BlueFrog130/composure-rs templates/tokio --name my-bot
+```
+
+The rest of this chapter builds the same bot by hand.
+
 ## Setting up
 
 Create an application in the [Developer Portal](https://discord.com/developers/applications)
@@ -31,8 +43,8 @@ Add the crates. On Cloudflare Workers (a `cdylib` built with `worker-build`):
 
 ```toml
 [dependencies]
-composure = { version = "0.1", features = ["macros", "tier1"] }
-composure_adapter_cloudflare = "0.1"
+composure = { version = "0.2", features = ["macros", "tier1"] }
+composure_adapter_cloudflare = "0.2"
 worker = "0.8"
 ```
 
@@ -40,8 +52,8 @@ On a server:
 
 ```toml
 [dependencies]
-composure = { version = "0.1", features = ["macros", "tier1"] }
-composure_adapter_tokio = "0.1"
+composure = { version = "0.2", features = ["macros", "tier1"] }
+composure_adapter_tokio = "0.2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
