@@ -10,6 +10,8 @@ use crate::types::{
     MessageFlags, PartialAttachment, PollCreate, Snowflake,
 };
 
+use crate::command::{View, ViewError};
+
 use super::{Body, Response, Rest, Result, Transport, route::routes};
 
 routes! {
@@ -256,6 +258,44 @@ pub struct EditMessage<'a> {
     pub files: &'a [File],
 }
 
+/// A Components V2 follow-up from a [`View`]: its components, flags (`IS_COMPONENTS_V2`,
+/// ephemeral, `SUPPRESS_NOTIFICATIONS`), allowed mentions and files. Fails before anything is sent when the
+/// View cannot be: a `custom_id` that could not be built, or past Discord's
+/// [limits](crate::types::limits).
+impl<'a> TryFrom<&'a View> for CreateFollowup<'a> {
+    type Error = ViewError;
+
+    fn try_from(view: &'a View) -> std::result::Result<Self, ViewError> {
+        view.check()?;
+        Ok(CreateFollowup {
+            components: Some(view.components()),
+            flags: Some(view.message_flags(true)),
+            allowed_mentions: view.mentions(),
+            files: view.files(),
+            ..Default::default()
+        })
+    }
+}
+
+/// An edit to a Components V2 message from a [`View`]: its components, flags (`IS_COMPONENTS_V2`,
+/// `SUPPRESS_NOTIFICATIONS`; ephemeral does not apply), allowed mentions and files. Fails before
+/// anything is sent when the View cannot be: a `custom_id` that could not be built, or past
+/// Discord's [limits](crate::types::limits).
+impl<'a> TryFrom<&'a View> for EditMessage<'a> {
+    type Error = ViewError;
+
+    fn try_from(view: &'a View) -> std::result::Result<Self, ViewError> {
+        view.check()?;
+        Ok(EditMessage {
+            components: Some(view.components()),
+            flags: Some(view.message_flags(false)),
+            allowed_mentions: view.mentions(),
+            files: view.files(),
+            ..Default::default()
+        })
+    }
+}
+
 impl<'a> From<&'a MessageCallbackData> for CreateFollowup<'a> {
     fn from(data: &'a MessageCallbackData) -> Self {
         CreateFollowup {
@@ -345,8 +385,7 @@ mod tests {
         let base = "https://discord.com/api/v10";
         let sent: Vec<_> = c
             .transport()
-            .requests
-            .borrow()
+            .requests()
             .iter()
             .map(|r| (r.method, r.url.strip_prefix(base).unwrap().to_string()))
             .collect();
@@ -398,5 +437,28 @@ mod tests {
         let body = String::from_utf8_lossy(request.body.as_deref().unwrap()).into_owned();
         assert!(body.contains(r#"name="files[0]"; filename="a.png""#));
         assert!(body.contains(r#""embeds":[{"#));
+    }
+
+    #[test]
+    fn follow_ups_and_edits_from_a_view() {
+        use crate::command::View;
+        use crate::types::Component;
+
+        let c = empty_client();
+        let view = View::new(vec![Component::text("hi")])
+            .ephemeral()
+            .file(File::new("a.png", vec![1]));
+        block_on(c.create_followup(&CreateFollowup::try_from(&view).unwrap())).unwrap();
+        let body = c.transport().text(0);
+        // A follow-up can be ephemeral
+        assert!(body.contains(r#""flags":32832"#), "{body}");
+        assert!(body.contains(r#"filename="a.png""#), "{body}");
+
+        let view = View::new(vec![Component::text("edited")]).ephemeral();
+        block_on(c.edit_original(&EditMessage::try_from(&view).unwrap())).unwrap();
+        assert_eq!(
+            c.transport().body(1),
+            serde_json::json!({ "components": [{ "type": 10, "content": "edited" }], "flags": 1 << 15 })
+        );
     }
 }

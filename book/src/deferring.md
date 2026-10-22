@@ -7,7 +7,10 @@ that implements [`Platform`](https://docs.rs/composure/latest/composure/command/
 
 Enable the `rest` feature (the [`rest`](https://docs.rs/composure/latest/composure/rest/) client and Interaction Endpoints), plus the
 `rest-*` features for the [`BotClient`](https://docs.rs/composure/latest/composure/rest/struct.BotClient.html) Endpoints you call, or `tier1`
-for the common ones.
+for the common ones. Beyond `tier1` are groups such as Linked Roles metadata
+(`rest-role-connections`), onboarding and the welcome screen (`rest-onboarding`), stage
+instances (`rest-stage-instances`) and lobbies (`rest-lobbies`); `full` turns on every one. The
+[feature flags](https://docs.rs/composure/latest/composure/#feature-flags) list them all.
 
 ## Calling the API
 
@@ -63,13 +66,13 @@ fn census(ctx: Ctx<impl Platform>) -> Ephemeral<Deferred> {
 
 - The closure receives a [`DeferredCtx`](https://docs.rs/composure/latest/composure/command/struct.DeferredCtx.html): an owned, `'static`
   copy of the Interaction and State, with the same `user()`, `guild_id()`, `client()`, `bot()`,
-  `theme()`, plus [`sleep`](https://docs.rs/composure/latest/composure/command/struct.DeferredCtx.html#method.sleep) on the platform's timer.
+  plus [`sleep`](https://docs.rs/composure/latest/composure/command/struct.DeferredCtx.html#method.sleep) on the platform's timer.
 - Its future must be `Send + 'static`, so it owns what it uses: convert borrowed parameters
   first (`let text = text.to_owned();`) and `move` them in.
 - Wrap the result of `defer` in [`Ephemeral`](https://docs.rs/composure/latest/composure/command/struct.Ephemeral.html) to defer ephemerally;
   the final message is then ephemeral too, whatever `work` returns.
-- The App's [Theme](theming.md) fills in the result like any response.
-- A failing `work` edits the response with the error message and is logged.
+- A failing `work` edits the response with the error, rendered as the App renders errors
+  ([`errors = ..`](views.md#styling)), and is logged.
 - Background Work has a time limit set by the platform: about 30 seconds after the response on
   Cloudflare Workers (`wait_until`), until shutdown's grace period on tokio. The Interaction
   token, which the final edit uses, expires after 15 minutes.
@@ -130,8 +133,8 @@ fn countdown(ctx: Ctx<impl Platform>) -> Deferred {
 Request bodies ([`EditMessage`](https://docs.rs/composure/latest/composure/rest/struct.EditMessage.html),
 [`CreateFollowup`](https://docs.rs/composure/latest/composure/rest/struct.CreateFollowup.html), ...) borrow their fields; absent fields are
 left out of the request. [`MessageCallbackData`](https://docs.rs/composure/latest/composure/types/struct.MessageCallbackData.html) converts into
-both. REST bodies are never [themed](theming.md); build them with `ctx.theme()`'s
-helpers to match.
+both. Build them with the same Views and colors as your replies to match
+([Styling](views.md#styling)).
 
 ## Outside Interactions
 

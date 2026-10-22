@@ -1,0 +1,50 @@
+---
+source: crates/macros/src/view.rs
+expression: "expand(r###\"<Modal title=\"Feedback\" custom_id=\"feedback\">\n                <Label text=\"Topic\"><TextInput name=\"topic\" max_len=100/></Label>\n                <Label text=\"Kind\"><RadioGroup name=\"kind\" options=Kind/></Label>\n            </Modal>\"###)"
+---
+fn view() -> View {
+    {
+        let __view = {
+            #[allow(unused_braces)]
+            {
+                {
+                    let _: ::composure::command::ModalView;
+                    ::composure::command::ModalView::builder()
+                        .title("Feedback")
+                        .custom_id("feedback")
+                        .reserve(2usize)
+                        .child({
+                            {
+                                let _: ::composure::types::Label;
+                                ::composure::types::Label::builder()
+                                    .text("Topic")
+                                    .child({
+                                        ::composure::types::TextInput::builder()
+                                            .name("topic")
+                                            .max_len(100)
+                                            .build()
+                                    })
+                                    .build()
+                            }
+                        })
+                        .child({
+                            {
+                                let _: ::composure::types::Label;
+                                ::composure::types::Label::builder()
+                                    .text("Kind")
+                                    .child({
+                                        ::composure::types::RadioGroup::builder()
+                                            .name("kind")
+                                            .options::<Kind>()
+                                            .build()
+                                    })
+                                    .build()
+                            }
+                        })
+                        .build()
+                }
+            }
+        };
+        __view
+    }
+}

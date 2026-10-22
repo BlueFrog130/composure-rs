@@ -40,7 +40,7 @@ mod view;
 /// ```ignore
 /// /// Everything the bot serves
 /// #[app(handlers(ping, echo, Admin, counter_click, on_feedback, Card, Moderation),
-///       theme = THEME, events = MyEvents)]
+///       events = MyEvents, errors = render_error)]
 /// pub struct Bot;
 /// ```
 ///
@@ -49,14 +49,16 @@ mod view;
 ///   listed handles (components, modals, autocomplete, commands) to `handler`
 /// - Apps nest: a module can declare its own `#[app]` next to its handlers and be listed in the
 ///   root one
-/// - `theme = THEME` (a `Theme` constant): fills in unset colors and branding on this App's
-///   responses; a nested App's own Theme wins for its Routes, the outer one fills in the rest
 /// - `events = MyEvents` (a unit struct implementing `EventHandler`): handles Webhook Events;
 ///   at most one App in a tree sets it
+/// - `errors = render_error` (a `fn(&HandlerError) -> InteractionResponse`, an `ErrorRenderer`):
+///   the response handler errors are answered with, here and from deferred work, instead of
+///   `HandlerError::response`'s ephemeral text; at most one App in a tree sets it, and the
+///   root uses it for the whole tree
 ///
 /// Two Commands with the same name and type, two handlers with the same `custom_id` prefix, more
-/// Commands than Discord allows in one Scope, or a placed sub-View with handlers that is not
-/// listed fail to compile.
+/// Commands than Discord allows in one Scope, a placed sub-View with handlers that is not
+/// listed, or two Apps setting `events` (or `errors`) fail to compile.
 #[proc_macro_attribute]
 pub fn app(args: TokenStream, item: TokenStream) -> TokenStream {
     app::expand(args.into(), item.into())
@@ -299,6 +301,21 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 /// need the markup to be in a `#[view]`. A `<Section>`'s `<Button>` or `<Thumbnail>` child is
 /// its accessory. Wrap attribute values that use `<..>` in braces.
 ///
+/// As Leptos's `view!` does, markup expands to builder calls: a tag is its type's `builder()`
+/// (`Container::builder()`), each attribute a method (`.accent_color(..)`), each child a
+/// `.child(..)` whose bound says where it may go (`RowChild`, ...), then `.build()`. So the
+/// compiler checks attributes and placement and the IDE completes and documents them.
+///
+/// Every error in the markup is reported, not just the first, each at the offending token. The
+/// rest still expands (to an empty View when nothing parsed), so `{..}` blocks keep
+/// type-checking and completing in incomplete markup. Discord's limits the markup shows (5
+/// buttons in a row, 3 texts in a section, 5 children in a modal, 25 options) are compile
+/// errors; the rest are checked when the View is answered with or sent.
+///
+/// A `View` is the whole message: `.ephemeral()`, `.allowed_mentions(..)`,
+/// `.suppress_notifications()` and `.file(..)` set the rest, and `<File>`, `<Thumbnail>` and
+/// `<Item>` given a `File` as `src` upload it with the message.
+///
 /// | Tag | Builds | Attributes (every tag but `<Modal>`, `<Item>` and `<Option>` also takes `id`) |
 /// |---|---|---|
 /// | `<Container>` | `Container` | `accent_color`, `spoiler` |
@@ -306,9 +323,9 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 /// | `<Text>` (`<TextDisplay>`) | `TextDisplay` | `content` (or text children) |
 /// | `<Separator>` | `Separator` | `small` / `large`, `spacing`, `divider` |
 /// | `<Row>` (`<ActionRow>`) | `ActionRow` | |
-/// | `<Thumbnail>` | `Thumbnail` | `url` (required), `description`, `spoiler` |
-/// | `<Gallery>` (`<MediaGallery>`) | `MediaGallery` | `<Item url=..>` children: `description`, `spoiler` |
-/// | `<File>` | `FileComponent` | `url` (required, `attachment://..`), `spoiler` |
+/// | `<Thumbnail>` | `Thumbnail` | `src`/`url` (required: a URL, a `File` to upload, an `&Attachment`), `description`, `spoiler` |
+/// | `<Gallery>` (`<MediaGallery>`) | `MediaGallery` | `<Item src=..>` children: `description`, `spoiler` |
+/// | `<File>` | `FileComponent` | `src`/`url` (required: a `File` to upload, or `attachment://..`), `spoiler` |
 /// | `<Button>` | `ButtonComponent` | `primary` / `secondary` / `success` / `danger`, `style`, `on:click`, `custom_id`, `url`, `sku_id`, `label`, `emoji`, `disabled` |
 /// | `<StringSelect>` (`<Select>`) | `StringSelect` | `on:select`, `custom_id`, `name` (modals), `options` (a Choice enum), `placeholder`, `min`, `max`, `disabled`, `required` |
 /// | `<UserSelect>`, `<RoleSelect>`, `<MentionableSelect>`, `<ChannelSelect>` | the entity selects | as `<StringSelect>` without `options`, plus `default_values`, `channel_types` |
@@ -322,9 +339,7 @@ pub fn derive_choice(item: TokenStream) -> TokenStream {
 /// | `<FileUpload>` | `FileUpload` | `name`, `min`, `max`, `file_types`, `required` |
 #[proc_macro]
 pub fn rsx(input: TokenStream) -> TokenStream {
-    view::expand_macro(input.into())
-        .unwrap_or_else(syn::Error::into_compile_error)
-        .into()
+    view::expand_macro(input.into()).into()
 }
 
 /// Defines a View: a layout rendered from its Props (the parameters, owned values), whose

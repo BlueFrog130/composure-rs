@@ -38,9 +38,9 @@ static API: &[Entry] = api! {
     "#[autocomplete]", "composure/latest/composure/attr.autocomplete.html", "Suggestions for an Option while the user types.";
     "#[derive(Choice)]", "composure/latest/composure/derive.Choice.html", "An enum as an Option's fixed choices, or a select's options.";
     "#[derive(Modal)]", "composure/latest/composure/derive.Modal.html", "A struct as a modal form: each field a labeled input.";
-    "Ctx", "composure/latest/composure/command/struct.Ctx.html", "What a handler gets: the Interaction, the user, the platform's State, the theme, and REST and defer helpers.";
+    "Ctx", "composure/latest/composure/command/struct.Ctx.html", "What a handler gets: the Interaction, the user, the platform's State, and REST and defer helpers.";
     "HandlerError", "composure/latest/composure/command/struct.HandlerError.html", "A handler's failure: logged, and answered ephemerally; HandlerError::user shows its message.";
-    "Theme", "composure/latest/composure/command/struct.Theme.html", "Colors and branding filled into every embed and container a bot answers with.";
+    "ErrorRenderer", "composure/latest/composure/command/type.ErrorRenderer.html", "How an App answers handler errors: #[app(errors = render)] instead of the default ephemeral text.";
     "Platform", "composure/latest/composure/command/trait.Platform.html", "What an Adapter's State provides for REST and Background Work: a Transport, the bot token, spawn.";
     "BotClient", "composure/latest/composure/rest/struct.BotClient.html", "Discord's REST API with the bot token, one feature per resource.";
     "CloudflareInteractionBot", "composure_adapter_cloudflare/latest/composure_adapter_cloudflare/struct.CloudflareInteractionBot.html", "Serves a bot from a Cloudflare Worker: signature checks, dispatch, Background Work with wait_until.";

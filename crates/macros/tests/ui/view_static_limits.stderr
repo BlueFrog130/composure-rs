@@ -1,0 +1,23 @@
+error: a `<Row>` holds up to 5 buttons
+  --> tests/ui/view_static_limits.rs:11:14
+   |
+11 |             <Button custom_id="6">"6"</Button>
+   |              ^^^^^^
+
+error: a `<Section>` holds 1-3 texts beside its accessory
+  --> tests/ui/view_static_limits.rs:17:14
+   |
+17 |             <Text>"4"</Text>
+   |              ^^^^
+
+error: a select holds up to 25 options
+  --> tests/ui/view_static_limits.rs:34:51
+   |
+34 |                 <Option value="25">"25"</Option> <Option value="26">"26"</Option>
+   |                                                   ^^^^^^
+
+error: a `<Modal>` holds up to 5 components
+  --> tests/ui/view_static_limits.rs:40:86
+   |
+40 |             "1" <Text>"2"</Text> <Text>"3"</Text> <Text>"4"</Text> <Text>"5"</Text> <Text>"6"</Text>
+   |                                                                                      ^^^^

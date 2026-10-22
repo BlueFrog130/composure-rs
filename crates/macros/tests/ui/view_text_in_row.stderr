@@ -1,5 +1,25 @@
-error: text cannot go in a <Row>
+error[E0277]: `&str` cannot go in a `<Row>`
  --> tests/ui/view_text_in_row.rs:4:25
   |
 4 |     let _ = rsx! { <Row>"Text"</Row> };
   |                         ^^^^^^
+  |                         |
+  |                         `&'static str` doesn't satisfy the trait bound
+  |                         the trait `RowChild` is not implemented for `&str`
+  |
+  = note: a <Row> takes up to 5 <Button>s, or one select
+  = help: the following other types implement trait `RowChild`:
+            ButtonComponent
+            Filter<I, P>
+            FilterMap<I, F>
+            FlatMap<I, U, F>
+            Flatten<I>
+            Map<I, F>
+            Option<T>
+            Rev<I>
+          and $N others
+note: required by a bound in `RowBuilder::child`
+ --> $WORKSPACE/crates/composure/src/command/markup.rs
+  |
+  |     pub fn child(mut self, child: impl RowChild) -> Self {
+  |                                        ^^^^^^^^ required by this bound in `RowBuilder::child`

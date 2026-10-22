@@ -26,6 +26,8 @@ mod data;
 mod error;
 mod event;
 mod handler;
+mod limits;
+mod markup;
 mod modal;
 mod option;
 #[cfg(feature = "rest")]
@@ -33,7 +35,6 @@ mod platform;
 mod response;
 mod route;
 mod set;
-mod theme;
 mod view;
 
 pub use autocomplete::*;
@@ -43,6 +44,7 @@ pub use data::*;
 pub use error::*;
 pub use event::*;
 pub use handler::*;
+pub use markup::*;
 pub use modal::*;
 pub use option::*;
 #[cfg(feature = "rest")]
@@ -50,5 +52,4 @@ pub use platform::*;
 pub use response::*;
 pub use route::*;
 pub use set::*;
-pub use theme::*;
 pub use view::*;

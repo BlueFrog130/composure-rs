@@ -43,9 +43,9 @@ are called over the Platform's Transport, so tests intercept those calls like Di
 
 Every message is built in `rsx!` from the tone containers in [`src/ui.rs`](src/ui.rs):
 `<ui::Primary>`, `<ui::Secondary>`, `<ui::Success>`, `<ui::Warning>` and `<ui::Error>`, each with
-an optional `title`. They set their accent color themselves, so messages sent through REST
-(`ui::send`: announcements, feedback, the install log) look the same as replies, which are
-themed.
+an optional `title`. They set their accent color from the consts there, so replies and
+messages sent through REST (`ui::send`: announcements, feedback, the install log) look the same.
+Handler errors are answered in the same style by `ui::render_error`, the App's `errors = ..`.
 
 ## Set up
 

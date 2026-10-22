@@ -57,7 +57,6 @@ fn hello(ctx: Ctx) -> String {
 | [`guild_id()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.guild_id), [`channel_id()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.channel_id) | Where it was invoked |
 | [`locale()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.locale) | The user's language |
 | [`entitlements()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.entitlements), [`is_entitled(sku)`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.is_entitled) | Premium SKUs the user or guild has |
-| [`theme()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.theme) | The App's [Theme](theming.md) |
 | [`interaction()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.interaction), [`data()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.data) | Everything Discord sent |
 | [`state()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.state) | The Adapter's State |
 | [`client()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.client), [`bot()`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.bot), [`defer(..)`](https://docs.rs/composure/latest/composure/command/struct.Ctx.html#method.defer) | REST and Background Work, with a [`Platform`](https://docs.rs/composure/latest/composure/command/trait.Platform.html) State ([REST and deferring](deferring.md)) |

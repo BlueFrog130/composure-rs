@@ -1,5 +1,5 @@
-//! Commands that only answer: Options, Choices, State, Groups, context menus, errors, themed
-//! embeds (colors and footer come from the bot's `THEME`).
+//! Commands that only answer: Options, Choices, State, Groups, context menus, errors, and
+//! embeds in the bot's colors ([`style`](crate::style)).
 
 use composure::{
     Choice, Ctx, app, autocomplete, command,
@@ -7,6 +7,8 @@ use composure::{
     group,
     types::{Embed, Message, User},
 };
+
+use crate::style;
 
 /// Say hello
 #[command(
@@ -46,7 +48,7 @@ pub fn ice_cream(
     #[option("Flavor")] flavor: Flavor,
     #[option("Scoops")] scoops: Option<u8>,
 ) -> Embed {
-    Embed::new().with_title(&format!("{} x {}", scoops.unwrap_or(1), flavor.name()))
+    style::embed(style::PRIMARY).with_title(&format!("{} x {}", scoops.unwrap_or(1), flavor.name()))
 }
 
 const FRUITS: [&str; 8] = [
@@ -106,11 +108,13 @@ pub fn ban(
     if ctx.user().is_some_and(|me| me.id == user.id) {
         return Err(HandlerError::user("You can't ban yourself."));
     }
-    Ok(Ephemeral(ctx.theme().warning(format!(
-        "Would ban {} ({})",
-        user.display_name(),
-        reason.unwrap_or("no reason")
-    ))))
+    Ok(Ephemeral(style::embed(style::WARNING).with_description(
+        &format!(
+            "Would ban {} ({})",
+            user.display_name(),
+            reason.unwrap_or("no reason")
+        ),
+    )))
 }
 
 /// Kick a member

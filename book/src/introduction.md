@@ -12,11 +12,12 @@ chapter by chapter; every example in it is compiled as a test.
 4. [Components and modals](components.md): buttons, selects and forms with `#[component]`,
    `#[modal]` and `#[derive(Modal)]`, state in the `custom_id`
 5. [Views](views.md): `rsx!` markup and `#[view]`, with a reference of every tag and attribute
-6. [Themes](theming.md): colors and branding on embeds and containers
-7. [REST and deferring](deferring.md): calling Discord's API, follow-ups, Deferred Responses
-8. [Webhook Events](events.md): app installs, entitlements, lobby messages
-9. [Platforms](platforms.md): Adapters, State, platform-specific Commands, logging
-10. [Testing](testing.md): running handlers without Discord
+6. [REST and deferring](deferring.md): calling Discord's API, follow-ups, Deferred Responses
+7. [Webhook Events](events.md): app installs, entitlements, lobby messages
+8. [Platforms](platforms.md): Adapters, State, platform-specific Commands, logging
+9. [Testing](testing.md): running handlers without Discord
+10. [Local development](local_development.md), [Deploying](deploying.md) and
+    [Troubleshooting](troubleshooting.md): running a bot, shipping it, and fixing it
 
 The [API documentation](https://docs.rs/composure) covers every type and function.
 

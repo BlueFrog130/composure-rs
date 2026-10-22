@@ -185,13 +185,11 @@ mod tests {
         .unwrap();
         block_on(c.delete_role(g, r, None)).unwrap();
         let t = c.transport();
-        t.responses
-            .borrow_mut()
-            .push_back(super::super::RawResponse {
-                status: 200,
-                headers: Vec::new(),
-                body: br#"{"6":12,"7":0}"#.to_vec(),
-            });
+        t.queue(super::super::RawResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: br#"{"6":12,"7":0}"#.to_vec(),
+        });
         let counts = block_on(c.get_role_member_counts(g))
             .unwrap()
             .model()

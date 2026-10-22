@@ -45,3 +45,6 @@ jobs:
             echo "::error::Add a change file for the changelog with \`knope document-change\` (see CONTRIBUTING.md), or label the PR \`no changeset\` if it needs no release note."
             exit 1
           fi
+      - name: Check the change files
+        # Known crates; a breaking change bumps the crates that depend on it too
+        run: scripts/check-change-files.sh

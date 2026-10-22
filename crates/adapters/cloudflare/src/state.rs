@@ -133,8 +133,8 @@ impl<T: Send + Sync + 'static> Platform for Worker<T> {
         });
     }
 
-    fn bot_token(&self) -> Option<String> {
-        self.bot_token.as_deref().map(str::to_owned)
+    fn bot_token(&self) -> Option<&str> {
+        self.bot_token.as_deref()
     }
 }
 
@@ -154,14 +154,16 @@ impl<T> HasData for Worker<T> {
 pub(crate) fn log_handler_error(error: &HandlerError) {
     use composure::command::ErrorKind;
 
+    // The message and its causes
+    let error_text = format!("{error:#}");
     match error.kind() {
         // Expected outcomes the user already sees
-        ErrorKind::User => debug!("user error", error = error),
+        ErrorKind::User => debug!("user error", error = error_text),
         // Usually Commands out of sync with Discord
         ErrorKind::UnknownCommand | ErrorKind::InvalidOption => {
-            warn!("interaction failed", error = error)
+            warn!("interaction failed", error = error_text)
         }
-        ErrorKind::Handler => error!("handler failed", error = error),
+        ErrorKind::Handler => error!("handler failed", error = error_text),
     }
 }
 

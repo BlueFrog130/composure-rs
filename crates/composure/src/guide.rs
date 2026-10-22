@@ -16,9 +16,6 @@ mod components {}
 #[doc = include_str!("../../../book/src/views.md")]
 mod views {}
 
-#[doc = include_str!("../../../book/src/theming.md")]
-mod theming {}
-
 #[doc = include_str!("../../../book/src/deferring.md")]
 mod deferring {}
 
@@ -30,3 +27,12 @@ mod platforms {}
 
 #[doc = include_str!("../../../book/src/testing.md")]
 mod testing {}
+
+#[doc = include_str!("../../../book/src/local_development.md")]
+mod local_development {}
+
+#[doc = include_str!("../../../book/src/deploying.md")]
+mod deploying {}
+
+#[doc = include_str!("../../../book/src/troubleshooting.md")]
+mod troubleshooting {}

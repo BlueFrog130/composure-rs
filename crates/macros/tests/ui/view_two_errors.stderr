@@ -1,0 +1,48 @@
+error[E0277]: `composure::command::Element<ButtonComponent>` cannot go in a `<Container>`
+ --> tests/ui/view_two_errors.rs:7:14
+  |
+7 |             <Button custom_id="x">"Loose"</Button>
+  |              ^^^^^^
+  |              |
+  |              `composure::command::Element<ButtonComponent>` doesn't satisfy the trait bound
+  |              the trait `ContainerChild` is not implemented for `composure::command::Element<ButtonComponent>`
+  |
+  = note: a <Container> takes text, <Text>, <Section>, <Gallery>, <File>, <Separator> and <Row>, components, Views and Props; buttons and selects go in a <Row>
+  = help: the following other types implement trait `ContainerChild`:
+            composure::command::Element<FileComponent>
+            composure::command::Element<composure::types::ActionRow>
+            composure::command::Element<composure::types::MediaGallery>
+            composure::command::Element<composure::types::Section>
+            composure::command::Element<composure::types::Separator>
+            composure::command::Element<composure::types::TextDisplay>
+note: required by a bound in `ContainerBuilder::child`
+ --> $WORKSPACE/crates/composure/src/command/markup.rs
+  |
+  |     pub fn child(mut self, child: impl ContainerChild) -> Self {
+  |                                        ^^^^^^^^^^^^^^ required by this bound in `ContainerBuilder::child`
+
+error[E0277]: `&str` cannot go in a `<Row>`
+  --> tests/ui/view_two_errors.rs:10:14
+   |
+10 |         <Row>"Text"</Row>
+   |              ^^^^^^
+   |              |
+   |              `&'static str` doesn't satisfy the trait bound
+   |              the trait `RowChild` is not implemented for `&str`
+   |
+   = note: a <Row> takes up to 5 <Button>s, or one select
+   = help: the following other types implement trait `RowChild`:
+             ButtonComponent
+             Filter<I, P>
+             FilterMap<I, F>
+             FlatMap<I, U, F>
+             Flatten<I>
+             Map<I, F>
+             Option<T>
+             Rev<I>
+           and $N others
+note: required by a bound in `RowBuilder::child`
+  --> $WORKSPACE/crates/composure/src/command/markup.rs
+   |
+   |     pub fn child(mut self, child: impl RowChild) -> Self {
+   |                                        ^^^^^^^^ required by this bound in `RowBuilder::child`

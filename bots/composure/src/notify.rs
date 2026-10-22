@@ -7,7 +7,7 @@ use composure::{
     Ctx, command,
     command::{Ephemeral, HandlerError, View},
     group,
-    rest::{BotClient, Error as RestError, Transport},
+    rest::{BotClient, CreateMessage, Error as RestError, Transport},
     rsx,
     types::{PartialChannel, Snowflake, Webhook},
     view,
@@ -251,7 +251,13 @@ pub async fn announce_new<T: Transport>(
             release: release.clone(),
         };
         tracing::info!(channel = ?config.announce_channel, "announcement channel");
-        let message = ui::send(bot, config.announce_channel, announcement.render()).await?;
+        let message = bot
+            .create_message(
+                config.announce_channel,
+                &CreateMessage::try_from(&announcement.render())?,
+            )
+            .await?
+            .model()?;
         // Already posted: a failed publish is logged, not retried, so it is never posted twice
         if let Err(error) = bot
             .crosspost_message(config.announce_channel, message.id)

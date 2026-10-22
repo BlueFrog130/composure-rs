@@ -790,8 +790,7 @@ pub struct Container {
     /// Up to 40 action rows, text displays, sections, media galleries, separators and files
     pub components: Vec<Component>,
 
-    /// Color of the accent bar on the left; filled in by the App's
-    /// [`Theme`](crate::command::Theme) when unset
+    /// Color of the accent bar on the left; none when unset
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accent_color: Option<u32>,
 
@@ -801,7 +800,7 @@ pub struct Container {
 }
 
 impl Container {
-    /// A container of `components` without an accent color, which the App's [`Theme`](crate::command::Theme) fills in
+    /// A container of `components` without an accent color ([`with_accent_color`](Self::with_accent_color) sets one)
     pub fn new(components: Vec<Component>) -> Self {
         Self {
             t: TypeField,

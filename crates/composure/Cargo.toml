@@ -1,6 +1,7 @@
 [package]
 name = "composure"
-version.workspace = true
+# Bumped by knope from .changeset/ (see knope.toml)
+version = "0.1.3"
 edition.workspace = true
 rust-version.workspace = true
 description = "Discord bots over HTTP Interactions, no gateway: slash commands, components, modals and JSX-like views, on Cloudflare Workers (WASM) or any server"
@@ -19,7 +20,6 @@ hex = "0.4.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["raw_value"] }
 serde_repr = "0.1.21"
-strum = { version = "0.28.0", features = ["derive"] }
 composure_macros = { workspace = true, optional = true }
 reqwest = { version = "0.13.5", optional = true, features = ["blocking"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"], optional = true }
@@ -78,15 +78,26 @@ rest-polls = ["rest"]
 rest-soundboard = ["rest"]
 ## The app's own settings on `BotClient`
 rest-application = ["rest"]
+## Linked Roles: the app's role connection metadata on `BotClient`
+rest-role-connections = ["rest"]
+## Guild onboarding and the welcome screen on `BotClient`
+rest-onboarding = ["rest"]
+## Stage instances on `BotClient`
+rest-stage-instances = ["rest"]
+## Lobbies (Social SDK): lobbies, members, messages, channel linking on `BotClient`
+rest-lobbies = ["rest"]
 ## What most bots need
 tier1 = ["rest", "rest-commands", "rest-messages", "rest-users", "rest-channels", "rest-guilds", "rest-members", "rest-roles"]
 ## Every Endpoint
-full = ["tier1", "rest-bans", "rest-threads", "rest-invites", "rest-emojis", "rest-stickers", "rest-scheduled-events", "rest-automod", "rest-audit-log", "rest-webhooks", "rest-monetization", "rest-polls", "rest-soundboard", "rest-application"]
+full = ["tier1", "rest-bans", "rest-threads", "rest-invites", "rest-emojis", "rest-stickers", "rest-scheduled-events", "rest-automod", "rest-audit-log", "rest-webhooks", "rest-monetization", "rest-polls", "rest-soundboard", "rest-application", "rest-role-connections", "rest-onboarding", "rest-stage-instances", "rest-lobbies"]
 ## Spans and events through `tracing` (`interaction`, `background_work`, `event`, `rest`). No
 ## subscriber is installed; the Adapter or application chooses one.
 tracing = ["dep:tracing"]
 ## Native blocking Transport for deploy-time tools (not for wasm)
 reqwest = ["rest", "dep:reqwest"]
+## `composure::testing`: Interaction builders, `TestPlatform`, `MockTransport`, `TestKey`, for a
+## bot's tests (dev-dependencies)
+testing = ["rest"]
 
 [dev-dependencies]
 futures = { version = "0.3.34", default-features = false, features = ["executor"] }

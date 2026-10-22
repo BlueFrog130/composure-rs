@@ -13,17 +13,18 @@ members = [
     "examples/tokio",
     "bots/composure",
 ]
+# cargo-generate templates: `{{project-name}}` placeholders, checked by scripts/check-templates.sh
+exclude = ["templates"]
 
 [workspace.package]
-# The published crates share one version, bumped by knope from .changeset/ (see knope.toml)
-version = "0.1.3"
 edition = "2024"
 rust-version = "1.88"
 license = "Apache-2.0"
 repository = "https://github.com/BlueFrog130/composure-rs"
 homepage = "https://github.com/BlueFrog130/composure-rs"
 
-# The published crates, as they depend on each other; `version` is kept in step by knope
+# The published crates, as they depend on each other; each `version` is bumped by knope with that
+# crate's own (see knope.toml)
 [workspace.dependencies]
 composure = { path = "crates/composure", version = "0.1.3" }
 composure_macros = { path = "crates/macros", version = "0.1.3" }

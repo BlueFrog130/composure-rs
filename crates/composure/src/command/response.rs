@@ -76,7 +76,8 @@ impl<T: IntoResponse> IntoResponse for Ephemeral<T> {
 }
 
 /// For components (and modals opened from one): edit the message the component is on instead of
-/// sending a new one. `Update("Saved")`, `Update(InteractionResponse::...)`
+/// sending a new one. `Update("Saved")`, `Update(InteractionResponse::...)`. The update keeps the
+/// message's files and drops the ephemeral flag, which an update cannot change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Update<T>(pub T);
 
@@ -88,7 +89,12 @@ impl<T: IntoResponse> IntoResponse for Update<T> {
 
     fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
         Ok(match self.0.try_into_response()? {
-            InteractionResponse::ChannelMessageWithSource(data) => {
+            InteractionResponse::ChannelMessageWithSource(mut data) => {
+                // An update cannot change whether the message is ephemeral
+                data.flags = data
+                    .flags
+                    .map(|flags| flags - MessageFlags::Ephemeral)
+                    .filter(|flags| !flags.is_empty());
                 InteractionResponse::UpdateMessage(data)
             }
             InteractionResponse::DeferredChannelMessageWithSource(_) => {
@@ -96,26 +102,6 @@ impl<T: IntoResponse> IntoResponse for Update<T> {
             }
             other => other,
         })
-    }
-}
-
-/// A Response sent as is, without the App's [`Theme`](super::Theme) filling in embed
-/// colors, branding and container accent colors: `Unthemed(embed)`, `Ephemeral(Unthemed(embed))`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Unthemed<T>(pub T);
-
-impl<T: IntoResponse> IntoResponse for Unthemed<T> {
-    fn into_response(self) -> InteractionResponse {
-        self.try_into_response()
-            .unwrap_or_else(|error| error.response())
-    }
-
-    fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
-        let mut response = self.0.try_into_response()?;
-        if let Some(data) = response.message_data_mut() {
-            data.unthemed = true;
-        }
-        Ok(response)
     }
 }
 

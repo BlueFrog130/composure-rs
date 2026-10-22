@@ -71,7 +71,7 @@ Composure is built for that model and nothing else.
 - **⚡ Tiny and fast.** A few microseconds and a few dozen allocations per Interaction; the full
   example bot is about 344 KB of gzipped WASM. The core has no async runtime and no HTTP stack.
 - **🔋 Batteries included.** A REST client for every Discord endpoint, deferred responses with
-  background work, follow-ups, file uploads, Webhook Events, themes, `tracing`, and a command
+  background work, follow-ups, file uploads, Webhook Events, `tracing`, and a command
   sync CLI with CI drift checks.
 
 | | Gateway bot | Composure |
@@ -186,6 +186,14 @@ cargo add composure_adapter_cloudflare   # or composure_adapter_tokio
 cargo add composure_sync                 # in a host-only `sync` binary
 ```
 
+Or start from a template, with a Command, a Sync binary, a test, and the platform's
+configuration (a `Dockerfile` for tokio):
+
+```sh
+cargo generate --git https://github.com/BlueFrog130/composure-rs templates/cloudflare --name my-bot
+cargo generate --git https://github.com/BlueFrog130/composure-rs templates/tokio --name my-bot
+```
+
 Then follow [Getting started](https://bluefrog130.github.io/composure-rs/getting_started.html):
 it takes you from an empty crate to a deployed bot.
 
@@ -207,7 +215,7 @@ Crypto signature checks), so a Worker only ships what it uses. See
 ## Learn more
 
 - **[The guide](https://bluefrog130.github.io/composure-rs/)**: commands,
-  responses, components and modals, Views, themes, REST and deferring, Webhook Events,
+  responses, components and modals, Views and styling, REST and deferring, Webhook Events,
   platforms, testing. Every example in it is compiled and tested.
 - **[Examples](https://github.com/BlueFrog130/composure-rs/tree/main/examples)**: one bot using
   every feature, served [on Workers](https://github.com/BlueFrog130/composure-rs/tree/main/examples/cloudflare)

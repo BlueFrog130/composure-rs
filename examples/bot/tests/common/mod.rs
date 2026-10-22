@@ -10,10 +10,9 @@ mod regression_bot;
 
 pub use regression_bot::RegressionBot;
 
-use ed25519_dalek::{Signer, SigningKey};
+use composure::testing::TestKey;
 use serde_json::{Value, json};
 
-const SEED: [u8; 32] = [7; 32];
 pub const TIMESTAMP: &str = "1760000000";
 
 const APP: &str = "1052322265397739523";
@@ -26,12 +25,11 @@ const ATTACHMENT: &str = "400000000000000001";
 const MESSAGE: &str = "500000000000000001";
 
 pub fn public_key() -> String {
-    hex::encode(SigningKey::from_bytes(&SEED).verifying_key().as_bytes())
+    TestKey::default().public_key()
 }
 
 pub fn sign(timestamp: &str, body: &[u8]) -> String {
-    let message = [timestamp.as_bytes(), body].concat();
-    hex::encode(SigningKey::from_bytes(&SEED).sign(&message).to_bytes())
+    TestKey::default().sign(timestamp, body)
 }
 
 /// How a case's request is signed
