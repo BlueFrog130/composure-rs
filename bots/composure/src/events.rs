@@ -3,6 +3,7 @@
 
 use composure::{
     command::{EventCtx, EventHandler, HandlerError},
+    rest::CreateMessage,
     rsx,
     types::{ApplicationAuthorized, ApplicationIntegrationType},
 };
@@ -40,7 +41,11 @@ impl<S: Services> EventHandler<S> for Events {
             ),
             _ => return Ok(()),
         };
-        ui::send(&bot, ctx.state().data().log_channel, log).await?;
+        bot.create_message(
+            ctx.state().data().log_channel,
+            &CreateMessage::try_from(&log)?,
+        )
+        .await?;
         tracing::info!(user_id = %user.id, "logged install");
 
         let Some(guild) = guild else {
@@ -58,7 +63,9 @@ impl<S: Services> EventHandler<S> for Events {
         // Best effort: the installer may not accept DMs
         let sent = async {
             let dm = bot.create_dm(user.id).await?.model()?;
-            ui::send(&bot, dm.id, welcome).await
+            bot.create_message(dm.id, &CreateMessage::try_from(&welcome)?)
+                .await?;
+            Ok::<_, HandlerError>(())
         }
         .await;
         if let Err(error) = sent {

@@ -4,7 +4,10 @@ use composure::{
     Choice, app,
     command::{Ephemeral, HandlerError, IntoResponse, ModalView, Update, View, dispatch},
     component, rsx,
-    types::{Interaction, InteractionResponse},
+    types::{
+        AllowedMentions, ButtonStyle, ChannelType, Component, File, Interaction,
+        InteractionResponse, SelectDefaultValue, SeparatorSpacing, Snowflake, TextInputStyle,
+    },
     view,
 };
 use futures::executor::block_on;
@@ -375,4 +378,291 @@ fn too_long_custom_id_is_an_error() {
         .try_into_response();
     let error: HandlerError = result.unwrap_err();
     assert!(error.to_string().contains("custom_id is"), "{error}");
+}
+
+/// A report attached by a sub-View
+#[view]
+pub fn Report(name: String) -> View {
+    rsx! { <File src={File::new(name, b"a,b".to_vec())}/> }
+}
+
+#[test]
+fn files_are_uploaded_with_the_view() {
+    let view = rsx! { <File src={File::new("a.txt", b"hi".to_vec())} spoiler/> };
+    let response = view.into_response();
+    assert_eq!(response.files().len(), 1);
+    assert_eq!(response.files()[0].name, "a.txt");
+    let value = json(response);
+    assert_eq!(
+        value["data"]["components"][0]["file"]["url"],
+        "attachment://a.txt"
+    );
+    assert_eq!(value["data"]["flags"], 1 << 15);
+}
+
+#[test]
+fn sub_view_files_reach_the_response() {
+    let view = rsx! {
+        <Container>
+            <Report name="r.csv"/>
+            <Section>
+                <Text>"Avatar"</Text>
+                <Thumbnail src={File::new("me.png", vec![1])}/>
+            </Section>
+        </Container>
+    }
+    .file(File::new("extra.txt", vec![2]));
+    let names: Vec<_> = view.files().iter().map(|file| file.name.as_str()).collect();
+    assert_eq!(names, ["r.csv", "me.png", "extra.txt"]);
+    let response = view.into_response();
+    assert_eq!(response.files().len(), 3);
+    let value = json(response);
+    let container = &value["data"]["components"][0];
+    assert_eq!(
+        container["components"][0]["file"]["url"],
+        "attachment://r.csv"
+    );
+    assert_eq!(
+        container["components"][1]["accessory"]["media"]["url"],
+        "attachment://me.png"
+    );
+}
+
+#[test]
+fn ephemeral_views_keep_components_v2() {
+    let view = rsx! { <Text>"Only you"</Text> }
+        .ephemeral()
+        .suppress_notifications();
+    let value = json(view.clone().into_response());
+    assert_eq!(value["data"]["flags"], (1 << 15) | (1 << 6) | (1 << 12));
+    // An update cannot change ephemerality
+    let value = json(Update(view).into_response());
+    assert_eq!(value["type"], 7);
+    assert_eq!(value["data"]["flags"], (1 << 15) | (1 << 12));
+}
+
+#[test]
+fn allowed_mentions_are_sent() {
+    let view = rsx! { <Text>"<@1>"</Text> }.allowed_mentions(AllowedMentions {
+        parse: vec![],
+        roles: vec![],
+        users: vec![],
+        replied_user: false,
+    });
+    let value = json(view.into_response());
+    assert_eq!(value["data"]["allowed_mentions"]["parse"], json!([]));
+}
+
+#[test]
+fn views_past_discords_limits_are_errors() {
+    let buttons: Vec<_> = (0..6)
+        .map(|i| rsx! { <Button custom_id={i.to_string()}>"b"</Button> })
+        .collect();
+    let error = rsx! { <Row>{buttons}</Row> }
+        .try_into_response()
+        .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "6 buttons in a row, Discord allows at most 5"
+    );
+}
+
+/// Every attribute of every built-in tag, so each is checked to be a builder method; the guide
+/// test below reads this markup back. Values are literals, numbers or `{..}`, which it skips.
+#[test]
+fn every_attribute_compiles() {
+    let file = || File::new("a.png", vec![1]);
+    // every attribute: begin
+    let _ = rsx! {
+        <Container id=1 accent_color=0x123456 spoiler>
+            <Section id=2 accessory={Component::text("x")}><Text id=3 content="c"/></Section>
+            <Section><Text>"t"</Text><Thumbnail id=4 src={file()} description="d" spoiler/></Section>
+            <Section><Text>"t"</Text><Thumbnail url="https://example.com/a.png"/></Section>
+            <Gallery id=5>
+                <Item src="https://example.com/a.png" description="d" spoiler/>
+                <Item url="https://example.com/b.png"/>
+            </Gallery>
+            <File id=6 src={file()} spoiler/>
+            <File url="attachment://a.png"/>
+            <Separator id=7 small divider=false/>
+            <Separator large spacing={SeparatorSpacing::Small}/>
+            <Row id=8>
+                <Button id=9 primary on:click={count(1)} emoji="👍" disabled=false>"a"</Button>
+                <Button secondary custom_id="b" label="b"/>
+                <Button success custom_id="c">"c"</Button>
+                <Button danger custom_id="d">"d"</Button>
+                <Button style={ButtonStyle::Primary} url="https://example.com">"e"</Button>
+            </Row>
+            <Row><Button sku_id={Snowflake::from_u64(1)}/></Row>
+            <Row>
+                <StringSelect id=10 on:select={count(2)} options=Color placeholder="p" min=1 max=2 disabled=false>
+                    <Option value="x" label="X" description="d" emoji="🎨" default/>
+                </StringSelect>
+            </Row>
+            <Row><StringSelect custom_id="s" min_values=1 max_values=2/></Row>
+            <Row><UserSelect custom_id="u" default_values={vec![SelectDefaultValue::user(Snowflake::from_u64(1))]}/></Row>
+            <Row><RoleSelect custom_id="r"/></Row>
+            <Row><MentionableSelect custom_id="m"/></Row>
+            <Row><ChannelSelect custom_id="c" channel_types={vec![ChannelType::GuildText]}/></Row>
+        </Container>
+    };
+    let _ = rsx! {
+        <Modal title="t" on:submit={count(3)}>
+            <Label id=11 text="a" description="d">
+                <TextInput id=12 name="a" paragraph min_len=1 max_len=2 placeholder="p" value="v" required/>
+            </Label>
+            <Label label="b"><TextInput name="b" style={TextInputStyle::Short} min_length=1 max_length=2/></Label>
+            <Label text="c"><RadioGroup id=13 name="c" options=Color required/></Label>
+            <Label text="d">
+                <CheckboxGroup id=14 name="d" options=Color min=0 max=1 min_values=0 max_values=1 required/>
+            </Label>
+            <Label text="e">
+                <FileUpload id=15 name="e" min=0 max=1 min_values=0 max_values=1 file_types={vec!["image".to_string()]} required/>
+            </Label>
+        </Modal>
+    };
+    let _ = rsx! {
+        <Modal title="t" custom_id="m">
+            <Label text="a"><Checkbox id=16 name="a" default/></Label>
+            <Label text="b"><StringSelect name="b" required=false/></Label>
+        </Modal>
+    };
+    // every attribute: end
+}
+
+/// The tags in `every_attribute_compiles` and their attributes, read from this file
+fn tags_and_attributes() -> Vec<(String, Vec<String>)> {
+    let source = include_str!("views.rs").replace("\r\n", "\n");
+    let markup = source
+        .split_once("// every attribute: begin")
+        .and_then(|(_, rest)| rest.split_once("// every attribute: end"))
+        .expect("the markup")
+        .0
+        .to_string();
+    let chars: Vec<char> = markup.chars().collect();
+    let mut tags: Vec<(String, Vec<String>)> = Vec::new();
+    let name = |i: &mut usize| {
+        let start = *i;
+        while *i < chars.len() && (chars[*i].is_alphanumeric() || chars[*i] == '_') {
+            *i += 1;
+        }
+        chars[start..*i].iter().collect::<String>()
+    };
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] != '<' || !chars.get(i + 1).is_some_and(|c| c.is_uppercase()) {
+            i += 1;
+            continue;
+        }
+        i += 1;
+        let tag = name(&mut i);
+        let mut attrs = Vec::new();
+        loop {
+            while chars[i].is_whitespace() {
+                i += 1;
+            }
+            if chars[i] == '>' || chars[i] == '/' {
+                break;
+            }
+            let attr = name(&mut i);
+            // `on:click=..`: the `on` attribute
+            while chars[i] == ':' {
+                i += 1;
+                name(&mut i);
+            }
+            attrs.push(attr);
+            if chars[i] == '=' {
+                i += 1;
+                match chars[i] {
+                    '"' => {
+                        i += 1;
+                        while chars[i] != '"' {
+                            i += 1;
+                        }
+                        i += 1;
+                    }
+                    '{' => {
+                        let mut depth = 0;
+                        loop {
+                            match chars[i] {
+                                '{' => depth += 1,
+                                '}' => depth -= 1,
+                                _ => {}
+                            }
+                            i += 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                    }
+                    _ => {
+                        while !chars[i].is_whitespace() && chars[i] != '>' && chars[i] != '/' {
+                            i += 1;
+                        }
+                    }
+                }
+            }
+        }
+        match tags.iter_mut().find(|(t, _)| *t == tag) {
+            Some((_, known)) => {
+                for attr in attrs {
+                    if !known.contains(&attr) {
+                        known.push(attr);
+                    }
+                }
+            }
+            None => tags.push((tag, attrs)),
+        }
+    }
+    tags
+}
+
+/// The guide's tag reference documents every tag and attribute (`every_attribute_compiles` uses
+/// each, so each is a builder method)
+#[test]
+fn the_guide_documents_every_tag_and_attribute() {
+    let tags = tags_and_attributes();
+    assert_eq!(tags.len(), 23, "every built-in tag: {tags:?}");
+    let guide = include_str!("../../../book/src/views.md").replace("\r\n", "\n");
+    let reference = guide
+        .split_once("## Tag reference")
+        .and_then(|(_, rest)| rest.split_once("\n## "))
+        .map(|(reference, _)| reference)
+        .expect("a tag reference");
+    let (intro, _) = reference.split_once("#### ").unwrap();
+    let sections: Vec<&str> = reference.split("#### ").skip(1).collect();
+    let section = |tag: &str| {
+        sections
+            .iter()
+            .find(|section| {
+                section
+                    .lines()
+                    .next()
+                    .unwrap()
+                    .contains(&format!("`<{tag}>`"))
+            })
+            .copied()
+            .unwrap_or_else(|| panic!("no section for `<{tag}>`"))
+    };
+    for (tag, attrs) in &tags {
+        let mut text = section(tag).to_string();
+        // Sections that say "as <StringSelect>" or "every input below"
+        match tag.as_str() {
+            "UserSelect" | "RoleSelect" | "MentionableSelect" | "ChannelSelect" => {
+                text += section("StringSelect")
+            }
+            "TextInput" | "RadioGroup" | "CheckboxGroup" | "Checkbox" | "FileUpload" => {
+                text += section("Label")
+            }
+            _ => {}
+        }
+        for attr in attrs {
+            let documented = match attr.as_str() {
+                "id" => intro.contains("`id`"),
+                "on" => text.contains("`on:"),
+                attr => text.contains(&format!("`{attr}`")) || text.contains(&format!("`{attr}=")),
+            };
+            assert!(documented, "`{attr}` of `<{tag}>` is not in the guide");
+        }
+    }
 }

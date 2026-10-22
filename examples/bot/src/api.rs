@@ -5,9 +5,10 @@ use std::time::Duration;
 
 use composure::{
     Ctx, Mentionable, app, autocomplete, command,
-    command::{Deferred, Ephemeral, HandlerError, Platform},
+    command::{Deferred, Ephemeral, HandlerError, Platform, View},
     definition::ApplicationCommand,
     rest::{CommandScope, EditMessage},
+    rsx,
     types::{File, InteractionResponse, Message},
 };
 
@@ -183,12 +184,15 @@ fn command_name(command: &ApplicationCommand) -> &str {
 
 /// Get your text back as a file
 #[command]
-pub fn export(
-    #[option("What to put in the file", max_len = 2000)] text: &str,
-) -> InteractionResponse {
-    // Files in the initial response: the Adapter sends it through the callback endpoint
-    InteractionResponse::respond_with_message("Here's your file:".to_string())
-        .with_file(File::new("export.txt", text.as_bytes().to_vec()).content_type("text/plain"))
+pub fn export(#[option("What to put in the file", max_len = 2000)] text: &str) -> View {
+    let file = File::new("export.txt", text.as_bytes().to_vec()).content_type("text/plain");
+    // `<File>` uploads the file with the View and points at it (`attachment://export.txt`); a
+    // response with files goes through the callback endpoint
+    rsx! {
+        <Text>"Here's your file:"</Text>
+        <File src={file}/>
+    }
+    .ephemeral()
 }
 
 /// This module's Commands, listed in [`Bot`](crate::Bot)

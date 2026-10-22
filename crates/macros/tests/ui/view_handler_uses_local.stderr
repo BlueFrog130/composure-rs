@@ -1,0 +1,39 @@
+error: `total` is not a Prop: inline handlers only see Props (carried in the custom_id). Make it a Prop, or move this markup into a sub-View.
+  --> tests/ui/view_handler_uses_local.rs:11:62
+   |
+11 |             <Button on:click:show=move |_| Ephemeral(format!("{total}"))>"Show"</Button>
+   |                                                              ^^^^^^^^^
+
+error: `item` is not a Prop: inline handlers only see Props (carried in the custom_id). Make it a Prop, or move this markup into a sub-View.
+  --> tests/ui/view_handler_uses_local.rs:21:58
+   |
+21 |                 <Button on:click:pick=move |_| Ephemeral(item.clone())>"Pick"</Button>
+   |                                                          ^^^^
+
+error: a local `title` shadows the Prop `title`, but inline handlers only see Props (carried in the custom_id), so this is the Prop. Rename the local, or make the value a Prop.
+  --> tests/ui/view_handler_uses_local.rs:33:54
+   |
+33 |             <Button on:click:echo=move |_| Ephemeral(title)>"Echo"</Button>
+   |                                                      ^^^^^
+
+warning: unused import: `Ephemeral`
+ --> tests/ui/view_handler_uses_local.rs:2:15
+  |
+2 |     command::{Ephemeral, View},
+  |               ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total`
+ --> tests/ui/view_handler_uses_local.rs:8:9
+  |
+8 |     let total = count * 2;
+  |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `item`
+  --> tests/ui/view_handler_uses_local.rs:19:28
+   |
+19 |         {items.iter().map(|item| rsx! {
+   |                            ^^^^ help: if this is intentional, prefix it with an underscore: `_item`

@@ -76,7 +76,8 @@ impl<T: IntoResponse> IntoResponse for Ephemeral<T> {
 }
 
 /// For components (and modals opened from one): edit the message the component is on instead of
-/// sending a new one. `Update("Saved")`, `Update(InteractionResponse::...)`
+/// sending a new one. `Update("Saved")`, `Update(InteractionResponse::...)`. The update keeps the
+/// message's files and drops the ephemeral flag, which an update cannot change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Update<T>(pub T);
 
@@ -88,7 +89,12 @@ impl<T: IntoResponse> IntoResponse for Update<T> {
 
     fn try_into_response(self) -> Result<InteractionResponse, HandlerError> {
         Ok(match self.0.try_into_response()? {
-            InteractionResponse::ChannelMessageWithSource(data) => {
+            InteractionResponse::ChannelMessageWithSource(mut data) => {
+                // An update cannot change whether the message is ephemeral
+                data.flags = data
+                    .flags
+                    .map(|flags| flags - MessageFlags::Ephemeral)
+                    .filter(|flags| !flags.is_empty());
                 InteractionResponse::UpdateMessage(data)
             }
             InteractionResponse::DeferredChannelMessageWithSource(_) => {

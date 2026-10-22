@@ -7,6 +7,8 @@ use crate::types::{
     PinnedMessages, PollCreate, Snowflake, User,
 };
 
+use crate::command::{View, ViewError};
+
 use super::{
     Body, BotClient, EditMessage, Response, Result, Transport,
     route::{PathSegment, Query, routes},
@@ -88,6 +90,25 @@ pub struct CreateMessage<'a> {
     /// Files to upload, sent as multipart
     #[serde(skip)]
     pub files: &'a [File],
+}
+
+/// A Components V2 message from a [`View`]: its components, flags (`IS_COMPONENTS_V2`,
+/// `SUPPRESS_NOTIFICATIONS`; ephemeral does not apply), allowed mentions and files. Fails before
+/// anything is sent when the View cannot be: a `custom_id` that could not be built, or past
+/// Discord's [limits](crate::types::limits).
+impl<'a> TryFrom<&'a View> for CreateMessage<'a> {
+    type Error = ViewError;
+
+    fn try_from(view: &'a View) -> std::result::Result<Self, ViewError> {
+        view.check()?;
+        Ok(CreateMessage {
+            components: Some(view.components()),
+            flags: Some(view.message_flags(false)),
+            allowed_mentions: view.mentions(),
+            files: view.files(),
+            ..Default::default()
+        })
+    }
 }
 
 impl<T: Transport> BotClient<T> {
@@ -458,5 +479,53 @@ mod tests {
             ]
         );
         assert_eq!(t.body(1), json!({ "messages": ["6", "7"] }));
+    }
+
+    #[test]
+    fn create_message_from_a_view() {
+        use crate::command::{View, ViewError, custom_id::CustomIdError};
+        use crate::types::{ButtonComponent, Component};
+
+        let c = BotClient::new(MockTransport::default(), "t", Snowflake::from_u64(1));
+        let channel = Snowflake::from_u64(5);
+        let view = View::new(vec![Component::text("hi")]).ephemeral();
+        block_on(c.create_message(channel, &CreateMessage::try_from(&view).unwrap())).unwrap();
+        // Ephemeral does not apply to channel messages
+        assert_eq!(
+            c.transport().body(0),
+            json!({ "components": [{ "type": 10, "content": "hi" }], "flags": 1 << 15 })
+        );
+
+        let view = View::new(vec![Component::text("see file")]).file(File::new("a.txt", "x"));
+        block_on(c.create_message(channel, &CreateMessage::try_from(&view).unwrap())).unwrap();
+        let body = c.transport().text(1);
+        assert!(
+            body.contains(r#"name="files[0]"; filename="a.txt""#),
+            "{body}"
+        );
+        assert!(body.contains(r#""flags":32768"#), "{body}");
+
+        // A View that cannot be sent fails before any request
+        let broken = View::builder()
+            .child(
+                ButtonComponent::builder()
+                    .custom_id(Err(CustomIdError::TooLong(120)))
+                    .build(),
+            )
+            .build();
+        assert_eq!(
+            CreateMessage::try_from(&broken).unwrap_err(),
+            ViewError::CustomId(CustomIdError::TooLong(120))
+        );
+        let crowded = View::new(vec![Component::text("x"); 41]);
+        assert!(matches!(
+            CreateMessage::try_from(&crowded),
+            Err(ViewError::Limit {
+                max: 40,
+                found: 41,
+                ..
+            })
+        ));
+        assert_eq!(c.transport().requests().len(), 2);
     }
 }

@@ -26,6 +26,8 @@ mod data;
 mod error;
 mod event;
 mod handler;
+mod limits;
+mod markup;
 mod modal;
 mod option;
 #[cfg(feature = "rest")]
@@ -42,6 +44,7 @@ pub use data::*;
 pub use error::*;
 pub use event::*;
 pub use handler::*;
+pub use markup::*;
 pub use modal::*;
 pub use option::*;
 #[cfg(feature = "rest")]

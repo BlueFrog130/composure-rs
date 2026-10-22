@@ -17,6 +17,7 @@ mod interaction;
 mod interaction_response;
 mod invite;
 mod lazy;
+pub mod limits;
 mod lobby;
 mod member;
 mod message;

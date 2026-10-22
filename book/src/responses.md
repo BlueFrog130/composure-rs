@@ -139,6 +139,9 @@ fn export(#[option("What to put in the file", max_len = 2000)] text: &str) -> In
 # fn main() {}
 ```
 
+A [View](views.md#message-options) carries its files itself: `<File src={file}/>` uploads the
+`File` with the message and points the component at it.
+
 A response with files is multipart, which an HTTP reply to Discord cannot be: the Adapter sends
 it to the callback endpoint itself and answers Discord's request with `202`. Deferred results
 with files are sent with the edit of the original response.

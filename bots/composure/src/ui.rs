@@ -11,32 +11,10 @@
 
 use composure::{
     command::{Ephemeral, HandlerError, IntoResponse, View},
-    rest::{BotClient, CreateMessage, Transport},
     rsx,
-    types::{InteractionResponse, Message, MessageFlags, Snowflake},
+    types::InteractionResponse,
     view,
 };
-
-/// Posts `view` to `channel` as a Components V2 message
-pub async fn send<T: Transport>(
-    bot: &BotClient<T>,
-    channel: Snowflake,
-    view: View,
-) -> Result<Message, HandlerError> {
-    let components = view.into_components()?;
-    let message = bot
-        .create_message(
-            channel,
-            &CreateMessage {
-                components: Some(&components),
-                flags: Some(MessageFlags::IsComponentsV2),
-                ..Default::default()
-            },
-        )
-        .await?
-        .model()?;
-    Ok(message)
-}
 
 /// Composure's brand color
 pub const PRIMARY: u32 = 0x7c5cff;

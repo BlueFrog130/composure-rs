@@ -10,6 +10,8 @@ use crate::types::{
     Snowflake, Webhook,
 };
 
+use crate::command::{View, ViewError};
+
 use super::{
     Body, BotClient, EditMessage, Response, Rest, Result, Route, Transport,
     route::{Query, routes},
@@ -114,6 +116,25 @@ pub struct ExecuteWebhook<'a> {
     /// Send to this thread of the webhook's channel
     #[serde(skip)]
     pub thread_id: Option<Snowflake>,
+}
+
+/// A Components V2 message (for a webhook owned by the application) from a [`View`]: its
+/// components, flags (`IS_COMPONENTS_V2`, `SUPPRESS_NOTIFICATIONS`; ephemeral does not apply),
+/// allowed mentions and files. Fails before anything is sent when the View cannot be: a `custom_id`
+/// that could not be built, or past Discord's [limits](crate::types::limits).
+impl<'a> TryFrom<&'a View> for ExecuteWebhook<'a> {
+    type Error = ViewError;
+
+    fn try_from(view: &'a View) -> std::result::Result<Self, ViewError> {
+        view.check()?;
+        Ok(ExecuteWebhook {
+            components: Some(view.components()),
+            flags: Some(view.message_flags(false)),
+            allowed_mentions: view.mentions(),
+            files: view.files(),
+            ..Default::default()
+        })
+    }
 }
 
 impl<T: Transport> BotClient<T> {
@@ -417,6 +438,28 @@ mod tests {
         assert_eq!(t.request(0).header("authorization"), None);
         assert!(
             WebhookClient::from_url(MockTransport::default(), "https://example.com/x").is_none()
+        );
+    }
+
+    #[test]
+    fn execute_from_a_view() {
+        use crate::command::View;
+        use crate::types::Component;
+
+        let w = WebhookClient::from_url(
+            MockTransport::default(),
+            "https://discord.com/api/webhooks/5/tok",
+        )
+        .unwrap();
+        let view = View::new(vec![Component::text("hi")]).suppress_notifications();
+        block_on(w.execute(&ExecuteWebhook {
+            wait: true,
+            ..ExecuteWebhook::try_from(&view).unwrap()
+        }))
+        .unwrap();
+        assert_eq!(
+            w.transport().body(0),
+            json!({ "components": [{ "type": 10, "content": "hi" }], "flags": (1 << 15) | (1 << 12) })
         );
     }
 }

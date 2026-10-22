@@ -1,0 +1,67 @@
+---
+source: crates/macros/src/view.rs
+expression: "expand(r###\"<Container accent_color=0x5865F2>\n                \"## \" \"Components V2\"\n                <Section>\n                    <Text>\"Beside a thumbnail\"</Text>\n                    <Thumbnail src=\"https://example.com/a.png\"/>\n                </Section>\n                <Separator/>\n                <Row><Button primary custom_id=\"like\">\"Like\"</Button></Row>\n            </Container>\"###)"
+---
+fn view() -> View {
+    {
+        let __view = {
+            #[allow(unused_braces)]
+            {
+                ::composure::command::View::builder()
+                    .reserve(1usize)
+                    .child({
+                        {
+                            let _: ::composure::types::Container;
+                            ::composure::types::Container::builder()
+                                .accent_color(0x5865F2)
+                                .reserve(4usize)
+                                .child("## Components V2")
+                                .child({
+                                    {
+                                        let _: ::composure::types::Section;
+                                        ::composure::types::Section::builder()
+                                            .reserve(1usize)
+                                            .child({
+                                                {
+                                                    let _: ::composure::types::TextDisplay;
+                                                    ::composure::types::TextDisplay::builder()
+                                                        .child("Beside a thumbnail")
+                                                        .build()
+                                                }
+                                            })
+                                            .child({
+                                                ::composure::types::Thumbnail::builder()
+                                                    .src("https://example.com/a.png")
+                                                    .build()
+                                            })
+                                            .build()
+                                    }
+                                })
+                                .child({ ::composure::types::Separator::builder().build() })
+                                .child({
+                                    {
+                                        let _: ::composure::types::ActionRow;
+                                        ::composure::types::ActionRow::builder()
+                                            .reserve(1usize)
+                                            .child({
+                                                {
+                                                    let _: ::composure::types::ButtonComponent;
+                                                    ::composure::types::ButtonComponent::builder()
+                                                        .primary(true)
+                                                        .custom_id("like")
+                                                        .child("Like")
+                                                        .build()
+                                                }
+                                            })
+                                            .build()
+                                    }
+                                })
+                                .build()
+                        }
+                    })
+                    .build()
+            }
+        };
+        __view
+    }
+}
