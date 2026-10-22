@@ -19,6 +19,25 @@ feature at a time.
 The bot also logs every install to a private channel and DMs whoever adds it to a server
 (the `APPLICATION_AUTHORIZED` Webhook Event).
 
+## Next to composurejs's bot
+
+[composurejs's bot](https://github.com/BlueFrog130/composure-js/tree/main/bots/composure) offers
+the same Commands for the TypeScript port (`/package` for `/crate`) in the same home server. Each is
+its own Discord application, so Commands, components and webhooks never cross; name them
+**composure-rs** and **composurejs** in the Developer Portal, since Discord labels every Command and
+context menu entry with the app's name. Otherwise they keep apart by:
+
+- **Explain release**: versions named for another package (`composurejs v0.2.0`,
+  `composure_macros/v0.1.4`) are skipped, so a composurejs announcement never opens this changelog.
+- **Announcement channels**: one per bot (`#rust-releases`, `#js-releases`). `/notify` only sees
+  follower webhooks whose source is its own channel, so neither bot removes the other's.
+- **Cloudflare**: the Workers (`composure-bot`, `composurejs-bot`) and KV namespaces are separate;
+  their keys are the same, so they must never share a namespace.
+- **Color**: this bot's purple against composurejs's blue.
+
+The feedback and install-log channels may be shared: each post's author is the bot that sent it.
+The composurejs bot's README has the full table.
+
 ## How announcements work
 
 - Every 15 minutes, the `scheduled` handler in [`src/worker.rs`](src/worker.rs) fetches the

@@ -120,7 +120,8 @@ pub fn position(releases: &[Release], version: &str) -> Option<usize> {
         .position(|release| release.version == version)
 }
 
-/// The first `x.y.z` version in `text`, e.g. `composure v0.1.2` → `0.1.2`
+/// The first `x.y.z` version in `text` not named for another package, e.g. `composure v0.1.2` →
+/// `0.1.2`. `composurejs v0.2.0` is skipped: composurejs's bot announces those in the same server.
 pub fn find_version(text: &str) -> Option<&str> {
     let bytes = text.as_bytes();
     let mut start = 0;
@@ -140,7 +141,7 @@ pub fn find_version(text: &str) -> Option<&str> {
                     _ => break,
                 }
             }
-            if dots == 2 {
+            if dots == 2 && !named_for_another(&text[..start]) {
                 return Some(&text[start..end]);
             }
             start = end.max(start + 1);
@@ -149,6 +150,21 @@ pub fn find_version(text: &str) -> Option<&str> {
         }
     }
     None
+}
+
+/// Whether the word a version follows names a package other than `composure`: `composurejs` in
+/// `composurejs v0.2.0`, `composure_macros` in `composure_macros/v0.1.4`. A bare `v0.1.2` is ours.
+fn named_for_another(before: &str) -> bool {
+    let before = match before.strip_suffix(['v', 'V']) {
+        Some(rest) if !rest.ends_with(|c: char| c.is_ascii_alphabetic()) => rest,
+        _ => before,
+    };
+    let before = before.trim_end_matches(|c: char| c.is_whitespace() || "@/*`~:".contains(c));
+    let word = before
+        .rsplit(|c: char| !(c.is_alphanumeric() || "_@/.-".contains(c)))
+        .next()
+        .unwrap_or_default();
+    word.to_ascii_lowercase().contains("composure") && !word.eq_ignore_ascii_case("composure")
 }
 
 /// Release notes made for Discord: headings one level down (the page has its own `##`),
@@ -239,6 +255,22 @@ mod tests {
         assert_eq!(find_version("1.2 and 3.4.5."), Some("3.4.5"));
         assert_eq!(find_version("1.2.3.4"), Some("1.2.3"));
         assert_eq!(find_version("no version 1.2"), None);
+        assert_eq!(find_version("v0.1.2"), Some("0.1.2"));
+        assert_eq!(find_version("**composure** v0.1.2"), Some("0.1.2"));
+        assert_eq!(find_version("composure/v0.1.4"), Some("0.1.4"));
+    }
+
+    #[test]
+    fn skips_other_packages_versions() {
+        // composurejs's bot announces these in the same server
+        assert_eq!(find_version("composurejs v0.2.0 is out"), None);
+        assert_eq!(find_version("composurejs@0.2.0"), None);
+        assert_eq!(find_version("@composurejs/vite@0.3.0"), None);
+        assert_eq!(find_version("composure_macros/v0.1.4"), None);
+        assert_eq!(
+            find_version("composurejs v0.2.0, then composure v0.1.2"),
+            Some("0.1.2")
+        );
     }
 
     #[test]

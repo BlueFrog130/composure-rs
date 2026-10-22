@@ -468,6 +468,30 @@ fn explain_release_reads_the_version_from_a_message() {
     let response = env.answer(explain);
     assert!(response.is_ephemeral());
     assert!(text(&response).contains("## composure v0.1.1"));
+
+    // An announcement is Components V2: its text is in Text Displays
+    let announcement = |content: &str| {
+        let content = content.to_string();
+        in_guild(testing::message_command("Explain release", "")).json(move |json| {
+            json["data"]["resolved"]["messages"][MESSAGE_ID.to_string()]["components"] = json!([
+                { "type": 17, "components": [{ "type": 10, "content": content }] }
+            ]);
+        })
+    };
+    let response = env.answer(announcement("## composure v0.1.0 is out"));
+    assert!(
+        text(&response).contains("## composure v0.1.0"),
+        "{response}"
+    );
+
+    // composurejs's bot announces its own versions in the same server
+    let response = env.answer(announcement("## composurejs v0.1.2 is out"));
+    assert!(
+        response
+            .to_string()
+            .contains("doesn't mention a composure version"),
+        "{response}"
+    );
 }
 
 #[test]
