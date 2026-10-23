@@ -1,7 +1,7 @@
 [package]
 name = "composure"
 # Bumped by knope from .changeset/ (see knope.toml)
-version = "0.2.1"
+version = "0.2.2"
 edition.workspace = true
 rust-version.workspace = true
 description = "Discord bots over HTTP Interactions, no gateway: slash commands, components, modals and JSX-like views, on Cloudflare Workers (WASM) or any server"
