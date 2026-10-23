@@ -72,12 +72,11 @@ pub async fn fetch(
             })
         })
         .collect();
-    // ISO dates sort as text; the API's order is by creation, not publication
-    releases.sort_by(|a, b| {
-        b.date
-            .cmp(&a.date)
-            .then_with(|| newer(&b.version, &a.version))
-    });
+    // Newest version first, the earliest release of each first: `composure/v0.1.3` re-released
+    // the shared `v0.1.3`, and a version twice repeats a select option, which Discord rejects.
+    // ISO dates sort as text.
+    releases.sort_by(|a, b| newer(&b.version, &a.version).then_with(|| a.date.cmp(&b.date)));
+    releases.dedup_by(|a, b| a.version == b.version);
     Ok(releases)
 }
 

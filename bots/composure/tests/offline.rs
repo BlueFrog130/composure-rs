@@ -56,6 +56,14 @@ fn github_releases() -> Value {
             true
         ),
         release("v0.3.0", "2026-10-22T10:00:00Z", "draft", true, false),
+        // knope's first run re-released the last shared version under the crate's tag
+        release(
+            "composure/v0.1.2",
+            "2026-10-22T12:49:06Z",
+            "## What's Changed\n\n* Version each published crate on its own",
+            false,
+            false
+        ),
         release(
             "v0.1.2",
             "2026-10-20T17:05:02Z",
