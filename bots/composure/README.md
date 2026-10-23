@@ -33,7 +33,7 @@ context menu entry with the app's name. Otherwise they keep apart by:
   follower webhooks whose source is its own channel, so neither bot removes the other's.
 - **Cloudflare**: the Workers (`composure-bot`, `composurejs-bot`) and KV namespaces are separate;
   their keys are the same, so they must never share a namespace.
-- **Color**: this bot's purple against composurejs's blue.
+- **Color**: this bot's rust orange (`0xd34516`) against composurejs's TypeScript blue (`0x3178c6`).
 
 The feedback and install-log channels may be shared: each post's author is the bot that sent it.
 The composurejs bot's README has the full table.

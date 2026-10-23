@@ -577,7 +577,7 @@ fn notify_preview_shows_the_announcement() {
     // Components V2, ephemeral
     assert_eq!(response["data"]["flags"], 64 | (1 << 15));
     let container = &response["data"]["components"][0];
-    assert_eq!(container["accent_color"], 0x7c5cff);
+    assert_eq!(container["accent_color"], 0xd34516);
     let page = text(&response);
     assert!(page.contains("## composure v0.1.2 is out"), "{page}");
     assert!(page.contains("Released 2026-10-20"), "{page}");
@@ -650,7 +650,7 @@ fn cron_announces_new_releases_oldest_first() {
     );
     let first: Value = serde_json::from_str(&discord[0].2).unwrap();
     assert_eq!(first["flags"], 1 << 15, "Components V2");
-    assert_eq!(first["components"][0]["accent_color"], 0x7c5cff);
+    assert_eq!(first["components"][0]["accent_color"], 0xd34516);
     assert!(discord[0].2.contains("composure v0.1.1 is out"));
     assert!(discord[2].2.contains("composure v0.1.2 is out"));
     assert_eq!(env.kv.lock().unwrap()["announced"], b"0.1.2");

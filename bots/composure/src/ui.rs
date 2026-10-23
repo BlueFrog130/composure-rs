@@ -16,8 +16,8 @@ use composure::{
     view,
 };
 
-/// Composure's brand color
-pub const PRIMARY: u32 = 0x7c5cff;
+/// Rust orange: tells this bot's messages from composurejs's blue ones in the shared server
+pub const PRIMARY: u32 = 0xd34516;
 /// Discord's grey, for neutral information
 pub const SECONDARY: u32 = 0x4e5058;
 /// Discord's green
