@@ -250,7 +250,7 @@ impl OptionType<'_> for String {
     }
 }
 
-/// Integer value of a string or integer Option, for `#[derive(Choice)]` enums
+/// Integer value of an integer Option, for `#[derive(Choice)]` enums
 pub fn integer_value(option: Option<&DataOption>) -> Result<i64, OptionError> {
     match present(option)? {
         DataOption::Integer(o) => Ok(o.value),

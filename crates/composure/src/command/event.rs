@@ -54,15 +54,7 @@ impl<'a, S> EventCtx<'a, S> {
 impl<S: super::Platform> EventCtx<'_, S> {
     /// Client authorized by the bot token; an error when the Adapter has none
     pub fn bot(&self) -> Result<crate::rest::BotClient<S::Transport>, HandlerError> {
-        let token = self
-            .state
-            .bot_token()
-            .ok_or_else(|| HandlerError::new("the bot token (DISCORD_TOKEN) is not configured"))?;
-        Ok(crate::rest::BotClient::new(
-            self.state.transport(),
-            token,
-            self.application_id,
-        ))
+        super::platform::bot_client(self.state, self.application_id)
     }
 }
 

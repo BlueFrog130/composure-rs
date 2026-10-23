@@ -7,7 +7,10 @@
 //! - enums: the variant index, then its fields
 //! - sequences and maps: the length, then the items
 
-use std::fmt::{self, Display};
+use std::{
+    borrow::Cow,
+    fmt::{self, Display, Write},
+};
 
 use serde::{
     Serialize,
@@ -59,13 +62,17 @@ type Result<T, E = CustomIdError> = std::result::Result<T, E>;
 
 /// `prefix` followed by `state`'s fields; an error past 100 characters
 pub fn encode<T: Serialize + ?Sized>(prefix: &str, state: &T) -> Result<String> {
-    let mut writer = Writer {
-        out: String::from(prefix),
-    };
+    // One allocation: state rarely takes a `custom_id` past Discord's limit
+    let mut out = String::with_capacity(MAX_LEN);
+    out.push_str(prefix);
+    let mut writer = Writer { out };
     state.serialize(&mut writer)?;
-    let len = writer.out.chars().count();
-    if len > MAX_LEN {
-        return Err(CustomIdError::TooLong(len));
+    // Characters, not bytes, but never more characters than bytes
+    if writer.out.len() > MAX_LEN {
+        let len = writer.out.chars().count();
+        if len > MAX_LEN {
+            return Err(CustomIdError::TooLong(len));
+        }
     }
     Ok(writer.out)
 }
@@ -86,11 +93,9 @@ pub fn split(custom_id: &str) -> (&str, Option<&str>) {
 
 /// Decodes the fields after the prefix, as given by [`split`]
 pub fn decode<T: DeserializeOwned>(fields: Option<&str>) -> Result<T> {
-    let mut reader = Reader {
-        fields: fields.map(unescape_fields).unwrap_or_default().into_iter(),
-    };
+    let mut reader = Reader { rest: fields };
     let value = T::deserialize(&mut reader)?;
-    match reader.fields.len() {
+    match reader.remaining() {
         0 => Ok(value),
         n => Err(CustomIdError::Invalid(format!(
             "{n} unexpected trailing fields"
@@ -98,21 +103,23 @@ pub fn decode<T: DeserializeOwned>(fields: Option<&str>) -> Result<T> {
     }
 }
 
-fn unescape_fields(fields: &str) -> Vec<String> {
-    let mut out = vec![String::new()];
+/// `field` without its escapes; borrowed unless it has any
+fn unescape(field: &str) -> Cow<'_, str> {
+    if !field.contains(ESCAPE) {
+        return Cow::Borrowed(field);
+    }
+    let mut out = String::with_capacity(field.len());
     let mut escaped = false;
-    for c in fields.chars() {
+    for c in field.chars() {
         match c {
-            _ if escaped => {
+            ESCAPE if !escaped => escaped = true,
+            _ => {
                 escaped = false;
-                out.last_mut().expect("never empty").push(c);
+                out.push(c);
             }
-            ESCAPE => escaped = true,
-            SEPARATOR => out.push(String::new()),
-            _ => out.last_mut().expect("never empty").push(c),
         }
     }
-    out
+    Cow::Owned(out)
 }
 
 struct Writer {
@@ -122,12 +129,8 @@ struct Writer {
 impl Writer {
     fn field(&mut self, value: impl Display) {
         self.out.push(SEPARATOR);
-        for c in value.to_string().chars() {
-            if c == SEPARATOR || c == ESCAPE {
-                self.out.push(ESCAPE);
-            }
-            self.out.push(c);
-        }
+        // Formatted straight into the `custom_id`, escaping as it goes
+        let _ = write!(Escaping(&mut self.out), "{value}");
     }
 
     fn unsupported<T>(what: &str) -> Result<T> {
@@ -276,6 +279,21 @@ impl ser::Serializer for &mut Writer {
     }
 }
 
+/// Appends to a `custom_id` with separators and escapes escaped
+struct Escaping<'a>(&'a mut String);
+
+impl Write for Escaping<'_> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.chars() {
+            if c == SEPARATOR || c == ESCAPE {
+                self.0.push(ESCAPE);
+            }
+            self.0.push(c);
+        }
+        Ok(())
+    }
+}
+
 macro_rules! compound {
     ($($trait:ident :: $method:ident),*) => {$(
         impl ser::$trait for &mut Writer {
@@ -334,15 +352,31 @@ impl ser::SerializeStructVariant for &mut Writer {
     }
 }
 
-struct Reader {
-    fields: std::vec::IntoIter<String>,
+/// Reads fields off the `custom_id` in place: only a field with escapes is copied
+struct Reader<'a> {
+    /// The fields not read yet, still escaped; `None` once every field is read
+    rest: Option<&'a str>,
 }
 
-impl Reader {
-    fn next(&mut self) -> Result<String> {
-        self.fields
-            .next()
-            .ok_or_else(|| CustomIdError::Invalid("too few fields".into()))
+impl<'a> Reader<'a> {
+    fn next(&mut self) -> Result<Cow<'a, str>> {
+        let rest = self
+            .rest
+            .ok_or_else(|| CustomIdError::Invalid("too few fields".into()))?;
+        let (field, rest) = split(rest);
+        self.rest = rest;
+        Ok(unescape(field))
+    }
+
+    /// Whether the next field is empty (`None` for an `Option`)
+    fn next_is_empty(&self) -> bool {
+        self.rest
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(SEPARATOR))
+    }
+
+    /// How many fields are left
+    fn remaining(&self) -> usize {
+        std::iter::successors(self.rest, |rest| split(rest).1).count()
     }
 
     fn parse<T: std::str::FromStr>(&mut self, what: &str) -> Result<T> {
@@ -365,7 +399,7 @@ macro_rules! parse_number {
     )*};
 }
 
-impl<'de> de::Deserializer<'de> for &mut Reader {
+impl<'de> de::Deserializer<'de> for &mut Reader<'_> {
     type Error = CustomIdError;
 
     fn deserialize_any<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
@@ -375,7 +409,7 @@ impl<'de> de::Deserializer<'de> for &mut Reader {
     }
 
     fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
-        match self.next()?.as_str() {
+        match &*self.next()? {
             "1" | "true" => visitor.visit_bool(true),
             "0" | "false" => visitor.visit_bool(false),
             other => Err(CustomIdError::Invalid(format!("`{other}` is not a bool"))),
@@ -397,11 +431,14 @@ impl<'de> de::Deserializer<'de> for &mut Reader {
     );
 
     fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
-        visitor.visit_string(self.next()?)
+        match self.next()? {
+            Cow::Borrowed(field) => visitor.visit_str(field),
+            Cow::Owned(field) => visitor.visit_string(field),
+        }
     }
 
     fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
-        visitor.visit_string(self.next()?)
+        self.deserialize_str(visitor)
     }
 
     fn deserialize_bytes<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
@@ -413,7 +450,7 @@ impl<'de> de::Deserializer<'de> for &mut Reader {
     }
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
-        if self.fields.as_slice().first().is_some_and(String::is_empty) {
+        if self.next_is_empty() {
             self.next()?;
             visitor.visit_none()
         } else {
@@ -508,12 +545,12 @@ impl<'de> de::Deserializer<'de> for &mut Reader {
     }
 }
 
-struct Items<'r> {
-    reader: &'r mut Reader,
+struct Items<'r, 'a> {
+    reader: &'r mut Reader<'a>,
     left: usize,
 }
 
-impl<'de> de::SeqAccess<'de> for Items<'_> {
+impl<'de> de::SeqAccess<'de> for Items<'_, '_> {
     type Error = CustomIdError;
 
     fn next_element_seed<T: de::DeserializeSeed<'de>>(
@@ -532,7 +569,7 @@ impl<'de> de::SeqAccess<'de> for Items<'_> {
     }
 }
 
-impl<'de> de::MapAccess<'de> for Items<'_> {
+impl<'de> de::MapAccess<'de> for Items<'_, '_> {
     type Error = CustomIdError;
 
     fn next_key_seed<K: de::DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>> {
@@ -548,7 +585,7 @@ impl<'de> de::MapAccess<'de> for Items<'_> {
     }
 }
 
-impl<'de> de::EnumAccess<'de> for &mut Reader {
+impl<'de> de::EnumAccess<'de> for &mut Reader<'_> {
     type Error = CustomIdError;
     type Variant = Self;
 
@@ -559,7 +596,7 @@ impl<'de> de::EnumAccess<'de> for &mut Reader {
     }
 }
 
-impl<'de> de::VariantAccess<'de> for &mut Reader {
+impl<'de> de::VariantAccess<'de> for &mut Reader<'_> {
     type Error = CustomIdError;
 
     fn unit_variant(self) -> Result<()> {
@@ -675,10 +712,24 @@ mod tests {
     }
 
     #[test]
+    fn reads_escaped_fields() {
+        assert_eq!(round_trip(("a:b".to_string(), 1u8)), r"p:a\:b:1");
+        assert_eq!(
+            round_trip((Some(r"\".to_string()), None::<u8>, 2u8)),
+            r"p:\\::2"
+        );
+        assert_eq!(decode::<String>(Some("")).unwrap(), "");
+        assert_eq!(decode::<Option<String>>(Some("")).unwrap(), None);
+    }
+
+    #[test]
     fn rejects_mismatches() {
         assert!(decode::<u8>(Some("300")).is_err());
         assert!(decode::<u8>(None).is_err());
-        assert!(decode::<u8>(Some("1:2")).is_err(), "trailing fields");
+        assert_eq!(
+            decode::<u8>(Some("1:2:3")).unwrap_err().to_string(),
+            "custom_id: 2 unexpected trailing fields"
+        );
         assert!(decode::<bool>(Some("maybe")).is_err());
         assert!(decode::<Action>(Some("9")).is_err());
     }

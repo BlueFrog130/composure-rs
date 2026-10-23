@@ -294,7 +294,7 @@ fn cases() -> Vec<Case> {
                 assert_eq!(r["type"], 7);
                 assert_eq!(r["data"]["content"], "Clicked 5 times");
             },
-            32,
+            28,
         ),
         case(
             "button like (V2 card View)",
@@ -306,7 +306,7 @@ fn cases() -> Vec<Case> {
                     "-# 3 likes"
                 );
             },
-            45,
+            39,
         ),
         case(
             "button review (opens a modal View)",
@@ -315,7 +315,7 @@ fn cases() -> Vec<Case> {
                 assert_eq!(r["type"], 9);
                 assert_eq!(r["data"]["custom_id"], "review:send:2");
             },
-            45,
+            41,
         ),
         case(
             "button roll (deferred update)",
@@ -326,7 +326,7 @@ fn cases() -> Vec<Case> {
                 message(0, row(json!([button("Roll", "roll:2", 2)]))),
             ),
             |r| assert_eq!(r, &json!({ "type": 6 })),
-            26,
+            24,
         ),
         case(
             "select colors",
@@ -366,7 +366,7 @@ fn cases() -> Vec<Case> {
                     "Thanks! Idea **Docs**: Needs examples (0 screenshots); we'll be in touch"
                 )
             },
-            48,
+            45,
         ),
     ]
 }
