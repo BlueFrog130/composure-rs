@@ -581,6 +581,7 @@ fn notify_preview_shows_the_announcement() {
     let page = text(&response);
     assert!(page.contains("## composure v0.1.2 is out"), "{page}");
     assert!(page.contains("Released 2026-10-20"), "{page}");
+    assert!(page.contains(composure_bot::ui::FOOTER), "{page}");
     let links: Vec<_> = response
         .components()
         .into_iter()
