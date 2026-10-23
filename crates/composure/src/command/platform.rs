@@ -50,18 +50,16 @@ fn interaction_client<S: Platform>(
     )
 }
 
-fn bot_client<S: Platform>(
+/// The Bot Client of [`Ctx::bot`], [`DeferredCtx::bot`] and
+/// [`EventCtx::bot`](super::EventCtx::bot)
+pub(super) fn bot_client<S: Platform>(
     state: &S,
-    common: &InteractionCommon,
+    application_id: Snowflake,
 ) -> Result<BotClient<S::Transport>, HandlerError> {
     let token = state
         .bot_token()
         .ok_or_else(|| HandlerError::new("the bot token (DISCORD_TOKEN) is not configured"))?;
-    Ok(BotClient::new(
-        state.transport(),
-        token,
-        common.application_id,
-    ))
+    Ok(BotClient::new(state.transport(), token, application_id))
 }
 
 impl<'a, S: Platform, D: Clone + Send + Sync + 'static> Ctx<'a, S, D> {
@@ -74,7 +72,7 @@ impl<'a, S: Platform, D: Clone + Send + Sync + 'static> Ctx<'a, S, D> {
 
     /// Client authorized by the bot token; an error when the Adapter has none
     pub fn bot(&self) -> Result<BotClient<S::Transport>, HandlerError> {
-        bot_client(self.state(), &self.interaction().common)
+        bot_client(self.state(), self.interaction().common.application_id)
     }
 
     /// Answers with a Deferred Response (the user sees "thinking...") and runs `work` as
@@ -327,7 +325,7 @@ impl<S: Platform, D> DeferredCtx<S, D> {
 
     /// Client authorized by the bot token; an error when the Adapter has none
     pub fn bot(&self) -> Result<BotClient<S::Transport>, HandlerError> {
-        bot_client(&self.state, &self.interaction.common)
+        bot_client(&self.state, self.interaction.common.application_id)
     }
 
     /// Waits on the platform's timer (counts toward the Background Work time limit)

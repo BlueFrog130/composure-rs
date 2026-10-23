@@ -1,4 +1,8 @@
-use std::{borrow::Cow, fmt::Display, time::Duration};
+use std::{
+    borrow::Cow,
+    fmt::{Display, Write},
+    time::Duration,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -209,7 +213,9 @@ fn encode_reason(reason: &str) -> String {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b' ' => {
                 encoded.push(byte as char)
             }
-            _ => encoded.push_str(&format!("%{byte:02X}")),
+            _ => {
+                let _ = write!(encoded, "%{byte:02X}");
+            }
         }
     }
     encoded

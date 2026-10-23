@@ -468,6 +468,30 @@ fn explain_release_reads_the_version_from_a_message() {
     let response = env.answer(explain);
     assert!(response.is_ephemeral());
     assert!(text(&response).contains("## composure v0.1.1"));
+
+    // An announcement is Components V2: its text is in Text Displays
+    let announcement = |content: &str| {
+        let content = content.to_string();
+        in_guild(testing::message_command("Explain release", "")).json(move |json| {
+            json["data"]["resolved"]["messages"][MESSAGE_ID.to_string()]["components"] = json!([
+                { "type": 17, "components": [{ "type": 10, "content": content }] }
+            ]);
+        })
+    };
+    let response = env.answer(announcement("## composure v0.1.0 is out"));
+    assert!(
+        text(&response).contains("## composure v0.1.0"),
+        "{response}"
+    );
+
+    // composurejs's bot announces its own versions in the same server
+    let response = env.answer(announcement("## composurejs v0.1.2 is out"));
+    assert!(
+        response
+            .to_string()
+            .contains("doesn't mention a composure version"),
+        "{response}"
+    );
 }
 
 #[test]
@@ -553,10 +577,11 @@ fn notify_preview_shows_the_announcement() {
     // Components V2, ephemeral
     assert_eq!(response["data"]["flags"], 64 | (1 << 15));
     let container = &response["data"]["components"][0];
-    assert_eq!(container["accent_color"], 0x7c5cff);
+    assert_eq!(container["accent_color"], 0xd34516);
     let page = text(&response);
     assert!(page.contains("## composure v0.1.2 is out"), "{page}");
     assert!(page.contains("Released 2026-10-20"), "{page}");
+    assert!(page.contains(composure_bot::ui::FOOTER), "{page}");
     let links: Vec<_> = response
         .components()
         .into_iter()
@@ -626,7 +651,7 @@ fn cron_announces_new_releases_oldest_first() {
     );
     let first: Value = serde_json::from_str(&discord[0].2).unwrap();
     assert_eq!(first["flags"], 1 << 15, "Components V2");
-    assert_eq!(first["components"][0]["accent_color"], 0x7c5cff);
+    assert_eq!(first["components"][0]["accent_color"], 0xd34516);
     assert!(discord[0].2.contains("composure v0.1.1 is out"));
     assert!(discord[2].2.contains("composure v0.1.2 is out"));
     assert_eq!(env.kv.lock().unwrap()["announced"], b"0.1.2");

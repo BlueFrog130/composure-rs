@@ -5,9 +5,9 @@
 //! <ui::Error>"That release does not exist."</ui::Error>
 //! ```
 //!
-//! Each sets its accent color from the consts below, so replies, deferred edits and messages sent
-//! through REST (announcements, feedback) look alike. Handler errors use [`render_error`], the
-//! App's `errors = ..`, in the same style.
+//! Each sets its accent color from the consts below and ends with [`FOOTER`], so replies, deferred
+//! edits and messages sent through REST (announcements, feedback) look alike. Handler errors use
+//! [`render_error`], the App's `errors = ..`, in the same style.
 
 use composure::{
     command::{Ephemeral, HandlerError, IntoResponse, View},
@@ -16,8 +16,8 @@ use composure::{
     view,
 };
 
-/// Composure's brand color
-pub const PRIMARY: u32 = 0x7c5cff;
+/// Rust orange: tells this bot's messages from composurejs's blue ones in the shared server
+pub const PRIMARY: u32 = 0xd34516;
 /// Discord's grey, for neutral information
 pub const SECONDARY: u32 = 0x4e5058;
 /// Discord's green
@@ -26,6 +26,9 @@ pub const SUCCESS: u32 = 0x57f287;
 pub const WARNING: u32 = 0xfee75c;
 /// Discord's red
 pub const ERROR: u32 = 0xed4245;
+/// Under every panel: names the bot where the accent color doesn't show (notifications,
+/// colorblind readers)
+pub const FOOTER: &str = "-# composure-rs · Rust";
 
 /// Handler errors as an ephemeral [`Error`] container: the App's `errors = ..`, so the
 /// framework's error replies look like the bot's own
@@ -34,12 +37,13 @@ pub fn render_error(error: &HandlerError) -> InteractionResponse {
     Ephemeral(panel(ERROR, None, rsx! { <Text>{message}</Text> })).into_response()
 }
 
-/// A container with `accent` and an optional `### title` above `children`
+/// A container with `accent`, an optional `### title` above `children`, and [`FOOTER`] below
 fn panel(accent: u32, title: Option<String>, children: View) -> View {
     rsx! {
         <Container accent_color=accent>
             {title.map(|title| rsx! { <Text>"### " {title}</Text> })}
             {children}
+            <Text>{FOOTER}</Text>
         </Container>
     }
 }

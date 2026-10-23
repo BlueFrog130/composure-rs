@@ -9,7 +9,7 @@ use composure::{
     Ctx, app, autocomplete, command,
     command::{ComponentCtx, Ephemeral, HandlerError, IntoResponse, Update, View},
     rsx,
-    types::{InteractionResponse, Message, SelectOption, Snowflake},
+    types::{Component, InteractionResponse, Message, SelectOption, Snowflake},
     view,
 };
 
@@ -260,17 +260,20 @@ pub async fn explain_release(
     target: &Message,
 ) -> Result<Ephemeral<Changelog>, HandlerError> {
     let owner = invoker(ctx.user().map(|user| user.id))?;
-    let texts =
-        std::iter::once(target.content.as_str()).chain(target.embeds.iter().flat_map(|embed| {
+    let texts = std::iter::once(target.content.as_str())
+        .chain(target.embeds.iter().flat_map(|embed| {
             [embed.title.as_deref(), embed.description.as_deref()]
                 .into_iter()
                 .flatten()
-        }));
+        }))
+        .chain(text_displays(
+            target.components.as_deref().unwrap_or_default(),
+        ));
     let version = texts
         .filter_map(releases::find_version)
         .next()
         .ok_or_else(|| {
-            HandlerError::user("That message doesn't mention a version like `0.1.2`.")
+            HandlerError::user("That message doesn't mention a composure version like `0.1.2`.")
         })?;
     let releases = releases::load(ctx.state()).await?;
     Ok(Ephemeral(build(
@@ -280,6 +283,21 @@ pub async fn explain_release(
         None,
         None,
     )?))
+}
+
+/// Every Text Display's content in `components`, depth first: announcements are Components V2,
+/// with no content or embeds
+fn text_displays(components: &[Component]) -> Vec<&str> {
+    let mut texts = Vec::new();
+    for component in components {
+        match component {
+            Component::TextDisplay(text) => texts.push(text.content.as_str()),
+            Component::Container(container) => texts.extend(text_displays(&container.components)),
+            Component::Section(section) => texts.extend(text_displays(&section.components)),
+            _ => {}
+        }
+    }
+    texts
 }
 
 /// The changelog Commands and their View, listed in [`ComposureBot`](crate::ComposureBot)

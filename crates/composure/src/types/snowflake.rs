@@ -91,7 +91,7 @@ impl<'de> Deserialize<'de> for Snowflake {
             type Value = Snowflake;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("SnowflakeVisitor")
+                formatter.write_str("an id as a string of digits")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>

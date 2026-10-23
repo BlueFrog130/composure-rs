@@ -450,13 +450,41 @@ pub struct ModalSubmitComponent {
 }
 
 /// A submitted `value`: text (text inputs, radio groups) or a checkbox's state
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubmittedValue {
     /// Text, from a text input or radio group
     Text(String),
     /// Whether a checkbox was checked
     Checked(bool),
+}
+
+/// Read by JSON type, not `#[serde(untagged)]`, which would buffer each value first
+impl<'de> Deserialize<'de> for SubmittedValue {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+
+        impl de::Visitor<'_> for Visitor {
+            type Value = SubmittedValue;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a string or boolean")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(SubmittedValue::Text(v.to_string()))
+            }
+
+            fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(SubmittedValue::Text(v))
+            }
+
+            fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
+                Ok(SubmittedValue::Checked(v))
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
+    }
 }
 
 impl ModalSubmitComponent {
@@ -1412,5 +1440,17 @@ mod tests {
             Snowflake::from_u64(282265607313817601)
         );
         assert!(ping.common.invoking_user().is_none());
+    }
+
+    #[test]
+    pub fn submitted_values_are_text_or_checked() {
+        let component = |value: &str| {
+            serde_json::from_slice::<ModalSubmitComponent>(
+                format!(r#"{{ "type": 4, "custom_id": "x", "value": {value} }}"#).as_bytes(),
+            )
+        };
+        assert_eq!(component(r#""hi""#).unwrap().text(), Some("hi"));
+        assert_eq!(component("true").unwrap().checked(), Some(true));
+        assert!(component("1").is_err());
     }
 }
