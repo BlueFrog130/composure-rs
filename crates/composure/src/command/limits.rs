@@ -116,11 +116,17 @@ fn one(component: &Component, totals: &mut Totals) -> Result<(), ViewError> {
             button.custom_id.as_deref().map_or(Ok(()), custom_id)
         }
         Component::StringSelect(select) => {
-            at_most(
-                "options in a select",
-                MAX_SELECT_OPTIONS,
-                select.options.as_ref().map_or(0, Vec::len),
-            )?;
+            let options = select.options.as_deref().unwrap_or_default();
+            at_most("options in a select", MAX_SELECT_OPTIONS, options.len())?;
+            // Discord drops the whole response over a repeated value, with no error to the bot
+            for (i, option) in options.iter().enumerate() {
+                if options[..i].iter().any(|other| other.value == option.value) {
+                    return Err(ViewError::Duplicate {
+                        what: "option value in a select",
+                        value: option.value.clone(),
+                    });
+                }
+            }
             custom_id(&select.custom_id)
         }
         Component::UserSelect(select) => custom_id(&select.custom_id),
@@ -268,6 +274,26 @@ mod tests {
     fn options_of_a_select() {
         let row = ActionRow::new(vec![select(26)]).into();
         assert_eq!(limit(check_message(&[row])), ("options in a select", 26));
+    }
+
+    #[test]
+    fn option_values_of_a_select_are_unique() {
+        let mut row = select(3);
+        if let Component::StringSelect(select) = &mut row {
+            select.options.as_mut().unwrap()[2].value = "0".into();
+        }
+        let error = check_message(&[ActionRow::new(vec![row]).into()]).unwrap_err();
+        assert_eq!(
+            error,
+            ViewError::Duplicate {
+                what: "option value in a select",
+                value: "0".into()
+            }
+        );
+        assert_eq!(
+            error.to_string(),
+            "option value in a select \"0\" repeats, Discord requires each to be unique"
+        );
     }
 
     #[test]
