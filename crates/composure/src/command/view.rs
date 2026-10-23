@@ -219,7 +219,10 @@ impl Display for ViewError {
                 found,
             } => write!(f, "{found} {what}, Discord allows {min} to {max}"),
             ViewError::Duplicate { what, value } => {
-                write!(f, "{what} {value:?} repeats, Discord requires each to be unique")
+                write!(
+                    f,
+                    "{what} {value:?} repeats, Discord requires each to be unique"
+                )
             }
         }
     }
