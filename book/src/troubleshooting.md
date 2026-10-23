@@ -13,7 +13,7 @@ Cloudflare, stderr on a server.
 | No answer within 3 seconds | "The application did not respond"; the handler finishes later | Answer with `ctx.defer(..)` and do the slow part in Background Work ([REST and deferring](deferring.md)). On Workers, a cold start plus slow REST calls before answering can be enough |
 | Signature or public key mismatch | 401 in the logs; the Endpoint URL won't save | Set `DISCORD_PUBLIC_KEY` to the public key of the application whose Endpoint URL points at the bot, not another one's (development and production apps differ) |
 | Configuration failed to load | 500 on Workers, logged on the isolate's first request | A missing secret or var, or an error from `.with_credentials` / `.with_data`; set it and retry |
-| Discord rejected the response | The handler ran, nothing is logged as an error | A response Discord refuses: a component over its limits (5 buttons per row, 25 select options, label lengths), more than 10 embeds, an empty message. Compare the response with Discord's limits; [Testing](testing.md) shows the JSON |
+| Discord rejected the response | The handler ran, nothing is logged as an error | A response Discord refuses: more than 10 embeds, an empty message, a component built by hand over its limits. Views are checked before answering (counts, lengths, repeated select option values) and fail as a handler error instead. Compare the response with Discord's limits; [Testing](testing.md) shows the JSON |
 | Components V2 with content or embeds | An error naming the field | A Components V2 message (a `Container`, a View) carries its text in text displays: move `content` and `embeds` into components |
 
 ## Errors the user sees

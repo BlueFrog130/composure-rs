@@ -193,6 +193,13 @@ pub enum ViewError {
         /// How many there were
         found: usize,
     },
+    /// Two of something Discord requires to be unique share a value
+    Duplicate {
+        /// What repeats, e.g. `"option value in a select"`
+        what: &'static str,
+        /// The repeated value
+        value: String,
+    },
 }
 
 impl Display for ViewError {
@@ -211,6 +218,9 @@ impl Display for ViewError {
                 max,
                 found,
             } => write!(f, "{found} {what}, Discord allows {min} to {max}"),
+            ViewError::Duplicate { what, value } => {
+                write!(f, "{what} {value:?} repeats, Discord requires each to be unique")
+            }
         }
     }
 }
