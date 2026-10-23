@@ -26,7 +26,7 @@ homepage = "https://github.com/BlueFrog130/composure-rs"
 # The published crates, as they depend on each other; each `version` is bumped by knope with that
 # crate's own (see knope.toml)
 [workspace.dependencies]
-composure = { path = "crates/composure", version = "0.2.0" }
+composure = { path = "crates/composure", version = "0.2.1" }
 composure_macros = { path = "crates/macros", version = "0.2.0" }
 composure_commands = { path = "crates/commands", version = "0.2.0" }
 composure_sync = { path = "crates/sync", version = "0.2.0" }
