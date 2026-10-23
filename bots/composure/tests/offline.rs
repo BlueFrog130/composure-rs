@@ -343,6 +343,35 @@ fn syncs_every_command_with_its_contexts() {
 }
 
 #[test]
+fn changelog_reads_a_stored_copy_that_repeats_a_version() {
+    // As stored before releases were kept one per version: Discord drops a select repeating a value
+    let env = TestEnv::default();
+    let release = |version: &str, date: &str, tag: &str| {
+        json!({
+            "version": version, "date": date, "notes": "",
+            "url": format!("https://github.com/BlueFrog130/composure-rs/releases/tag/{tag}"),
+        })
+    };
+    let stored = json!([
+        release("0.1.2", "2026-10-22", "composure/v0.1.2"),
+        release("0.1.2", "2026-10-20", "v0.1.2"),
+        release("0.1.1", "2026-10-20", "v0.1.1"),
+    ]);
+    env.kv
+        .lock()
+        .unwrap()
+        .insert("releases".into(), serde_json::to_vec(&stored).unwrap());
+    let response = env.answer(command("changelog"));
+    assert_eq!(response["type"], 4, "{response}");
+    assert!(text(&response).contains("1 of 2"));
+    assert_eq!(
+        button(&response, "On GitHub")["url"],
+        "https://github.com/BlueFrog130/composure-rs/releases/tag/v0.1.2"
+    );
+    assert_eq!(env.github_calls(), 0);
+}
+
+#[test]
 fn changelog_opens_on_the_latest_release_and_pages() {
     let env = TestEnv::default();
     let alice = users::alice().id;

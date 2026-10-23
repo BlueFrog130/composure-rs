@@ -72,12 +72,16 @@ pub async fn fetch(
             })
         })
         .collect();
-    // Newest version first, the earliest release of each first: `composure/v0.1.3` re-released
-    // the shared `v0.1.3`, and a version twice repeats a select option, which Discord rejects.
-    // ISO dates sort as text.
+    one_per_version(&mut releases);
+    Ok(releases)
+}
+
+/// Newest version first, keeping the earliest release of each: `composure/v0.1.3` re-released
+/// the shared `v0.1.3`, and a version twice repeats a select option, which Discord rejects.
+/// ISO dates sort as text.
+fn one_per_version(releases: &mut Vec<Release>) {
     releases.sort_by(|a, b| newer(&b.version, &a.version).then_with(|| a.date.cmp(&b.date)));
     releases.dedup_by(|a, b| a.version == b.version);
-    Ok(releases)
 }
 
 /// Orders `a` and `b` by their numeric `x.y.z` parts
@@ -101,11 +105,13 @@ pub async fn refresh(
     Ok(releases)
 }
 
-/// The stored releases; fetched and stored when missing (before the cron trigger first ran)
+/// The stored releases; fetched and stored when missing (before the cron trigger first ran).
+/// Put in order again: a copy stored by an older version may repeat a version.
 pub async fn load(state: &impl Services) -> Result<Vec<Release>, HandlerError> {
     if let Some(bytes) = state.get(RELEASES_KEY).await?
-        && let Ok(releases) = serde_json::from_slice(&bytes)
+        && let Ok(mut releases) = serde_json::from_slice::<Vec<Release>>(&bytes)
     {
+        one_per_version(&mut releases);
         return Ok(releases);
     }
     refresh(&state.transport(), state, state.data()).await
