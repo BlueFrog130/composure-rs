@@ -1,8 +1,10 @@
+<img src="https://raw.githubusercontent.com/BlueFrog130/composure-rs/main/assets/logo.svg" alt="Composure logo" width="64" height="64" align="right">
+
 # composure_sync
 
 **`terraform plan` for your Discord slash commands.** Make Discord's stored commands match your
 [Composure](https://github.com/BlueFrog130/composure-rs) bot's code: see exactly what will be
-created, updated and deleted, confirm, done. Or let CI fail the build when they drift.
+created, updated and deleted, then confirm. In CI, `--check` fails the build when they drift.
 
 [![Crates.io](https://img.shields.io/crates/v/composure_sync.svg?logo=rust)](https://crates.io/crates/composure_sync)
 [![Docs.rs](https://img.shields.io/docsrs/composure_sync?logo=docs.rs)](https://docs.rs/composure_sync)
@@ -10,9 +12,9 @@ created, updated and deleted, confirm, done. Or let CI fail the build when they 
 [![License](https://img.shields.io/crates/l/composure_sync.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
 [![MSRV](https://img.shields.io/badge/rustc-1.88+-orange.svg?logo=rust)](https://blog.rust-lang.org/)
 
-- **One source of truth**: definitions come from your `#[command]` functions, never hand-written JSON
-- **Safe by default**: a readable plan first; the prompt defaults to *No* when something would be deleted
-- **CI-native**: `--check` exits 2 on drift, `--yes` deploys, and it never hangs waiting for input outside a terminal
+- **From code**: definitions come from your `#[command]` functions, never hand-written JSON
+- **Plan first**: a readable plan before any change; the prompt defaults to *No* when something would be deleted
+- **CI**: `--check` exits 2 on drift, `--yes` deploys, and it never hangs waiting for input outside a terminal
 - **Scopes**: keep admin and test commands in your own servers with `scope = "dev"`
 - **Minimal requests**: unchanged targets are skipped, changed ones are one bulk overwrite each
 

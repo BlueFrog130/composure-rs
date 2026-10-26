@@ -71,7 +71,7 @@ repository's `examples/` are built that way.
 
 ## Platform-specific Commands
 
-When a Command is inherently tied to a platform, take its State directly:
+When a Command only works on one platform, take its State directly:
 
 ```rust,ignore
 use composure::{command, command::{Ctx, HandlerError}};

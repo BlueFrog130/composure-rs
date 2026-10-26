@@ -1,3 +1,5 @@
+<img src="../../assets/logo.svg" alt="Composure logo" width="64" height="64" align="right">
+
 # Composure example bot on Cloudflare Workers
 
 [![CI](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlueFrog130/composure-rs/actions/workflows/ci.yml)

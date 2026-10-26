@@ -183,7 +183,7 @@ fn roll(#[option("Dice, like 2d6")] dice: &str) -> Result<Ephemeral<String>, Han
 ```
 
 A converted error keeps its causes (its [`source`](https://doc.rust-lang.org/std/error/trait.Error.html#method.source)
-chain) for the logs: `{}` prints only the message, as before, while `{:#}` and the `sources` log
+chain) for the logs: `{}` prints only the message, while `{:#}` and the `sources` log
 field show the rest, like `request failed: connection reset`.
 [`with_source`](https://docs.rs/composure/latest/composure/command/struct.HandlerError.html#method.with_source)
 adds a cause to an error you build yourself, without showing it to the user:

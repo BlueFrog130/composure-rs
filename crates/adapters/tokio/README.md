@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/BlueFrog130/composure-rs/main/assets/logo.svg" alt="Composure logo" width="64" height="64" align="right">
+
 # composure_adapter_tokio
 
 **Your Discord bot as a plain HTTP server.** Serve a [Composure](https://github.com/BlueFrog130/composure-rs)
@@ -11,10 +13,10 @@ across all cores, with the same answers as on Cloudflare Workers.
 [![MSRV](https://img.shields.io/badge/rustc-1.91+-orange.svg?logo=rust)](https://blog.rust-lang.org/)
 [![tokio](https://img.shields.io/badge/runs_on-tokio-463F3A?logo=rust&logoColor=white)](https://tokio.rs/)
 
-- **Production-ready defaults**: `GET /health`, a 1 MiB body limit, panics isolated to their request, graceful shutdown on Ctrl-C / SIGTERM
+- **Server defaults**: `GET /health`, a 1 MiB body limit, panics isolated to their request, graceful shutdown on Ctrl-C / SIGTERM
 - **Configured from the environment**: `DISCORD_PUBLIC_KEY`, `DISCORD_TOKEN`, `PORT`, and you're serving; or load `Credentials` with `config`, `figment`, `envy`, ...
 - **Your data in every Command**: `.with_data(..)` hands your Bot Data to handlers through `Host<T>`
-- **Background Work you can trust**: deferred work is tracked and awaited on shutdown
+- **Tracked Background Work**: deferred work is awaited on shutdown
 - **Testable**: point the HTTP client at a stand-in Discord with `HttpTransport::with_api_base`
 
 ## Usage
