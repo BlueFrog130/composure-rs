@@ -1,7 +1,7 @@
 [package]
 name = "composure_adapter_tokio"
 # Bumped by knope from .changeset/ (see knope.toml)
-version = "0.2.0"
+version = "0.2.1"
 edition.workspace = true
 rust-version = "1.91"
 description = "Serve Composure Discord bots from a hosted server on tokio and hyper, with graceful shutdown and health checks"
