@@ -16,6 +16,7 @@ talking to your bot.
 [![Downloads](https://img.shields.io/crates/d/composure.svg)](https://crates.io/crates/composure)
 [![License](https://img.shields.io/crates/l/composure.svg)](https://github.com/BlueFrog130/composure-rs/blob/main/LICENSE)
 [![MSRV](https://img.shields.io/badge/rustc-1.88+-orange.svg?logo=rust)](https://blog.rust-lang.org/)
+[![Discord](https://img.shields.io/badge/chat-on_Discord-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/8rWjWtp3pG)
 <br>
 [![Discord API](https://img.shields.io/badge/Discord_API-v10-5865F2?logo=discord&logoColor=white)](https://discord.com/developers/docs/interactions/overview)
 [![Cloudflare Workers](https://img.shields.io/badge/runs_on-Cloudflare_Workers-F38020?logo=cloudflareworkers&logoColor=white)](https://workers.cloudflare.com/)
@@ -26,6 +27,7 @@ talking to your bot.
 [Guide](https://bluefrog130.github.io/composure-rs/) ·
 [API docs](https://docs.rs/composure) ·
 [Examples](https://github.com/BlueFrog130/composure-rs/tree/main/examples) ·
+[Discord](https://discord.com/invite/8rWjWtp3pG) ·
 [Crates](#crates)
 
 </div>
@@ -233,7 +235,8 @@ Crypto signature checks), so a Worker only ships what it uses. See
 
 Composure is pre-1.0: the API may change between minor versions. It tracks Discord's
 v10 API and its latest components (Components V2, labels, radio groups, checkboxes, file
-uploads). Issues and pull requests are welcome.
+uploads). Issues and pull requests are welcome, and questions go in the
+[Discord server](https://discord.com/invite/8rWjWtp3pG).
 
 ## Contributing
 
