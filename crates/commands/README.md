@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/BlueFrog130/composure-rs/main/assets/logo.svg" alt="Composure logo" width="64" height="64" align="right">
+
 # composure_commands
 
 **A fluent builder for Discord application command definitions.**

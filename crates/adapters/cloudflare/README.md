@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/BlueFrog130/composure-rs/main/assets/logo.svg" alt="Composure logo" width="64" height="64" align="right">
+
 # composure_adapter_cloudflare
 
 **Run your Discord bot on Cloudflare's edge.** Serve a [Composure](https://github.com/BlueFrog130/composure-rs)

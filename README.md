@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="https://raw.githubusercontent.com/BlueFrog130/composure-rs/main/assets/logo.svg" alt="Composure logo" width="128" height="128">
+
 # Composure
 
 **Discord bots that live on the edge.**

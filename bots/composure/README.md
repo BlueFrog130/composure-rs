@@ -1,3 +1,5 @@
+<img src="../../assets/logo.svg" alt="Composure logo" width="64" height="64" align="right">
+
 # Composure bot
 
 Composure's own Discord bot, built with Composure and served from Cloudflare Workers. It
