@@ -1,7 +1,7 @@
 [package]
 name = "composure_sync"
 # Bumped by knope from .changeset/ (see knope.toml)
-version = "0.2.0"
+version = "0.2.1"
 edition.workspace = true
 rust-version.workspace = true
 description = "Deploy-time CLI that syncs a Composure bot's slash commands with Discord: plan, confirm, apply, CI drift checks"

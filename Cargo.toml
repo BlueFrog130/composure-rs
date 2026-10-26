@@ -26,12 +26,12 @@ homepage = "https://github.com/BlueFrog130/composure-rs"
 # The published crates, as they depend on each other; each `version` is bumped by knope with that
 # crate's own (see knope.toml)
 [workspace.dependencies]
-composure = { path = "crates/composure", version = "0.2.2" }
-composure_macros = { path = "crates/macros", version = "0.2.0" }
-composure_commands = { path = "crates/commands", version = "0.2.0" }
-composure_sync = { path = "crates/sync", version = "0.2.0" }
-composure_adapter_cloudflare = { path = "crates/adapters/cloudflare", version = "0.2.0" }
-composure_adapter_tokio = { path = "crates/adapters/tokio", version = "0.2.0" }
+composure = { path = "crates/composure", version = "0.2.3" }
+composure_macros = { path = "crates/macros", version = "0.2.1" }
+composure_commands = { path = "crates/commands", version = "0.2.1" }
+composure_sync = { path = "crates/sync", version = "0.2.1" }
+composure_adapter_cloudflare = { path = "crates/adapters/cloudflare", version = "0.2.1" }
+composure_adapter_tokio = { path = "crates/adapters/tokio", version = "0.2.1" }
 
 [profile.release]
 lto = true
