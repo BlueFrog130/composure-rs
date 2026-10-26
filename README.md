@@ -48,31 +48,31 @@ fn cookie(
 pub struct Bot;
 ```
 
-That function **is** the command. Its parameters become Discord Options (with `min`/`max`
+The function is the command. Its parameters become Discord Options (with `min`/`max`
 enforced by Discord and checked against `u8` at compile time), its doc comment the description,
 its return value the reply. Hand `Bot` to an Adapter to serve it, and to `composure_sync` to
 register it.
 
 ## Why Composure?
 
-Discord's future is [Interactions](https://discord.com/developers/docs/interactions/overview):
-commands, buttons, selects and modals that Discord delivers to your bot as signed HTTP requests.
-Composure is built for that model and nothing else.
+Composure handles [Interactions](https://discord.com/developers/docs/interactions/overview)
+only: commands, buttons, selects and modals that Discord delivers to your bot as signed HTTP
+requests.
 
-- **☁️ Serverless by design.** No WebSocket to keep alive, no process to babysit. Deploy to
+- **Serverless.** No WebSocket to keep alive, no process to babysit. Deploy to
   Cloudflare Workers and pay per request, or run it on any box with tokio.
-- **✍️ Write it once.** One function per command: the definition Discord stores and the handler
+- **Written once.** One function per command: the definition Discord stores and the handler
   that answers come from the same code, so they can never drift apart.
-- **🦀 Typed end to end.** Options arrive as `&str`, `u8`, `&User`, `Role` or your own enums.
+- **Typed end to end.** Options arrive as `&str`, `u8`, `&User`, `Role` or your own enums.
   Duplicate commands, too many Options, out-of-range bounds and bad `custom_id` prefixes fail
   to compile, not in production.
-- **🧩 Rich UIs in markup.** Build Components V2 messages and modals with JSX-like `rsx!`,
+- **Markup for messages.** Build Components V2 messages and modals with JSX-like `rsx!`,
   with click handlers right next to the buttons they belong to.
-- **💾 Stateless state.** Button and modal state rides in the `custom_id`, encoded for you. No
-  database for a counter.
-- **⚡ Tiny and fast.** A few microseconds and a few dozen allocations per Interaction; the full
-  example bot is about 344 KB of gzipped WASM. The core has no async runtime and no HTTP stack.
-- **🔋 Batteries included.** A REST client for every Discord endpoint, deferred responses with
+- **State in the `custom_id`.** Button and modal state is encoded into the `custom_id` for
+  you, so a counter needs no database.
+- **Small and fast.** A few microseconds and a few dozen allocations per Interaction; the full
+  example bot is about 307 KB of gzipped WASM. The core has no async runtime and no HTTP stack.
+- **REST and more.** A REST client for every Discord endpoint, deferred responses with
   background work, follow-ups, file uploads, Webhook Events, `tracing`, and a command
   sync CLI with CI drift checks.
 
@@ -85,7 +85,7 @@ Composure is built for that model and nothing else.
 | Reads every message | Possible (with intents) | No: Interactions and Webhook Events only |
 
 If your bot needs to watch every message or presence update, use a gateway library. If it
-responds to people, Composure does it with a fraction of the infrastructure.
+only answers people, Composure needs no gateway connection, and on Workers no server at all.
 
 ## A tour
 
@@ -115,7 +115,7 @@ pub fn Card(title: String, likes: u32) -> View {
 Clicking **Like** re-renders the message with new Props. Every Discord component has a tag,
 and every tag's attributes are [documented](https://bluefrog130.github.io/composure-rs/views.html#tag-reference).
 
-### Forms that arrive typed
+### Typed modal forms
 
 ```rust
 use composure::{Choice, Modal, modal, command::Ephemeral, types::Attachment};
@@ -140,7 +140,7 @@ fn on_feedback(form: Feedback) -> Ephemeral<String> {
 }
 ```
 
-### Slow work, answered in time
+### Slow work with `defer`
 
 ```rust
 use std::time::Duration;
@@ -157,7 +157,7 @@ fn crunch(ctx: Ctx<impl Platform>) -> Deferred {
 }
 ```
 
-### Serve it anywhere
+### Serve it
 
 ```rust
 // Cloudflare Workers
@@ -173,7 +173,7 @@ async fn main() -> Result<(), composure_adapter_tokio::Error> {
 }
 ```
 
-### Ship it
+### Sync it
 
 ```sh
 cargo run --bin sync             # show what changes on Discord, apply after confirming
@@ -231,7 +231,7 @@ Crypto signature checks), so a Worker only ships what it uses. See
 
 ## Status
 
-Composure is young and pre-1.0: the API may change between minor versions. It tracks Discord's
+Composure is pre-1.0: the API may change between minor versions. It tracks Discord's
 v10 API and its latest components (Components V2, labels, radio groups, checkboxes, file
 uploads). Issues and pull requests are welcome.
 

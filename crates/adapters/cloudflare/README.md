@@ -2,8 +2,7 @@
 
 # composure_adapter_cloudflare
 
-**Run your Discord bot on Cloudflare's edge.** Serve a [Composure](https://github.com/BlueFrog130/composure-rs)
-bot from a Cloudflare Worker: no server to run, scaled to zero between requests, and for many
+Serve a [Composure](https://github.com/BlueFrog130/composure-rs) bot from a Cloudflare Worker: no server to run, scaled to zero between requests, and for many
 bots within the Workers free plan (100,000 requests a day).
 
 [![Crates.io](https://img.shields.io/crates/v/composure_adapter_cloudflare.svg?logo=rust)](https://crates.io/crates/composure_adapter_cloudflare)
@@ -189,7 +188,7 @@ rustflags = [
 - **No one-caller inlining.** binaryen inlines every function that has one caller, whatever its size, which merges a bot into a few huge functions (the example's fetch handler was 94 KB); the first request then compiles every Command in them. Kept apart, the first request compiles only the code it runs; warm requests got faster too.
 - **No name section.** worker-build 0.8.7 keeps it for readable stack traces: 29% of the bundle, parsed on every cold start. `strip = true` in the profile also drops sections wasm-bindgen needs; these flags keep them. Panics then show `wasm-function[N]` frames. A worker-build that drops names for explicit `wasm-opt` arguments makes the flags redundant.
 
-Composure does its part: dispatch polls each Interaction kind and each handler in a function of its own (`composure::adapter::outlined`), and this adapter does the same for Webhook Events and responses with files.
+Composure's dispatch also polls each Interaction kind and each handler in a function of its own (`composure::adapter::outlined`), and this adapter does the same for Webhook Events and responses with files.
 
 On workerd ([`bench/tests/coldstart.rs`](https://github.com/BlueFrog130/composure-rs/blob/main/crates/adapters/cloudflare/bench/tests/coldstart.rs), the example bot, each step minus the same step for a JS Worker answering alike, median of 25 fresh starts):
 

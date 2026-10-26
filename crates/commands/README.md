@@ -2,7 +2,7 @@
 
 # composure_commands
 
-**A fluent builder for Discord application command definitions.**
+**A builder for Discord application command definitions.**
 
 [![Crates.io](https://img.shields.io/crates/v/composure_commands.svg?logo=rust)](https://crates.io/crates/composure_commands)
 [![Docs.rs](https://img.shields.io/docsrs/composure_commands?logo=docs.rs)](https://docs.rs/composure_commands)
@@ -15,7 +15,7 @@
 > [`composure_sync`](https://crates.io/crates/composure_sync) registers them.
 
 For everything else (commands answered by a hand-written `InteractionHandler`, or definitions
-generated from data) build them fluently:
+generated from data), build them with the builder:
 
 ```rust
 use composure::types::Snowflake;
