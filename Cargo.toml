@@ -5,6 +5,7 @@ members = [
     "crates/macros",
     "crates/commands",
     "crates/sync",
+    "crates/cargo-composure",
     "crates/adapters/cloudflare",
     "crates/adapters/cloudflare/bench",
     "crates/adapters/tokio",

@@ -7,7 +7,7 @@ compatibility_date = "2026-10-01"
 # production`, as the Worker `composure-bot`). `vars` and `kv_namespaces` are not
 # inherited from the top level, so each env lists its own.
 #
-# Secrets: `npx wrangler secret put <NAME> --env production`, and `.dev.vars` for dev:
+# Secrets: `npx wrangler secret put <NAME> --env production`, and `.env` for dev:
 # - DISCORD_PUBLIC_KEY (required), DISCORD_TOKEN (every REST call)
 # - GITHUB_TOKEN: fine-grained, read-only "Contents" on the repository; without it GitHub
 #   allows 60 requests an hour per IP, shared with every Worker on that IP

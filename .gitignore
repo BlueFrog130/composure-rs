@@ -6,3 +6,4 @@ target/
 !crates/macros/tests/ui/*.stderr
 .env
 .wrangler/
+.composure-dev.wrangler.toml

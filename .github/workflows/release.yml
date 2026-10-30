@@ -73,7 +73,7 @@ jobs:
         run: |
           metadata=$(cargo metadata --no-deps --format-version 1)
           crates=""
-          for crate in composure_macros composure composure_commands composure_sync composure_adapter_cloudflare composure_adapter_tokio; do
+          for crate in composure_macros composure composure_commands composure_sync composure_adapter_cloudflare composure_adapter_tokio cargo-composure; do
             version=$(jq -r --arg crate "$crate" '.packages[] | select(.name == $crate) | .version' <<< "$metadata")
             if git rev-parse --verify --quiet "refs/tags/$crate/v$version" > /dev/null; then
               echo "$crate $version is already released"

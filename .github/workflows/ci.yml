@@ -83,7 +83,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p composure_adapter_cloudflare -p composure_example_cloudflare -p composure_bench_cloudflare --target wasm32-unknown-unknown
-      - run: cargo check -p composure_adapter_tokio
+      - run: cargo check -p composure_adapter_tokio -p cargo-composure
 
   templates:
     name: Templates (cargo-generate)

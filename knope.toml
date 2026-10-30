@@ -57,6 +57,10 @@ versioned_files = [
 ]
 changelog = "crates/adapters/tokio/CHANGELOG.md"
 
+[packages.cargo-composure]
+versioned_files = ["crates/cargo-composure/Cargo.toml", "Cargo.lock"]
+changelog = "crates/cargo-composure/CHANGELOG.md"
+
 # `knope document-change`: write a change file for the current work
 [[workflows]]
 name = "document-change"

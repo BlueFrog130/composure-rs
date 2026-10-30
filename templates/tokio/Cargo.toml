@@ -15,3 +15,8 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
 composure = { version = "0.2", features = ["testing"] }
+
+# `cargo composure dev`: your development application and test server. Neither id is a secret
+[package.metadata.composure.dev]
+application = "{{application}}"
+guild = "{{guild}}"

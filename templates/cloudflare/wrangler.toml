@@ -3,7 +3,7 @@ main = "build/worker/shim.mjs"
 compatibility_date = "2026-10-01"
 
 # DISCORD_PUBLIC_KEY (required) and DISCORD_TOKEN (for the bot client) are secrets:
-# `npx wrangler secret put <NAME>` once deployed, `.dev.vars` for `wrangler dev`
+# `npx wrangler secret put <NAME>` once deployed, `.env` for `wrangler dev`
 
 [build]
 command = "cargo install -q worker-build@0.8.7 && worker-build --release"

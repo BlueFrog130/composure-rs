@@ -31,3 +31,8 @@ codegen-units = 1
 # keeps the first request from compiling the whole bot at once
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Oz", "--one-caller-inline-max-function-size", "0"]
+
+# `cargo composure dev`: your development application and test server. Neither id is a secret
+[package.metadata.composure.dev]
+application = "{{application}}"
+guild = "{{guild}}"

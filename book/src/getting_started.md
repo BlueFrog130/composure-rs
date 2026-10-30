@@ -185,8 +185,9 @@ It speaks plain HTTP: put it behind a TLS-terminating proxy or tunnel, and use t
 the Interactions Endpoint URL.
 
 Discord checks the URL when you save it (a signed Ping, which the Adapter answers), so the bot
-must be running first. See [Platforms](platforms.md) for State, Bot Data (your own
-configuration), platform-specific Commands and logging.
+must be running first. While you work on the bot, `cargo composure dev` takes care of that, the
+tunnel and Sync ([Local development](local_development.md)). See [Platforms](platforms.md) for
+State, Bot Data (your own configuration), platform-specific Commands and logging.
 
 ## Syncing Commands
 

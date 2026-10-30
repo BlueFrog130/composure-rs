@@ -37,3 +37,9 @@ serde_json = "1.0.154"
 # crates/adapters/cloudflare/bench/tests/coldstart.rs.
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Oz", "--one-caller-inline-max-function-size", "0"]
+
+# `cargo composure dev`: ids of the project's development application and test server
+[package.metadata.composure.dev]
+application = "1100146565504565411"
+guild = "798662131062931547"
+sync_bin = "sync-cloudflare"

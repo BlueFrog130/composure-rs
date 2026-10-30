@@ -3,7 +3,7 @@ main = "build/worker/shim.mjs"
 compatibility_date = "2026-10-01"
 
 # DISCORD_PUBLIC_KEY (required) and DISCORD_TOKEN (for REST commands) are secrets:
-# `npx wrangler secret put <NAME>`, or `.dev.vars` for `wrangler dev`
+# `npx wrangler secret put <NAME>`, or `.env` for `wrangler dev`
 
 # worker-build compiles the crate to wasm and writes the JS shim to build/worker
 [build]

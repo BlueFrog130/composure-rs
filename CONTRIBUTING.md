@@ -34,7 +34,8 @@ knope document-change
 ```
 
 Each published crate has its own version: `composure`, `composure_macros`, `composure_commands`,
-`composure_sync`, `composure_adapter_cloudflare` and `composure_adapter_tokio`. A change file names
+`composure_sync`, `composure_adapter_cloudflare`, `composure_adapter_tokio` and `cargo-composure`.
+A change file names
 the crates it changes and the kind of change for each. `knope document-change` asks for them and a
 summary, and writes a file like `.changeset/add_thread_endpoints.md`:
 

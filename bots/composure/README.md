@@ -129,13 +129,12 @@ cd bots/composure
 printf 'DISCORD_PUBLIC_KEY=...
 DISCORD_TOKEN=...
 GITHUB_TOKEN=...
-' > .dev.vars   # gitignored
-npx wrangler dev --env dev --test-scheduled   # http://127.0.0.1:8787; GET /__scheduled runs the cron
+' > .env   # gitignored
+cargo composure dev   # serves the Worker, opens a tunnel, repoints the dev application, syncs on every save
 ```
 
-Discord needs a public HTTPS URL, so expose it with a tunnel (e.g.
-`cloudflared tunnel --url http://localhost:8787`) and set it as the dev application's
-Interactions Endpoint URL. Sync the dev application's commands with its token in `.env`.
+To run the cron, serve it by hand: `npx wrangler dev --env dev --test-scheduled`, then
+`GET /__scheduled` on http://127.0.0.1:8787.
 
 ## Test
 

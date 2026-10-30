@@ -1,3 +1,13 @@
 [template]
 cargo_generate_version = ">=0.18.0"
-ignore = ["target", "build", ".wrangler", ".env", ".dev.vars", "Cargo.lock"]
+ignore = ["target", "build", ".wrangler", ".env", ".composure-dev.wrangler.toml", "Cargo.lock"]
+
+[placeholders.application]
+type = "string"
+prompt = "Development application id (for `cargo composure dev`, blank to set it later)"
+default = ""
+
+[placeholders.guild]
+type = "string"
+prompt = "Test server id (blank to set it later)"
+default = ""

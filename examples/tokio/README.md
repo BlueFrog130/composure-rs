@@ -19,11 +19,11 @@ Serves the [example bot](../bot)'s shared commands from a plain process with [`c
 ## Run locally
 
 ```sh
-cp examples/tokio/.env.example examples/tokio/.env   # fill in DISCORD_PUBLIC_KEY (and DISCORD_TOKEN for REST commands)
-cargo run -p composure_example_tokio                 # http://0.0.0.0:8080 (PORT to change)
+cp examples/tokio/.env.example examples/tokio/.env   # fill in DISCORD_PUBLIC_KEY, DISCORD_TOKEN of a development application
+cargo composure dev -p composure_example_tokio       # serves the bot, opens a tunnel, repoints the application, syncs on every save
 ```
 
-Discord needs a public HTTPS URL, so expose it with a tunnel (e.g. `cloudflared tunnel --url http://localhost:8080`) or a TLS-terminating reverse proxy, and set the application's **Interactions Endpoint URL** to it. Discord sends a signed Ping when you save; the bot must answer it for the save to succeed. For Webhook Events, set the Webhook Events URL to the same address plus `/events` and enable `Application Authorized`.
+Set your own application and test server with `--application` and `--guild`, or in `[package.metadata.composure.dev]`. See [Local development](https://bluefrog130.github.io/composure-rs/local_development.html). `cargo run -p composure_example_tokio` (http://0.0.0.0:8080, `PORT` to change) serves it on its own; Discord then needs a public HTTPS URL, from a tunnel or a TLS-terminating reverse proxy, as the application's **Interactions Endpoint URL**. For Webhook Events, set the Webhook Events URL to the same address plus `/events` and enable `Application Authorized`.
 
 Logs go to stderr through `tracing_subscriber::fmt`, filtered by `RUST_LOG` (default `info,composure=debug`): every line logged while handling an Interaction carries its `interaction` span (id, type, name, guild, user).
 

@@ -16,7 +16,7 @@ crates="composure:crates/composure composure_macros:crates/macros composure_comm
 for template in cloudflare tokio; do
     echo "::group::templates/$template"
     cargo generate --path "$root/templates/$template" --name "ci-$template" \
-        --destination "$out" --silent --vcs none
+        --destination "$out" --silent --vcs none --define application=1100146565504565411 --define guild=798662131062931547
     project="$out/ci-$template"
 
     # `name = "0.2"` and `name = { version = "0.2", .. }` become path dependencies

@@ -29,19 +29,18 @@ Worker config is `wrangler.toml`. `/note` needs a KV namespace: `npx wrangler kv
 
 ```sh
 cd examples/cloudflare
-echo "DISCORD_PUBLIC_KEY=<public key>" > .dev.vars   # gitignored
-echo "DISCORD_TOKEN=<bot token>" >> .dev.vars        # for the REST commands
-npx wrangler dev                                     # http://127.0.0.1:8787
+cp .env.example .env      # gitignored: DISCORD_PUBLIC_KEY, DISCORD_TOKEN of a development application
+cargo composure dev       # serves the Worker, opens a tunnel, repoints the application, syncs on every save
 ```
 
-Discord needs a public HTTPS URL, so expose it with a tunnel (e.g. `cloudflared tunnel --url http://localhost:8787`) and set the application's **Interactions Endpoint URL** to the tunnel URL. Discord sends a signed Ping when you save; the bot must answer it for the save to succeed.
+Set your own application and test server with `--application` and `--guild`, or in `[package.metadata.composure.dev]`. See [Local development](https://bluefrog130.github.io/composure-rs/local_development.html); `npx wrangler dev` (http://127.0.0.1:8787) still works on its own.
 
 ## Sync
 
 The `sync-cloudflare` bin publishes the shared commands plus `/note`. It loads `.env` from this directory (copy `.env.example`; variables already set in the environment win):
 
 ```sh
-cp .env.example .env   # fill in DISCORD_TOKEN, DISCORD_APPLICATION_ID, COMPOSURE_SCOPE_DEV (where /mod goes)
+cp .env.example .env   # fill in DISCORD_PUBLIC_KEY, DISCORD_TOKEN, DISCORD_APPLICATION_ID, COMPOSURE_SCOPE_DEV (where /mod goes)
 cargo run -p composure_example_cloudflare --bin sync-cloudflare -- --dry-run # show the plan
 cargo run -p composure_example_cloudflare --bin sync-cloudflare              # apply after confirming
 cargo run -p composure_example_cloudflare --bin sync-cloudflare -- --yes     # apply without asking (CI)

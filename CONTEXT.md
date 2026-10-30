@@ -137,6 +137,26 @@ _Avoid_: Handler (alone), endpoint
 How an App answers handler errors: a `fn(&HandlerError) -> InteractionResponse` set with `#[app(errors = ..)]` (at most one App in a tree), used for the initial response and for failed Background Work. Without one, errors are the ephemeral text of `HandlerError::response`. Colors are otherwise the bot's own `const`s, set where it builds messages; there is no framework palette.
 _Avoid_: Theme (removed, ADR 0015), error handler (handlers produce errors; this renders them)
 
+### Development
+
+**Dev Loop**:
+`cargo composure dev`: serving the bot, its Tunnel, Repoint, and rebuilding and dev Sync on every save.
+_Avoid_: Watch mode, hot reload (a save rebuilds and restarts the bot)
+
+**Dev Application**:
+The Discord application used for development, named in `[package.metadata.composure.dev]` apart from the token, and the only one the Dev Loop writes to.
+_Avoid_: Test bot, staging app
+
+**Tunnel**:
+A public HTTPS URL forwarding to the bot's local port, connected and ready for Repoint.
+
+**Repoint**:
+Setting the Dev Application's Interactions Endpoint URL to the Tunnel, once the bot answers through it.
+_Avoid_: Endpoint (a REST route function), update URL
+
+**dev Sync**:
+A Sync of every Command to the dev guild, on start and after each swap, through the bot's own Sync bin.
+
 ### Deployment
 
 **Sync**:

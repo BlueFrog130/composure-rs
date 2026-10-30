@@ -39,6 +39,22 @@ with Discord's JSON error code when it sent one.
 | 403, code 50001 (Missing Access) | The bot can't see the channel or isn't in the server, as with a user-installed app used in a server without the bot | Check `ctx.interaction().common.authorizing_integration_owners` before calling the bot client, or answer through `ctx.client()`, which needs no membership |
 | 429 | Rate limited for longer than the client waits (2 seconds by default) | `with_max_rate_limit_wait(..)` on the client, or do less per Interaction |
 
+## The Dev Loop
+
+`cargo composure dev` keeps running when a stage fails, and says which one:
+
+| Line | Cause | Fix |
+|---|---|---|
+| `tunnel failed: cloudflared is not installed` | cloudflared isn't on `PATH` | Install it, or set `CLOUDFLARED_PATH` |
+| `tunnel failed: no registered connection` | cloudflared can't reach Cloudflare | The line quotes cloudflared's last output; check the network |
+| `dns failed: no A record` | The tunnel's hostname wasn't published in time | Restart; Cloudflare's quick tunnels have no uptime guarantee |
+| `probe failed: no 401 from ..` | The bot didn't answer through the tunnel | The line quotes what it got. A bot that crashed at start logs why above it; a 500 usually means `DISCORD_PUBLIC_KEY` is missing |
+| `repoint failed: DISCORD_PUBLIC_KEY is not the public key of application ..` | `.env` has another application's key | Use the development application's |
+| `repoint failed: .. must answer Discord's signed PING` | Discord refused the URL twice | Check the bot's log for the Ping it received |
+| `application .. is not DISCORD_TOKEN's application` | `.env` has another application's token, or `application` is a typo | Nothing was changed. Use the development application's token |
+| `.dev.vars hides .env from the Worker` | Wrangler ignores `.env` when `.dev.vars` exists | Move its secrets to `.env` and delete it |
+| `port .. is not free` | Something else listens on the port, often a bot you started by hand | Stop it, or set `port` |
+
 ## Other surprises
 
 - **A Command doesn't show up.** Sync it; global Commands can take a moment to appear in the
